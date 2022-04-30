@@ -1,4 +1,4 @@
-use crate::relay::{Message as RelayMessage, RelayError};
+use crate::relay::{Relay, RelayError};
 use crate::types::{
     BuilderBidV1, ExecutionPayload, ProposalRequest, SignedBlindedBeaconBlock,
     ValidatorRegistrationV1,
@@ -8,16 +8,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use thiserror::Error;
-use tokio::sync::mpsc::Sender;
-use tokio::sync::oneshot;
 use tokio::time;
-
-type Relay = Sender<RelayMessage>;
 
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("no bids returned for proposal")]
     NoBidsReturned,
+    #[error("could not find relay for block")]
+    MissingProposal,
     #[error("issue with relay: {0}")]
     Relay(#[from] RelayError),
 }
@@ -26,13 +24,14 @@ pub enum Error {
 pub struct RelayMux(Arc<RelayMuxInner>);
 
 struct RelayMuxInner {
-    relays: Vec<Sender<RelayMessage>>,
+    relays: Vec<Relay>,
     state: Mutex<State>,
 }
 
 #[derive(Debug)]
 struct State {
-    outstanding_bids: HashMap<ProposalRequest, BuilderBidV1>,
+    // map from proposals to index of `Relay` in collection
+    outstanding_bids: HashMap<ProposalRequest, usize>,
 }
 
 impl RelayMux {
@@ -47,8 +46,9 @@ impl RelayMux {
         Self(Arc::new(inner))
     }
 
+    // tmp
     pub async fn run(&self) {
-        let mut interval = time::interval(Duration::from_secs(1));
+        let mut interval = time::interval(Duration::from_secs(12));
         loop {
             interval.tick().await;
             let state = self.0.state.lock().unwrap();
@@ -61,50 +61,45 @@ impl RelayMux {
         &self,
         registration: &ValidatorRegistrationV1,
     ) -> Vec<Result<(), RelayError>> {
-        let responses = join_all(self.0.relays.iter().map(|relay| async {
-            let (resp_tx, resp_rx) = oneshot::channel();
-            let msg = RelayMessage::Registration(registration.clone(), resp_tx);
-            let _ = relay.send(msg).await;
-            resp_rx.await
-        }))
-        .await;
-
-        for response in responses {
-            tracing::info!("{response:?}");
-        }
-        vec![]
+        join_all(
+            self.0
+                .relays
+                .iter()
+                .map(|relay| relay.register_validator(registration)),
+        )
+        .await
     }
 
     pub async fn fetch_best_bid(
         &self,
         proposal_request: &ProposalRequest,
-    ) -> Result<BuilderBidV1, Vec<Error>> {
-        let responses = join_all(self.0.relays.iter().map(|relay| async {
-            let (resp_tx, resp_rx) = oneshot::channel();
-            let msg = RelayMessage::FetchBid(proposal_request.clone(), resp_tx);
-            let _ = relay.send(msg).await;
-            resp_rx.await?
-        }))
+    ) -> Result<BuilderBidV1, Error> {
+        // TODO do not block on slow relays
+        let bids = join_all(
+            self.0
+                .relays
+                .iter()
+                .enumerate()
+                .map(|(i, relay)| async move { (i, relay.fetch_bid(proposal_request).await) }),
+        )
         .await;
 
-        // TODO do not block on slow relays
-        let best_bid = responses
+        let (relay_index, best_bid) = bids
             .into_iter()
-            .filter_map(|result| match result {
-                Ok(bid) => Some(bid),
+            .filter_map(|(i, bid)| match bid {
+                Ok(bid) => Some((i, bid)),
                 Err(err) => {
                     tracing::warn!("{err}");
                     None
                 }
             })
-            .max_by_key(|bid| bid.value)
-            .ok_or_else(|| vec![Error::NoBidsReturned])?;
+            .max_by_key(|(_, bid)| bid.value)
+            .ok_or_else(|| Error::NoBidsReturned)?;
 
-        // TODO track by relay
         let mut state = self.0.state.lock().unwrap();
         state
             .outstanding_bids
-            .insert(proposal_request.clone(), best_bid.clone());
+            .insert(proposal_request.clone(), relay_index);
 
         Ok(best_bid)
     }
@@ -112,9 +107,23 @@ impl RelayMux {
     pub async fn accept_bid(
         &self,
         signed_block: &SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Vec<RelayError>> {
-        // TODO: post the block
-        // TODO: return the execution payload
-        Ok(ExecutionPayload { a: 12 })
+    ) -> Result<ExecutionPayload, Error> {
+        let relay_index = {
+            let state = self.0.state.lock().unwrap();
+            let key = proposal_from(signed_block);
+            match state.outstanding_bids.get(&key) {
+                Some(relay_index) => *relay_index,
+                None => return Err(Error::MissingProposal),
+            }
+        };
+
+        let relay = &self.0.relays[relay_index];
+        Ok(relay.accept_bid(signed_block).await?)
     }
+}
+
+fn proposal_from(signed_block: &SignedBlindedBeaconBlock) -> ProposalRequest {
+    // TODO: fill out once types exist
+    // let block = &signed_block.message;
+    ProposalRequest { a: 122 }
 }

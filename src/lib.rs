@@ -35,19 +35,9 @@ impl Service {
             .iter()
             .map(|addr| Relay::new(http_client.clone(), addr))
             .collect::<Vec<_>>();
-        let relay_channels = relays
-            .iter()
-            .map(|relay| relay.channel())
-            .collect::<Vec<_>>();
-
-        let relay_mux = RelayMux::new(relay_channels);
+        let relay_mux = RelayMux::new(relays);
 
         let mut tasks = vec![];
-        for mut relay in relays.into_iter() {
-            tasks.push(tokio::spawn(async move {
-                relay.run().await;
-            }));
-        }
 
         let relay_mux_clone = relay_mux.clone();
         tasks.push(tokio::spawn(async move {

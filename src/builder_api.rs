@@ -2,17 +2,29 @@ use crate::relay_mux::RelayMux;
 use crate::types::{ProposalRequest, SignedBlindedBeaconBlock, ValidatorRegistrationV1};
 use axum::routing::post;
 use axum::{extract::Extension, Router};
-use axum_json_rpc::error::JsonRpcErrorReason;
+use axum_json_rpc::error::{JsonRpcError, JsonRpcErrorReason};
 use axum_json_rpc::{JsonRpcExtractor, JsonRpcResponse, JsonRpcResult};
+use serde_json::Value;
 use std::net::{Ipv4Addr, SocketAddr};
+use thiserror::Error;
 
+const JSON_RPC_RESPONSE_SUCCESS: &str = "OK";
+
+#[derive(Debug, Error)]
 pub enum Error {
+    #[error("server error: {0}")]
     Generic(String),
+    #[error("unknown parent hash in proposal request")]
     UnknownHash,
+    #[error("unknown validator with pubkey in proposal request")]
     UnknownValidator,
+    #[error("unknown fee recipient for proposer given in proposal request")]
     UnknownFeeRecipient,
+    #[error("block does not match the provided header")]
     UnknownBlock,
+    #[error("invalid signature")]
     InvalidSignature,
+    #[error("invalid timestamp")]
     InvalidTimestamp,
 }
 
@@ -39,7 +51,10 @@ impl From<Error> for JsonRpcErrorReason {
 
 fn handle_status(request_id: i64) -> JsonRpcResult {
     tracing::debug!("called `builder_status`");
-    Ok(JsonRpcResponse::success(request_id, "OK"))
+    Ok(JsonRpcResponse::success(
+        request_id,
+        JSON_RPC_RESPONSE_SUCCESS,
+    ))
 }
 
 async fn validate_registration(registration: &ValidatorRegistrationV1) -> Result<(), Error> {
@@ -54,16 +69,31 @@ async fn handle_validator_registration(
 ) -> JsonRpcResult {
     tracing::debug!("called `builder_registerValidatorV1` with {registration:?}");
 
-    validate_registration(registration).await;
-    // TODO return err
+    if let Err(err) = validate_registration(registration).await {
+        tracing::error!("{err:?}");
+        let err_msg = err.to_string();
+        let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
+        return Ok(JsonRpcResponse::error(request_id, rpc_error));
+    }
 
-    relay_mux.register_validator(registration).await;
-
-    // TODO: return any err to caller
-
-    // TODO: remove
-    let result = registration.a + 1;
-    Ok(JsonRpcResponse::success(request_id, result))
+    let responses = relay_mux.register_validator(registration).await;
+    let mut errors = responses
+        .into_iter()
+        .filter(|result| result.is_err())
+        .collect::<Vec<_>>();
+    if errors.is_empty() {
+        Ok(JsonRpcResponse::success(
+            request_id,
+            JSON_RPC_RESPONSE_SUCCESS,
+        ))
+    } else {
+        // TODO: how to send multiple errors?
+        let error = errors.swap_remove(0).err().unwrap();
+        let err_msg = error.to_string();
+        let error = Error::Generic(err_msg.clone());
+        let rpc_error = JsonRpcError::new(error.into(), err_msg, Value::Null);
+        Ok(JsonRpcResponse::error(request_id, rpc_error))
+    }
 }
 
 async fn handle_fetch_bid(
@@ -71,13 +101,20 @@ async fn handle_fetch_bid(
     relay_mux: RelayMux,
     proposal_request: &ProposalRequest,
 ) -> JsonRpcResult {
-    tracing::info!("called `builder_getHeaderV1` with {proposal_request:?}");
+    tracing::debug!("called `builder_getHeaderV1` with {proposal_request:?}");
 
-    let best_bid = relay_mux.fetch_best_bid(proposal_request).await.unwrap();
-    tracing::error!("{best_bid:?}");
-    // TODO: handle error
+    // TODO: any validations?
 
-    Ok(JsonRpcResponse::success(request_id, best_bid))
+    match relay_mux.fetch_best_bid(proposal_request).await {
+        Ok(bid) => Ok(JsonRpcResponse::success(request_id, bid)),
+        Err(err) => {
+            tracing::error!("{err:?}");
+            let err_msg = err.to_string();
+            let err = Error::Generic(err_msg.clone());
+            let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
+            return Ok(JsonRpcResponse::error(request_id, rpc_error));
+        }
+    }
 }
 
 async fn handle_accept_bid(
@@ -85,14 +122,20 @@ async fn handle_accept_bid(
     relay_mux: RelayMux,
     signed_block: &SignedBlindedBeaconBlock,
 ) -> JsonRpcResult {
-    tracing::info!("called `builder_getPayloadV1` with {signed_block:?}");
+    tracing::debug!("called `builder_getPayloadV1` with {signed_block:?}");
 
-    let _ = relay_mux.accept_bid(signed_block).await;
-    // TODO: return payload to caller
+    // TODO: any validations?
 
-    // TODO: remove
-    let result = signed_block.a + 1;
-    Ok(JsonRpcResponse::success(request_id, result))
+    match relay_mux.accept_bid(signed_block).await {
+        Ok(execution_payload) => Ok(JsonRpcResponse::success(request_id, execution_payload)),
+        Err(err) => {
+            tracing::error!("{err:?}");
+            let err_msg = err.to_string();
+            let err = Error::Generic(err_msg.clone());
+            let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
+            return Ok(JsonRpcResponse::error(request_id, rpc_error));
+        }
+    }
 }
 
 async fn handle_builder_api(
