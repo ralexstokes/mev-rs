@@ -1,12 +1,13 @@
+use futures::future::join_all;
 use reqwest::Client;
 use std::net::{Ipv4Addr, SocketAddr};
 
-mod json_rpc_server;
+mod builder_api;
 mod relay;
 mod relay_mux;
 mod types;
 
-use json_rpc_server::Server as JsonRpcServer;
+use builder_api::Server as BuilderApiServer;
 use relay::Relay;
 use relay_mux::RelayMux;
 
@@ -32,11 +33,32 @@ impl Service {
             .config
             .relays
             .iter()
-            .map(|addr| Relay::new(http_client.clone(), addr));
-        let mut relay_mux = RelayMux::over(relays);
-        relay_mux.connect_to_all().await;
+            .map(|addr| Relay::new(http_client.clone(), addr))
+            .collect::<Vec<_>>();
+        let relay_channels = relays
+            .iter()
+            .map(|relay| relay.channel())
+            .collect::<Vec<_>>();
 
-        let mut json_rpc_server = JsonRpcServer::new(self.config.host, self.config.port, relay_mux);
-        json_rpc_server.run().await;
+        let relay_mux = RelayMux::new(relay_channels);
+
+        let mut tasks = vec![];
+        for mut relay in relays.into_iter() {
+            tasks.push(tokio::spawn(async move {
+                relay.run().await;
+            }));
+        }
+
+        let relay_mux_clone = relay_mux.clone();
+        tasks.push(tokio::spawn(async move {
+            relay_mux.run().await;
+        }));
+
+        let mut builder_api = BuilderApiServer::new(self.config.host, self.config.port);
+        tasks.push(tokio::spawn(async move {
+            builder_api.run(relay_mux_clone).await;
+        }));
+
+        join_all(tasks).await;
     }
 }

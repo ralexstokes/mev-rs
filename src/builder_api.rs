@@ -5,7 +5,6 @@ use axum::{extract::Extension, Router};
 use axum_json_rpc::error::JsonRpcErrorReason;
 use axum_json_rpc::{JsonRpcExtractor, JsonRpcResponse, JsonRpcResult};
 use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::Arc;
 
 pub enum Error {
     Generic(String),
@@ -38,52 +37,57 @@ impl From<Error> for JsonRpcErrorReason {
     }
 }
 
-fn serve_status(request_id: i64) -> JsonRpcResult {
-    tracing::info!("called `builder_status`");
+fn handle_status(request_id: i64) -> JsonRpcResult {
+    tracing::debug!("called `builder_status`");
     Ok(JsonRpcResponse::success(request_id, "OK"))
 }
 
-async fn serve_validator_registration(
+async fn validate_registration(registration: &ValidatorRegistrationV1) -> Result<(), Error> {
+    // TODO: validations
+    Ok(())
+}
+
+async fn handle_validator_registration(
     request_id: i64,
-    relay_mux: Arc<RelayMux>,
+    relay_mux: RelayMux,
     registration: &ValidatorRegistrationV1,
 ) -> JsonRpcResult {
-    tracing::info!("called `builder_registerValidatorV1` with {registration:?}");
-    if let Err(errs) = relay_mux.register_validator(registration).await {
-        for err in errs {
-            tracing::error!("{err:?}");
-        }
-        // TODO: return err to caller
-    }
+    tracing::debug!("called `builder_registerValidatorV1` with {registration:?}");
+
+    validate_registration(registration).await;
+    // TODO return err
+
+    relay_mux.register_validator(registration).await;
+
+    // TODO: return any err to caller
 
     // TODO: remove
     let result = registration.a + 1;
     Ok(JsonRpcResponse::success(request_id, result))
 }
 
-async fn serve_header(
+async fn handle_fetch_bid(
     request_id: i64,
-    relay_mux: Arc<RelayMux>,
+    relay_mux: RelayMux,
     proposal_request: &ProposalRequest,
 ) -> JsonRpcResult {
     tracing::info!("called `builder_getHeaderV1` with {proposal_request:?}");
 
-    let _ = relay_mux.fetch_best_header(proposal_request).await;
-    // TODO: return header to caller
+    let best_bid = relay_mux.fetch_best_bid(proposal_request).await.unwrap();
+    tracing::error!("{best_bid:?}");
+    // TODO: handle error
 
-    // TODO: remove
-    let result = proposal_request.a + 1;
-    Ok(JsonRpcResponse::success(request_id, result))
+    Ok(JsonRpcResponse::success(request_id, best_bid))
 }
 
-async fn serve_payload(
+async fn handle_accept_bid(
     request_id: i64,
-    relay_mux: Arc<RelayMux>,
+    relay_mux: RelayMux,
     signed_block: &SignedBlindedBeaconBlock,
 ) -> JsonRpcResult {
     tracing::info!("called `builder_getPayloadV1` with {signed_block:?}");
 
-    let _ = relay_mux.post_block(signed_block).await;
+    let _ = relay_mux.accept_bid(signed_block).await;
     // TODO: return payload to caller
 
     // TODO: remove
@@ -91,24 +95,24 @@ async fn serve_payload(
     Ok(JsonRpcResponse::success(request_id, result))
 }
 
-async fn serve_builder_api(
+async fn handle_builder_api(
     request: JsonRpcExtractor,
-    Extension(relay_mux): Extension<Arc<RelayMux>>,
+    Extension(relay_mux): Extension<RelayMux>,
 ) -> JsonRpcResult {
     let request_id = request.get_request_id();
     match request.method() {
-        "builder_status" => serve_status(request_id),
+        "builder_status" => handle_status(request_id),
         "builder_registerValidatorV1" => {
             let params: ValidatorRegistrationV1 = request.parse_params()?;
-            serve_validator_registration(request_id, relay_mux, &params).await
+            handle_validator_registration(request_id, relay_mux, &params).await
         }
         "builder_getHeaderV1" => {
             let params: ProposalRequest = request.parse_params()?;
-            serve_header(request_id, relay_mux, &params).await
+            handle_fetch_bid(request_id, relay_mux, &params).await
         }
         "builder_getPayloadV1" => {
             let params: SignedBlindedBeaconBlock = request.parse_params()?;
-            serve_payload(request_id, relay_mux, &params).await
+            handle_accept_bid(request_id, relay_mux, &params).await
         }
         method => Ok(request.method_not_found(method)),
     }
@@ -117,27 +121,22 @@ async fn serve_builder_api(
 pub struct Server {
     host: Ipv4Addr,
     port: u16,
-    relay_mux: Arc<RelayMux>,
 }
 
 impl Server {
-    pub fn new(host: Ipv4Addr, port: u16, relay_mux: RelayMux) -> Self {
-        Self {
-            host,
-            port,
-            relay_mux: Arc::new(relay_mux),
-        }
+    pub fn new(host: Ipv4Addr, port: u16) -> Self {
+        Self { host, port }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&mut self, relay_mux: RelayMux) {
         let router = Router::new()
-            .route("/", post(serve_builder_api))
-            .layer(Extension(self.relay_mux.clone()));
+            .route("/", post(handle_builder_api))
+            .layer(Extension(relay_mux));
         let addr = SocketAddr::from((self.host, self.port));
-        let json_rpc_server = axum::Server::bind(&addr).serve(router.into_make_service());
+        let json_rpc_handler = axum::Server::bind(&addr).serve(router.into_make_service());
 
         tracing::debug!("listening...");
-        if let Err(err) = json_rpc_server.await {
+        if let Err(err) = json_rpc_handler.await {
             tracing::error!("error while listening for incoming: {err}")
         }
     }

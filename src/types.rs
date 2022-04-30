@@ -1,12 +1,13 @@
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize)]
 pub struct ValidatorRegistrationV1 {
     pub a: i64,
     // feeRecipient: Bytes20,
     // timestamp: u64,
+    // gasLimit: u64,
     // pubkey: BLSPubkey,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
 pub struct ProposalRequest {
     pub a: i64,
     // slot: Slot,
@@ -14,9 +15,9 @@ pub struct ProposalRequest {
     // parentHash: Hash,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct BuilderBidV1 {
-    pub a: i64,
+    pub value: u64,
     // header: ExecutionPayloadHeader,
     // value: U256,
     // pubkey: BLSPubkey,
