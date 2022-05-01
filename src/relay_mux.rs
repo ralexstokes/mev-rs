@@ -59,13 +59,13 @@ impl RelayMux {
     pub async fn register_validator(
         &self,
         registration: &ValidatorRegistrationV1,
-    ) -> Vec<Result<(), RelayError>> {
-        join_all(
-            self.0
-                .relays
-                .iter()
-                .map(|relay| relay.register_validator(registration)),
-        )
+    ) -> Vec<Result<(), Error>> {
+        join_all(self.0.relays.iter().map(|relay| async {
+            relay
+                .register_validator(registration)
+                .await
+                .map_err(Into::into)
+        }))
         .await
     }
 

@@ -1,4 +1,3 @@
-use crate::relay::RelayError;
 use crate::relay_mux::{Error as RelayMuxError, RelayMux};
 use crate::types::{
     BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
@@ -56,12 +55,6 @@ impl From<Error> for JsonRpcError {
     fn from(err: Error) -> Self {
         let err_msg = err.to_string();
         JsonRpcError::new(err.into(), err_msg, Value::Null)
-    }
-}
-
-impl From<RelayError> for Error {
-    fn from(err: RelayError) -> Self {
-        Self::Generic(err.to_string())
     }
 }
 
