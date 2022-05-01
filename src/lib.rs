@@ -11,6 +11,7 @@ use builder_api::Server as BuilderApiServer;
 use relay::Relay;
 use relay_mux::RelayMux;
 
+#[derive(Debug)]
 pub struct ServiceConfig {
     pub host: Ipv4Addr,
     pub port: u16,
