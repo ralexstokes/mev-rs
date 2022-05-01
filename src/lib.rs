@@ -1,5 +1,5 @@
-mod builder_api;
-mod relay;
+mod builder_api_client;
+mod builder_api_server;
 mod relay_mux;
 mod service;
 mod types;

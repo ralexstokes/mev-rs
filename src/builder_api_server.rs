@@ -10,7 +10,7 @@ use serde_json::Value;
 use std::net::{Ipv4Addr, SocketAddr};
 use thiserror::Error;
 
-const JSON_RPC_RESPONSE_SUCCESS: &str = "OK";
+pub(crate) const JSON_RPC_RESPONSE_SUCCESS: &str = "OK";
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -225,7 +225,7 @@ impl Server {
         let addr = SocketAddr::from((self.host, self.port));
         let json_rpc_handler = axum::Server::bind(&addr).serve(router.into_make_service());
 
-        tracing::info!("listening...");
+        tracing::info!("listening at {addr}...");
         if let Err(err) = json_rpc_handler.await {
             tracing::error!("error while listening for incoming: {err}")
         }

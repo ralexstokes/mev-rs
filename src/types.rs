@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ValidatorRegistrationV1 {
     pub a: i64,
     // feeRecipient: Bytes20,
@@ -7,7 +7,7 @@ pub struct ValidatorRegistrationV1 {
     // pubkey: BLSPubkey,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct BidRequest {
     pub a: i64,
     // slot: Slot,
@@ -15,7 +15,7 @@ pub struct BidRequest {
     // parentHash: Hash,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct BuilderBidV1 {
     pub value: u64,
     // header: ExecutionPayloadHeader,
@@ -23,14 +23,14 @@ pub struct BuilderBidV1 {
     // pubkey: BLSPubkey,
 }
 
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct SignedBlindedBeaconBlock {
     pub a: i64,
     // message: BlindedBeaconBlock,
     // signature: BLSSignature,
 }
 
-#[derive(Debug, serde::Serialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct ExecutionPayload {
     pub a: i64,
     // ...

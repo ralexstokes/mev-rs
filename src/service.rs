@@ -1,8 +1,7 @@
-use crate::builder_api::Server as BuilderApiServer;
-use crate::relay::Relay;
+use crate::builder_api_client::Client as Relay;
+use crate::builder_api_server::Server as ApiServer;
 use crate::relay_mux::RelayMux;
 use futures::future::join_all;
-use reqwest::Client;
 use std::net::{Ipv4Addr, SocketAddr};
 
 #[derive(Debug)]
@@ -22,13 +21,11 @@ impl Service {
     }
 
     pub async fn run(&mut self) {
-        let http_client = Client::new();
-
         let relays = self
             .config
             .relays
             .iter()
-            .map(|addr| Relay::new(http_client.clone(), addr))
+            .map(|addr| Relay::new(addr))
             .collect::<Vec<_>>();
         let relay_mux = RelayMux::new(relays);
 
@@ -39,7 +36,7 @@ impl Service {
             relay_mux.run().await;
         }));
 
-        let mut builder_api = BuilderApiServer::new(self.config.host, self.config.port);
+        let mut builder_api = ApiServer::new(self.config.host, self.config.port);
         tasks.push(tokio::spawn(async move {
             builder_api.run(relay_mux_clone).await;
         }));
