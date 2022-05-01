@@ -38,7 +38,7 @@ async fn main() {
         port: args.port,
         relays: args
             .relays
-            .split(",")
+            .split(',')
             .filter_map(|relay| {
                 relay
                     .parse()

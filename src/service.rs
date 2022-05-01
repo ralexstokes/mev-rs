@@ -25,7 +25,7 @@ impl Service {
             .config
             .relays
             .iter()
-            .map(|addr| Relay::new(addr))
+            .map(Relay::new)
             .collect::<Vec<_>>();
         let relay_mux = RelayMux::new(relays);
 

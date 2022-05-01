@@ -41,6 +41,7 @@ impl RelayMux {
         };
         Self(Arc::new(inner))
     }
+
     pub async fn run(&self) {
         // TODO purge expired state if a bid fails for some reason
         // - requires consensus clock...
@@ -86,7 +87,7 @@ impl RelayMux {
                 }
             })
             .max_by_key(|(_, bid)| bid.value)
-            .ok_or_else(|| Error::NoBidsReturned)?;
+            .ok_or(Error::NoBidsReturned)?;
 
         let mut state = self.0.state.lock().unwrap();
         state

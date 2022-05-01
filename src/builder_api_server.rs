@@ -180,7 +180,7 @@ async fn handle_accept_bid(
         Err(err) => {
             tracing::error!("{err:?}");
             let err: Error = err.into();
-            return Ok(JsonRpcResponse::error(request_id, err.into()));
+            Ok(JsonRpcResponse::error(request_id, err.into()))
         }
     }
 }
