@@ -1,5 +1,8 @@
-use crate::relay_mux::RelayMux;
-use crate::types::{ProposalRequest, SignedBlindedBeaconBlock, ValidatorRegistrationV1};
+use crate::relay::RelayError;
+use crate::relay_mux::{Error as RelayMuxError, RelayMux};
+use crate::types::{
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
+};
 use axum::routing::post;
 use axum::{extract::Extension, Router};
 use axum_json_rpc::error::{JsonRpcError, JsonRpcErrorReason};
@@ -49,6 +52,25 @@ impl From<Error> for JsonRpcErrorReason {
     }
 }
 
+impl From<Error> for JsonRpcError {
+    fn from(err: Error) -> Self {
+        let err_msg = err.to_string();
+        JsonRpcError::new(err.into(), err_msg, Value::Null)
+    }
+}
+
+impl From<RelayError> for Error {
+    fn from(err: RelayError) -> Self {
+        Self::Generic(err.to_string())
+    }
+}
+
+impl From<RelayMuxError> for Error {
+    fn from(err: RelayMuxError) -> Self {
+        Self::Generic(err.to_string())
+    }
+}
+
 fn handle_status(request_id: i64) -> JsonRpcResult {
     tracing::debug!("called `builder_status`");
     Ok(JsonRpcResponse::success(
@@ -71,9 +93,7 @@ async fn handle_validator_registration(
 
     if let Err(err) = validate_registration(registration).await {
         tracing::error!("{err:?}");
-        let err_msg = err.to_string();
-        let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
-        return Ok(JsonRpcResponse::error(request_id, rpc_error));
+        return Ok(JsonRpcResponse::error(request_id, err.into()));
     }
 
     let responses = relay_mux.register_validator(registration).await;
@@ -89,32 +109,58 @@ async fn handle_validator_registration(
     } else {
         // TODO: how to send multiple errors?
         let error = errors.swap_remove(0).err().unwrap();
-        let err_msg = error.to_string();
-        let error = Error::Generic(err_msg.clone());
-        let rpc_error = JsonRpcError::new(error.into(), err_msg, Value::Null);
-        Ok(JsonRpcResponse::error(request_id, rpc_error))
+        let err: Error = error.into();
+        Ok(JsonRpcResponse::error(request_id, err.into()))
     }
+}
+
+async fn validate_bid_request(bid_request: &BidRequest) -> Result<(), Error> {
+    // TODO validations
+    Ok(())
+}
+
+async fn validate_bid(bid: &BuilderBidV1) -> Result<(), Error> {
+    // TODO validations
+    Ok(())
 }
 
 async fn handle_fetch_bid(
     request_id: i64,
     relay_mux: RelayMux,
-    proposal_request: &ProposalRequest,
+    bid_request: &BidRequest,
 ) -> JsonRpcResult {
-    tracing::debug!("called `builder_getHeaderV1` with {proposal_request:?}");
+    tracing::debug!("called `builder_getHeaderV1` with {bid_request:?}");
 
-    // TODO: any validations?
+    if let Err(err) = validate_bid_request(bid_request).await {
+        tracing::error!("{err:?}");
+        return Ok(JsonRpcResponse::error(request_id, err.into()));
+    }
 
-    match relay_mux.fetch_best_bid(proposal_request).await {
-        Ok(bid) => Ok(JsonRpcResponse::success(request_id, bid)),
+    match relay_mux.fetch_best_bid(bid_request).await {
+        Ok(bid) => {
+            if let Err(err) = validate_bid(&bid).await {
+                tracing::error!("{err:?}");
+                Ok(JsonRpcResponse::error(request_id, err.into()))
+            } else {
+                Ok(JsonRpcResponse::success(request_id, bid))
+            }
+        }
         Err(err) => {
             tracing::error!("{err:?}");
-            let err_msg = err.to_string();
-            let err = Error::Generic(err_msg.clone());
-            let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
-            return Ok(JsonRpcResponse::error(request_id, rpc_error));
+            let err: Error = err.into();
+            Ok(JsonRpcResponse::error(request_id, err.into()))
         }
     }
+}
+
+async fn validate_signed_block(signed_block: &SignedBlindedBeaconBlock) -> Result<(), Error> {
+    // TODO validations
+    Ok(())
+}
+
+async fn validate_execution_payload(execution_payload: &ExecutionPayload) -> Result<(), Error> {
+    // TODO validations
+    Ok(())
 }
 
 async fn handle_accept_bid(
@@ -124,16 +170,24 @@ async fn handle_accept_bid(
 ) -> JsonRpcResult {
     tracing::debug!("called `builder_getPayloadV1` with {signed_block:?}");
 
-    // TODO: any validations?
+    if let Err(err) = validate_signed_block(signed_block).await {
+        tracing::error!("{err:?}");
+        return Ok(JsonRpcResponse::error(request_id, err.into()));
+    }
 
     match relay_mux.accept_bid(signed_block).await {
-        Ok(execution_payload) => Ok(JsonRpcResponse::success(request_id, execution_payload)),
+        Ok(execution_payload) => {
+            if let Err(err) = validate_execution_payload(&execution_payload).await {
+                tracing::error!("{err:?}");
+                Ok(JsonRpcResponse::error(request_id, err.into()))
+            } else {
+                Ok(JsonRpcResponse::success(request_id, execution_payload))
+            }
+        }
         Err(err) => {
             tracing::error!("{err:?}");
-            let err_msg = err.to_string();
-            let err = Error::Generic(err_msg.clone());
-            let rpc_error = JsonRpcError::new(err.into(), err_msg, Value::Null);
-            return Ok(JsonRpcResponse::error(request_id, rpc_error));
+            let err: Error = err.into();
+            return Ok(JsonRpcResponse::error(request_id, err.into()));
         }
     }
 }
@@ -150,7 +204,7 @@ async fn handle_builder_api(
             handle_validator_registration(request_id, relay_mux, &params).await
         }
         "builder_getHeaderV1" => {
-            let params: ProposalRequest = request.parse_params()?;
+            let params: BidRequest = request.parse_params()?;
             handle_fetch_bid(request_id, relay_mux, &params).await
         }
         "builder_getPayloadV1" => {
@@ -178,7 +232,7 @@ impl Server {
         let addr = SocketAddr::from((self.host, self.port));
         let json_rpc_handler = axum::Server::bind(&addr).serve(router.into_make_service());
 
-        tracing::debug!("listening...");
+        tracing::info!("listening...");
         if let Err(err) = json_rpc_handler.await {
             tracing::error!("error while listening for incoming: {err}")
         }

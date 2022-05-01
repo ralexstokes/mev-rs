@@ -1,6 +1,5 @@
 use crate::types::{
-    BuilderBidV1, ExecutionPayload, ProposalRequest, SignedBlindedBeaconBlock,
-    ValidatorRegistrationV1,
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
 };
 use reqwest::{Client, Error, StatusCode};
 use std::net::SocketAddr;
@@ -25,7 +24,7 @@ pub enum RelayError {
 //         oneshot::Sender<Result<(), RelayError>>,
 //     ),
 //     FetchBid(
-//         ProposalRequest,
+//         BidRequest,
 //         oneshot::Sender<Result<BuilderBidV1, RelayError>>,
 //     ),
 // }
@@ -81,7 +80,7 @@ impl Relay {
 
     pub async fn fetch_bid(
         &self,
-        proposal_request: &ProposalRequest,
+        proposal_request: &BidRequest,
     ) -> Result<BuilderBidV1, RelayError> {
         Ok(BuilderBidV1 { value: 12 })
     }

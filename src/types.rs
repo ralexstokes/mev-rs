@@ -8,7 +8,7 @@ pub struct ValidatorRegistrationV1 {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize)]
-pub struct ProposalRequest {
+pub struct BidRequest {
     pub a: i64,
     // slot: Slot,
     // pubkey: BLSPubkey,

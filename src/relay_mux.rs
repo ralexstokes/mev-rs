@@ -1,7 +1,6 @@
 use crate::relay::{Relay, RelayError};
 use crate::types::{
-    BuilderBidV1, ExecutionPayload, ProposalRequest, SignedBlindedBeaconBlock,
-    ValidatorRegistrationV1,
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
 };
 use futures::future::join_all;
 use std::collections::HashMap;
@@ -31,7 +30,7 @@ struct RelayMuxInner {
 #[derive(Debug)]
 struct State {
     // map from proposals to index of `Relay` in collection
-    outstanding_bids: HashMap<ProposalRequest, usize>,
+    outstanding_bids: HashMap<BidRequest, usize>,
 }
 
 impl RelayMux {
@@ -72,7 +71,7 @@ impl RelayMux {
 
     pub async fn fetch_best_bid(
         &self,
-        proposal_request: &ProposalRequest,
+        proposal_request: &BidRequest,
     ) -> Result<BuilderBidV1, Error> {
         // TODO do not block on slow relays
         let bids = join_all(
@@ -122,8 +121,8 @@ impl RelayMux {
     }
 }
 
-fn proposal_from(signed_block: &SignedBlindedBeaconBlock) -> ProposalRequest {
+fn proposal_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
     // TODO: fill out once types exist
     // let block = &signed_block.message;
-    ProposalRequest { a: 122 }
+    BidRequest { a: 122 }
 }
