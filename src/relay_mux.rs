@@ -116,7 +116,14 @@ impl RelayMux {
 }
 
 fn bid_request_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
-    // TODO: fill out once types exist
-    // let block = &signed_block.message;
-    BidRequest { a: 122 }
+    let block = &signed_block.message;
+
+    // TODO: index -> pubkey
+    let pubkey = Default::default();
+
+    BidRequest {
+        slot: block.slot,
+        pubkey,
+        parentHash: block.body.execution_payload_header.parent_hash,
+    }
 }
