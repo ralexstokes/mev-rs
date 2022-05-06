@@ -119,11 +119,11 @@ fn bid_request_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
     let block = &signed_block.message;
 
     // TODO: index -> pubkey
-    let pubkey = Default::default();
+    let public_key = Default::default();
 
     BidRequest {
         slot: block.slot,
-        pubkey,
-        parentHash: block.body.execution_payload_header.parent_hash.clone(),
+        public_key,
+        parent_hash: block.body.execution_payload_header.parent_hash.clone(),
     }
 }

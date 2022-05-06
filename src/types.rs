@@ -6,12 +6,12 @@ use ssz_rs::prelude::*;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct ValidatorRegistrationV1 {
-    pub feeRecipient: ExecutionAddress,
+    pub fee_recipient: ExecutionAddress,
     #[serde(with = "crate::serde::as_string")]
-    pub gasLimit: u64,
+    pub gas_limit: u64,
     #[serde(with = "crate::serde::as_string")]
     pub timestamp: u64,
-    pub pubkey: BlsPublicKey,
+    pub public_key: BlsPublicKey,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -24,15 +24,15 @@ pub struct SignedValidatorRegistration {
 pub struct BidRequest {
     #[serde(with = "crate::serde::as_string")]
     pub slot: Slot,
-    pub pubkey: BlsPublicKey,
-    pub parentHash: Hash32,
+    pub public_key: BlsPublicKey,
+    pub parent_hash: Hash32,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct BuilderBidV1 {
     pub header: ExecutionPayloadHeader,
     pub value: U256,
-    pub pubkey: BlsPublicKey,
+    pub public_key: BlsPublicKey,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
