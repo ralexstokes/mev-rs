@@ -77,6 +77,7 @@ impl RelayMux {
         )
         .await;
 
+        // TODO allow for multiple relays to serve same bid
         let (relay_index, best_bid) = bids
             .into_iter()
             .filter_map(|(i, bid)| match bid {

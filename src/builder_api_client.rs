@@ -15,6 +15,7 @@ pub enum Error {
     JsonRpcError(#[from] HttpClientError),
 }
 
+// TODO write as `beacon-api-client` with "extension" methods
 pub struct Client {
     client: HttpClient,
 }
