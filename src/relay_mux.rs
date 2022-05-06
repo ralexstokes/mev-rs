@@ -86,7 +86,7 @@ impl RelayMux {
                     None
                 }
             })
-            .max_by_key(|(_, bid)| bid.value)
+            .max_by_key(|(_, bid)| bid.value.clone())
             .ok_or(Error::NoBidsReturned)?;
 
         let mut state = self.0.state.lock().unwrap();
@@ -124,6 +124,6 @@ fn bid_request_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
     BidRequest {
         slot: block.slot,
         pubkey,
-        parentHash: block.body.execution_payload_header.parent_hash,
+        parentHash: block.body.execution_payload_header.parent_hash.clone(),
     }
 }
