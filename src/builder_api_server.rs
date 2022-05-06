@@ -1,6 +1,7 @@
 use crate::relay_mux::{Error as RelayMuxError, RelayMux};
 use crate::types::{
-    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock,
+    SignedValidatorRegistration,
 };
 use axum::routing::post;
 use axum::{extract::Extension, Router};
@@ -72,7 +73,7 @@ fn handle_status(request_id: i64) -> JsonRpcResult {
     ))
 }
 
-async fn validate_registration(_registration: &ValidatorRegistrationV1) -> Result<(), Error> {
+async fn validate_registration(_registration: &SignedValidatorRegistration) -> Result<(), Error> {
     // TODO: validations
     Ok(())
 }
@@ -80,7 +81,7 @@ async fn validate_registration(_registration: &ValidatorRegistrationV1) -> Resul
 async fn handle_validator_registration(
     request_id: i64,
     relay_mux: RelayMux,
-    registration: &ValidatorRegistrationV1,
+    registration: &SignedValidatorRegistration,
 ) -> JsonRpcResult {
     tracing::debug!("called `builder_registerValidatorV1` with {registration:?}");
 
@@ -193,7 +194,7 @@ async fn handle_builder_api(
     match request.method() {
         "builder_status" => handle_status(request_id),
         "builder_registerValidatorV1" => {
-            let params: ValidatorRegistrationV1 = request.parse_params()?;
+            let params: SignedValidatorRegistration = request.parse_params()?;
             handle_validator_registration(request_id, relay_mux, &params).await
         }
         "builder_getHeaderV1" => {

@@ -279,9 +279,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "3.1.16"
+version = "3.1.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f52d4f8e4a1419219935762e32913b4430f37cb0c0200ad17a89ee18c0188a9f"
+checksum = "47582c09be7c8b32c0ab3a6181825ababb713fde6fff20fc573a3870dd45c6a0"
 dependencies = [
  "atty",
  "bitflags",
@@ -673,7 +673,7 @@ dependencies = [
 [[package]]
 name = "ethereum_consensus"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum_consensus#189e77f92c8759162749dfc9573fa5bff7f9c552"
+source = "git+https://github.com/ralexstokes/ethereum_consensus#8ba5a19244eabc44899ec3f7a69b1e6c9771fd6d"
 dependencies = [
  "blst",
  "enr",

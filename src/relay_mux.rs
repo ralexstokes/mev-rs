@@ -1,6 +1,7 @@
 use crate::builder_api_client::{Client as Relay, Error as RelayError};
 use crate::types::{
-    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock,
+    SignedValidatorRegistration,
 };
 use futures::future::join_all;
 use std::collections::HashMap;
@@ -55,7 +56,7 @@ impl RelayMux {
 
     pub async fn register_validator(
         &self,
-        registration: &ValidatorRegistrationV1,
+        registration: &SignedValidatorRegistration,
     ) -> Vec<Result<(), Error>> {
         join_all(self.0.relays.iter().map(|relay| async {
             relay

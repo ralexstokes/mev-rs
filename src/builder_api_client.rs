@@ -1,6 +1,7 @@
 use crate::builder_api_server::JSON_RPC_RESPONSE_SUCCESS;
 use crate::types::{
-    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
+    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock,
+    SignedValidatorRegistration,
 };
 use ethers_providers::{Http as HttpClient, HttpClientError, JsonRpcClient};
 use std::net::SocketAddr;
@@ -30,7 +31,7 @@ impl Client {
 
     pub async fn register_validator(
         &self,
-        registration: &ValidatorRegistrationV1,
+        registration: &SignedValidatorRegistration,
     ) -> Result<(), Error> {
         let response = self
             .client
