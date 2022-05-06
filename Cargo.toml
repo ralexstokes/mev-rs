@@ -1,5 +1,5 @@
 [package]
-name = "mev_boost_rs"
+name = "mev-boost-rs"
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"

@@ -1,4 +1,4 @@
-# mev_boost_rs 🚀
+# mev-boost-rs 🚀
 
 A gateway for validators to connect to a network of block builders.
 
