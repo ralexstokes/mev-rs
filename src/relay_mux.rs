@@ -49,7 +49,7 @@ impl RelayMux {
         loop {
             interval.tick().await;
             let state = self.0.state.lock().unwrap();
-            dbg!(state);
+            std::mem::drop(dbg!(state));
         }
     }
 

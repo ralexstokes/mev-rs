@@ -72,7 +72,7 @@ fn handle_status(request_id: i64) -> JsonRpcResult {
     ))
 }
 
-async fn validate_registration(registration: &ValidatorRegistrationV1) -> Result<(), Error> {
+async fn validate_registration(_registration: &ValidatorRegistrationV1) -> Result<(), Error> {
     // TODO: validations
     Ok(())
 }
@@ -107,12 +107,12 @@ async fn handle_validator_registration(
     }
 }
 
-async fn validate_bid_request(bid_request: &BidRequest) -> Result<(), Error> {
+async fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
     // TODO validations
     Ok(())
 }
 
-async fn validate_bid(bid: &BuilderBidV1) -> Result<(), Error> {
+async fn validate_bid(_bid: &BuilderBidV1) -> Result<(), Error> {
     // TODO validations
     Ok(())
 }
@@ -146,12 +146,12 @@ async fn handle_fetch_bid(
     }
 }
 
-async fn validate_signed_block(signed_block: &SignedBlindedBeaconBlock) -> Result<(), Error> {
+async fn validate_signed_block(_signed_block: &SignedBlindedBeaconBlock) -> Result<(), Error> {
     // TODO validations
     Ok(())
 }
 
-async fn validate_execution_payload(execution_payload: &ExecutionPayload) -> Result<(), Error> {
+async fn validate_execution_payload(_execution_payload: &ExecutionPayload) -> Result<(), Error> {
     // TODO validations
     Ok(())
 }
