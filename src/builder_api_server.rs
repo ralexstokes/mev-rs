@@ -10,7 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
     Router,
 };
-use beacon_api_client::{ApiError, ConsensusVersion, VersionedValue};
+use beacon_api_client::{ApiError, ConsensusVersion, Error as BeaconApiError, VersionedValue};
 use std::net::{Ipv4Addr, SocketAddr};
 use thiserror::Error;
 
@@ -36,21 +36,27 @@ pub enum Error {
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
-        let status = match self {
+        let message = self.to_string();
+        let code = match self {
             Self::UnknownHash => StatusCode::BAD_REQUEST,
             Self::UnknownValidator => StatusCode::BAD_REQUEST,
             Self::UnknownFeeRecipient => StatusCode::BAD_REQUEST,
             Self::UnknownBlock => StatusCode::BAD_REQUEST,
             Self::InvalidSignature => StatusCode::BAD_REQUEST,
             Self::InvalidTimestamp => StatusCode::BAD_REQUEST,
-            Self::Relay(_) => StatusCode::BAD_REQUEST,
+            Self::Relay(err) => match err {
+                RelayMuxError::Relay(BeaconApiError::Api(ApiError { code, .. })) => {
+                    StatusCode::from_u16(code).expect("constructed safely")
+                }
+                _ => StatusCode::BAD_REQUEST,
+            },
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (
-            status,
+            code,
             Json(ApiError {
-                code: status.as_u16(),
-                message: self.to_string(),
+                code: code.as_u16(),
+                message,
             }),
         )
             .into_response()
