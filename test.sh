@@ -16,10 +16,10 @@ curl --write-out %{http_code} -s -X POST -d '
 }' -H "Content-Type: application/json"  http://localhost:18550/eth/v1/builder/validators | jq .
 echo ""
 echo "> fetching bid"
-curl -s -H "Content-Type: application/json" http://localhost:18550/eth/v1/builder/header/3752095/0x3030303030303030303030303030303030303030303030303030303030303030/0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 | jq .
+curl --write-out %{http_code} -s -H "Content-Type: application/json" http://localhost:18550/eth/v1/builder/header/3752095/0x3030303030303030303030303030303030303030303030303030303030303030/0xc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 | jq .
 echo ""
 echo "> accepting bid"
-curl -s -X POST -d '
+curl --write-out %{http_code} -s -X POST -d '
 {
    "message":{
       "slot":"0",
