@@ -6,7 +6,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 
 const DEFAULT_HOST: Ipv4Addr = Ipv4Addr::LOCALHOST;
 const DEFAULT_PORT: u16 = 18550;
-const DEFAULT_RELAY_URL: &str = "127.0.0.1:8080";
+const DEFAULT_RELAY_URL: &str = "http://127.0.0.1:8081";
 
 #[derive(Parser, Debug)]
 #[clap(version, about, long_about=None)]

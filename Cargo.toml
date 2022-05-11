@@ -14,8 +14,6 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures = "0.3.21"
 
 axum = "0.5.4"
-axum-json-rpc = { git = "https://github.com/ralexstokes/axum-json-rpc" }
-ethers-providers = "0.6.2"
 url = { version = "2.2.2", default-features = false }
 
 serde = { version = "1.0", features = ["derive"] }
@@ -27,6 +25,7 @@ clap = { version = "3.1.14", features = ["derive"] }
 
 ethereum_consensus = { git = "https://github.com/ralexstokes/ethereum_consensus" }
 ssz_rs = { git = "https://github.com/ralexstokes/ssz_rs" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
 [[bin]]
 name = "main"

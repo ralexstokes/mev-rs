@@ -1,14 +1,16 @@
-use crate::builder_api_client::Client as Relay;
 use crate::builder_api_server::Server as ApiServer;
+use crate::relay::Relay;
 use crate::relay_mux::RelayMux;
+use beacon_api_client::Client;
 use futures::future::join_all;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::net::Ipv4Addr;
+use url::Url;
 
 #[derive(Debug)]
 pub struct ServiceConfig {
     pub host: Ipv4Addr,
     pub port: u16,
-    pub relays: Vec<SocketAddr>,
+    pub relays: Vec<Url>,
 }
 
 pub struct Service {
@@ -25,7 +27,8 @@ impl Service {
             .config
             .relays
             .iter()
-            .map(Relay::new)
+            .cloned()
+            .map(|endpoint| Relay::new(Client::new(endpoint)))
             .collect::<Vec<_>>();
         let relay_mux = RelayMux::new(relays);
 

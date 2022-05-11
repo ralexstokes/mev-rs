@@ -1,7 +1,9 @@
-use crate::builder_api_client::{Client as Relay, Error as RelayError};
+use crate::relay::Relay;
 use crate::types::{
-    BidRequest, BuilderBidV1, ExecutionPayload, SignedBlindedBeaconBlock, ValidatorRegistrationV1,
+    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration,
 };
+use beacon_api_client::Error as ApiError;
 use futures::future::join_all;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -15,8 +17,10 @@ pub enum Error {
     NoBidsReturned,
     #[error("could not find relay with outstanding bid to accept")]
     MissingOpenBid,
+    #[error("could not register with any relay")]
+    CouldNotRegister,
     #[error("issue with relay: {0}")]
-    Relay(#[from] RelayError),
+    Relay(#[from] ApiError),
 }
 
 #[derive(Clone)]
@@ -55,18 +59,37 @@ impl RelayMux {
 
     pub async fn register_validator(
         &self,
-        registration: &ValidatorRegistrationV1,
-    ) -> Vec<Result<(), Error>> {
-        join_all(self.0.relays.iter().map(|relay| async {
+        registration: &SignedValidatorRegistration,
+    ) -> Result<(), Error> {
+        let responses = join_all(self.0.relays.iter().map(|relay| async {
             relay
                 .register_validator(registration)
                 .await
-                .map_err(Into::into)
+                .map_err(Error::from)
         }))
-        .await
+        .await;
+
+        let mut failures = vec![];
+        let mut some_success = false;
+        for response in responses {
+            if let Err(err) = response {
+                failures.push(err);
+            } else {
+                some_success = true;
+            }
+        }
+        // TODO save failures to retry later
+        if some_success {
+            Ok(())
+        } else {
+            Err(Error::CouldNotRegister)
+        }
     }
 
-    pub async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<BuilderBidV1, Error> {
+    pub async fn fetch_best_bid(
+        &self,
+        bid_request: &BidRequest,
+    ) -> Result<SignedBuilderBid, Error> {
         // TODO do not block on slow relays
         let bids = join_all(
             self.0
@@ -87,7 +110,7 @@ impl RelayMux {
                     None
                 }
             })
-            .max_by_key(|(_, bid)| bid.value.clone())
+            .max_by_key(|(_, bid)| bid.message.value.clone())
             .ok_or(Error::NoBidsReturned)?;
 
         let mut state = self.0.state.lock().unwrap();
