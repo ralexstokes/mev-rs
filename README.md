@@ -7,3 +7,7 @@ A gateway for validators to connect to a network of block builders.
 This project is currently experimental and subject to frequent changes as we are still working on stabilizing the builder specs.
 
 It has not been audited for security purposes and should not be used in production yet.
+
+# Status
+
+Implements `v0.0.0` of the [`builder-specs`](https://github.com/ethereum/builder-specs)
