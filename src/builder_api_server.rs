@@ -166,10 +166,10 @@ impl Server {
             .route("/eth/v1/builder/blinded_blocks", post(handle_accept_bid))
             .layer(Extension(relay_mux));
         let addr = SocketAddr::from((self.host, self.port));
-        let json_rpc_handler = axum::Server::bind(&addr).serve(router.into_make_service());
+        let server = axum::Server::bind(&addr).serve(router.into_make_service());
 
         tracing::info!("listening at {addr}...");
-        if let Err(err) = json_rpc_handler.await {
+        if let Err(err) = server.await {
             tracing::error!("error while listening for incoming: {err}")
         }
     }
