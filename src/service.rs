@@ -13,6 +13,16 @@ pub struct ServiceConfig {
     pub relays: Vec<Url>,
 }
 
+impl Default for ServiceConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".parse().unwrap(),
+            port: 18550,
+            relays: vec![],
+        }
+    }
+}
+
 pub struct Service {
     config: ServiceConfig,
 }
