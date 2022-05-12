@@ -27,5 +27,8 @@ ethereum_consensus = { git = "https://github.com/ralexstokes/ethereum_consensus"
 ssz_rs = { git = "https://github.com/ralexstokes/ssz_rs" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
+[dev-dependencies]
+rand = "0.8.5"
+
 [[bin]]
 name = "main"

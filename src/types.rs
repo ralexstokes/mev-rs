@@ -5,7 +5,7 @@ pub(crate) use ethereum_consensus::builder::SignedValidatorRegistration;
 pub(crate) use ethereum_consensus::primitives::BlsPublicKey;
 use ethereum_consensus::primitives::BlsSignature;
 pub(crate) use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
-use ssz_rs::prelude::*;
+pub(crate) use ssz_rs::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct BidRequest {

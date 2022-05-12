@@ -152,7 +152,7 @@ impl Server {
         Self { host, port }
     }
 
-    pub async fn run(&mut self, relay_mux: RelayMux) {
+    pub async fn run(&self, relay_mux: RelayMux) {
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
             .route(

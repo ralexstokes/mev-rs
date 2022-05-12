@@ -1,7 +1,7 @@
 use crate::relay::Relay;
 use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+    BidRequest, ExecutionPayload, Hash32, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration, Slot,
 };
 use beacon_api_client::Error as ApiError;
 use futures::future::join_all;
@@ -34,7 +34,7 @@ struct RelayMuxInner {
 #[derive(Debug, Default)]
 struct State {
     // map from bid requests to index of `Relay` in collection
-    outstanding_bids: HashMap<BidRequest, usize>,
+    outstanding_bids: HashMap<(Slot, Hash32), usize>,
 }
 
 impl RelayMux {
@@ -114,9 +114,8 @@ impl RelayMux {
             .ok_or(Error::NoBidsReturned)?;
 
         let mut state = self.0.state.lock().unwrap();
-        state
-            .outstanding_bids
-            .insert(bid_request.clone(), relay_index);
+        let key = (bid_request.slot, bid_request.parent_hash.clone());
+        state.outstanding_bids.insert(key, relay_index);
 
         Ok(best_bid)
     }
@@ -127,7 +126,7 @@ impl RelayMux {
     ) -> Result<ExecutionPayload, Error> {
         let relay_index = {
             let mut state = self.0.state.lock().unwrap();
-            let key = bid_request_from(signed_block);
+            let key = bid_key_from(signed_block);
             match state.outstanding_bids.remove(&key) {
                 Some(relay_index) => relay_index,
                 None => return Err(Error::MissingOpenBid),
@@ -139,15 +138,11 @@ impl RelayMux {
     }
 }
 
-fn bid_request_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
+fn bid_key_from(signed_block: &SignedBlindedBeaconBlock) -> (Slot, Hash32) {
     let block = &signed_block.message;
 
-    // TODO: index -> pubkey
-    let public_key = Default::default();
-
-    BidRequest {
-        slot: block.slot,
-        public_key,
-        parent_hash: block.body.execution_payload_header.parent_hash.clone(),
-    }
+    (
+        block.slot,
+        block.body.execution_payload_header.parent_hash.clone(),
+    )
 }

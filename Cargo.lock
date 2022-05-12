@@ -551,7 +551,7 @@ dependencies = [
 [[package]]
 name = "ethereum_consensus"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum_consensus#3e3623bb85372bd6c8d23a33c1c6733fd6e2cdda"
+source = "git+https://github.com/ralexstokes/ethereum_consensus#d444f7eff22ba6f96abeb86ca140fd3b91705178"
 dependencies = [
  "blst",
  "enr",
@@ -1204,6 +1204,7 @@ dependencies = [
  "clap",
  "ethereum_consensus",
  "futures",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "ssz_rs",

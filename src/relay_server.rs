@@ -1,6 +1,7 @@
 use crate::types::{
-    BidRequest, BlsPublicKey, ExecutionAddress, ExecutionPayload, SignedBlindedBeaconBlock,
-    SignedBuilderBid, SignedValidatorRegistration,
+    BidRequest, BlsPublicKey, BuilderBid, ExecutionAddress, ExecutionPayload,
+    ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration, U256,
 };
 use axum::routing::{get, post};
 use axum::{
@@ -91,7 +92,6 @@ async fn handle_validator_registration(
     Extension(state): Extension<Arc<Mutex<State>>>,
 ) -> Result<(), Error> {
     tracing::debug!("processing registration {registration:?}");
-    println!("{registration:?}");
 
     validate_registration(&registration).await?;
 
@@ -102,7 +102,8 @@ async fn handle_validator_registration(
         registration.fee_recipient.clone(),
     );
 
-    dbg!(state);
+    tracing::debug!("{:?}", state);
+
     Ok(())
 }
 
@@ -114,13 +115,34 @@ async fn handle_fetch_bid(
 
     validate_bid_request(&bid_request).await?;
 
-    // TODO assemble bid
-    let bid = SignedBuilderBid::default();
+    let public_key = &bid_request.public_key;
+
+    let state = state.lock().unwrap();
+    let fee_recipient = state
+        .fee_recipients
+        .get(public_key)
+        .ok_or(Error::UnknownValidator)?;
+
+    let bid = BuilderBid {
+        header: ExecutionPayloadHeader {
+            parent_hash: bid_request.parent_hash.clone(),
+            fee_recipient: fee_recipient.clone(),
+            ..Default::default()
+        },
+        value: U256::from_bytes_le([1u8; 32]),
+        public_key: Default::default(),
+    };
+
+    let signed_bid = SignedBuilderBid {
+        message: bid,
+        ..Default::default()
+    };
+
     // TODO validate?
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
-        data: bid,
+        data: signed_bid,
     }))
 }
 
@@ -132,8 +154,14 @@ async fn handle_accept_bid(
 
     validate_signed_block(&block).await?;
 
-    // TODO return full payload
-    let payload = ExecutionPayload::default();
+    let block = &block.message;
+    let header = &block.body.execution_payload_header;
+
+    let payload = ExecutionPayload {
+        parent_hash: header.parent_hash.clone(),
+        fee_recipient: header.fee_recipient.clone(),
+        ..Default::default()
+    };
 
     validate_execution_payload(&payload).await?;
 
@@ -163,7 +191,7 @@ impl Server {
         }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&self) {
         let state = self.state.clone();
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
