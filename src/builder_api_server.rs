@@ -10,9 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
     Router,
 };
-use beacon_api_client::{
-    ApiError, ApiResult, ConsensusVersion, Error as BeaconApiError, VersionedValue,
-};
+use beacon_api_client::{ApiError, ConsensusVersion, Error as BeaconApiError, VersionedValue};
 use std::net::{Ipv4Addr, SocketAddr};
 use thiserror::Error;
 
@@ -111,7 +109,7 @@ async fn handle_validator_registration(
 async fn handle_fetch_bid(
     Path(bid_request): Path<BidRequest>,
     Extension(relay_mux): Extension<RelayMux>,
-) -> Result<Json<ApiResult<VersionedValue<SignedBuilderBid>>>, Error> {
+) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     tracing::debug!("fetching best bid for block for request {bid_request:?}");
 
     validate_bid_request(&bid_request).await?;
@@ -120,16 +118,16 @@ async fn handle_fetch_bid(
 
     validate_bid(&bid).await?;
 
-    Ok(Json(ApiResult::Ok(VersionedValue {
+    Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
         data: bid,
-    })))
+    }))
 }
 
 async fn handle_accept_bid(
     Json(block): Json<SignedBlindedBeaconBlock>,
     Extension(relay_mux): Extension<RelayMux>,
-) -> Result<Json<ApiResult<VersionedValue<ExecutionPayload>>>, Error> {
+) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
     tracing::debug!("accepting bid for block {block:?}");
 
     validate_signed_block(&block).await?;
@@ -138,10 +136,10 @@ async fn handle_accept_bid(
 
     validate_execution_payload(&payload).await?;
 
-    Ok(Json(ApiResult::Ok(VersionedValue {
+    Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
         data: payload,
-    })))
+    }))
 }
 
 pub struct Server {
