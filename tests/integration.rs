@@ -11,7 +11,6 @@ use mev_boost_rs::{
 };
 use rand;
 use rand::seq::SliceRandom;
-use tokio::time::{self, Duration};
 use url::Url;
 
 fn setup_logging() {
@@ -20,7 +19,7 @@ fn setup_logging() {
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "debug".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "error".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -29,7 +28,7 @@ fn setup_logging() {
 struct Proposer {
     index: usize,
     validator: Validator,
-    signing_key: SecretKey,
+    _signing_key: SecretKey,
     fee_recipient: ExecutionAddress,
 }
 
@@ -47,7 +46,7 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             Proposer {
                 index: i,
                 validator,
-                signing_key,
+                _signing_key: signing_key,
                 fee_recipient,
             }
         })
@@ -56,7 +55,7 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
 
 #[tokio::test]
 async fn test_end_to_end() {
-    // setup_logging();
+    setup_logging();
 
     // start upstream relay
     let relay = Relay::new("127.0.0.1".parse().unwrap(), 8080);
