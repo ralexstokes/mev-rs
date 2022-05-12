@@ -50,6 +50,6 @@ async fn main() {
             })
             .collect(),
     };
-    let mut service = Service::from(config);
+    let service = Service::from(config);
     service.run().await;
 }

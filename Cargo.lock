@@ -126,7 +126,7 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/beacon-api-client#7445971a3301d5bebed8e9d0da0e5985a94f9dbc"
+source = "git+https://github.com/ralexstokes/beacon-api-client#3f8e5a47b13888d3fc0f66cc817d9ef881c621d0"
 dependencies = [
  "ethereum_consensus",
  "reqwest",
@@ -551,7 +551,7 @@ dependencies = [
 [[package]]
 name = "ethereum_consensus"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum_consensus#3e3623bb85372bd6c8d23a33c1c6733fd6e2cdda"
+source = "git+https://github.com/ralexstokes/ethereum_consensus#d444f7eff22ba6f96abeb86ca140fd3b91705178"
 dependencies = [
  "blst",
  "enr",
@@ -1204,6 +1204,7 @@ dependencies = [
  "clap",
  "ethereum_consensus",
  "futures",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "ssz_rs",

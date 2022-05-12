@@ -13,6 +13,16 @@ pub struct ServiceConfig {
     pub relays: Vec<Url>,
 }
 
+impl Default for ServiceConfig {
+    fn default() -> Self {
+        Self {
+            host: "127.0.0.1".parse().unwrap(),
+            port: 18550,
+            relays: vec![],
+        }
+    }
+}
+
 pub struct Service {
     config: ServiceConfig,
 }
@@ -22,7 +32,7 @@ impl Service {
         Self { config }
     }
 
-    pub async fn run(&mut self) {
+    pub async fn run(&self) {
         let relays = self
             .config
             .relays
@@ -39,7 +49,7 @@ impl Service {
             relay_mux.run().await;
         }));
 
-        let mut builder_api = ApiServer::new(self.config.host, self.config.port);
+        let builder_api = ApiServer::new(self.config.host, self.config.port);
         tasks.push(tokio::spawn(async move {
             builder_api.run(relay_mux_clone).await;
         }));
