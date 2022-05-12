@@ -53,7 +53,7 @@ impl RelayMux {
         loop {
             interval.tick().await;
             let state = self.0.state.lock().unwrap();
-            std::mem::drop(dbg!(state));
+            tracing::info!("{:?}", state);
         }
     }
 
