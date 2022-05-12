@@ -7,7 +7,7 @@ use ethereum_consensus::primitives::BlsSignature;
 pub(crate) use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
 use ssz_rs::prelude::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub struct BidRequest {
     #[serde(with = "crate::serde::as_string")]
     pub slot: Slot,
