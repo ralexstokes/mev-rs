@@ -52,26 +52,67 @@ impl IntoResponse for Error {
 
 async fn validate_registration(_registration: &SignedValidatorRegistration) -> Result<(), Error> {
     // TODO validations
+
+    // track timestamps
+    // -- must be greater than previous successful announcement
+    // -- if more than 10 seconds in future, error
+
+    // pubkey is active or in entry queue
+    // -- `is_eligible_for_activation` || `is_active_validator`
+
+    // verify signature
     Ok(())
 }
 
 async fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
     // TODO validations
+
+    // verify slot is timely
+
+    // verify parent_hash is on a chain tip
+
+    // verify public_key is one of the possible proposers
+
     Ok(())
 }
 
 async fn validate_bid(_bid: &SignedBuilderBid) -> Result<(), Error> {
     // TODO validations
+
+    // verify builder signature
+
+    // OPTIONAL:
+    // verify payload header
+    // -- parent_hash matches
+    // -- fee recip matches, maybe
+    // -- prev_randao matches
+    // -- block_number matches
+    // -- gas_limit is valid
+    // -- timestamp is valid
+    // -- base_fee_per_gas makes sense
+
     Ok(())
 }
 
 async fn validate_signed_block(_signed_block: &SignedBlindedBeaconBlock) -> Result<(), Error> {
     // TODO validations
+
+    // verify signature
+
+    // OPTIONAL:
+    // verify slot is timely
+    // verify proposer_index is correct
+    // verify parent_root matches
+    // verify payload header matches the one we sent out
     Ok(())
 }
 
 async fn validate_execution_payload(_execution_payload: &ExecutionPayload) -> Result<(), Error> {
     // TODO validations
+
+    // optional ish
+    // verify root matches root of corresponding header that was accepted
+
     Ok(())
 }
 
