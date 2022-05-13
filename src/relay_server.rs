@@ -46,14 +46,7 @@ impl IntoResponse for Error {
             Self::InvalidTimestamp => StatusCode::BAD_REQUEST,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        (
-            code,
-            Json(ApiError {
-                code: code.as_u16(),
-                message,
-            }),
-        )
-            .into_response()
+        (code, Json(ApiError { code, message })).into_response()
     }
 }
 

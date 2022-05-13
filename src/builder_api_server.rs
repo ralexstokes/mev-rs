@@ -45,21 +45,14 @@ impl IntoResponse for Error {
             Self::InvalidSignature => StatusCode::BAD_REQUEST,
             Self::InvalidTimestamp => StatusCode::BAD_REQUEST,
             Self::Relay(err) => match err {
-                RelayMuxError::Relay(BeaconApiError::Api(ApiError { code, .. })) => {
-                    StatusCode::from_u16(code).expect("constructed safely")
+                RelayMuxError::Relay(BeaconApiError::Api(api_err)) => {
+                    return (api_err.code, Json(api_err)).into_response();
                 }
                 _ => StatusCode::BAD_REQUEST,
             },
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        (
-            code,
-            Json(ApiError {
-                code: code.as_u16(),
-                message,
-            }),
-        )
-            .into_response()
+        (code, Json(ApiError { code, message })).into_response()
     }
 }
 
