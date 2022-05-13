@@ -3,11 +3,11 @@ use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use axum::routing::{get, post};
 use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
+    routing::{get, post},
     Router,
 };
 use beacon_api_client::{ApiError, ConsensusVersion, Error as BeaconApiError, VersionedValue};
