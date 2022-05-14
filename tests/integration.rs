@@ -7,7 +7,8 @@ use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::phase0::mainnet::Validator;
 use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
 use mev_boost_rs::{
-    relay_server::Server as Relay, BidRequest, Relay as RelayClient, Service, ServiceConfig,
+    builder::Builder, builder_api_server::Server as ApiServer, relay_server::Relay, BidRequest,
+    Relay as RelayClient, Service, ServiceConfig,
 };
 use rand;
 use rand::seq::SliceRandom;
@@ -58,8 +59,9 @@ async fn test_end_to_end() {
     setup_logging();
 
     // start upstream relay
-    let relay = Relay::new("127.0.0.1".parse().unwrap(), 8080);
-    tokio::spawn(async move { relay.run().await });
+    let relay = Relay::default();
+    let relay_server = ApiServer::new("127.0.0.1".parse().unwrap(), 8080, relay);
+    tokio::spawn(async move { relay_server.run().await });
 
     // start mux server
     let mut config = ServiceConfig::default();
@@ -117,7 +119,7 @@ async fn propose_block(beacon_node: &RelayClient, proposer: &Proposer, shuffling
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.pubkey.clone(),
     };
-    let signed_bid = beacon_node.fetch_bid(&request).await.unwrap();
+    let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
     let bid = &signed_bid.message;
     assert_eq!(bid.header.parent_hash, parent_hash);
 
@@ -139,7 +141,7 @@ async fn propose_block(beacon_node: &RelayClient, proposer: &Proposer, shuffling
 
     beacon_node.check_status().await.unwrap();
 
-    let payload = beacon_node.accept_bid(&signed_block).await.unwrap();
+    let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
     assert_eq!(payload.parent_hash, parent_hash);
     assert_eq!(payload.fee_recipient, proposer.fee_recipient);
