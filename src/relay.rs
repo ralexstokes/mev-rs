@@ -1,8 +1,21 @@
+use crate::builder::{Builder, Error as BuilderError};
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use beacon_api_client::{Client as BeaconApiClient, Error, VersionedValue};
+use async_trait::async_trait;
+use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, VersionedValue};
+
+pub type Error = beacon_api_client::Error;
+
+impl From<Error> for BuilderError {
+    fn from(err: Error) -> BuilderError {
+        match err {
+            Error::Api(err) => err.into(),
+            err => BuilderError::Internal(err.to_string()),
+        }
+    }
+}
 
 pub struct Relay {
     api: BeaconApiClient,
@@ -14,27 +27,29 @@ impl Relay {
     }
 
     pub async fn check_status(&self) -> Result<(), Error> {
-        let _ = self
-            .api
-            .http_get("/eth/v1/builder/status")
-            .await?
-            .error_for_status()?;
-        Ok(())
+        let response = self.api.http_get("/eth/v1/builder/status").await?;
+        api_error_or_ok(response).await
     }
+}
 
-    pub async fn register_validator(
+#[async_trait]
+impl Builder for Relay {
+    async fn register_validator(
         &self,
         registration: &SignedValidatorRegistration,
-    ) -> Result<(), Error> {
-        let _ = self
+    ) -> Result<(), BuilderError> {
+        let response = self
             .api
             .http_post("/eth/v1/builder/validators", registration)
-            .await?
-            .error_for_status()?;
-        Ok(())
+            .await?;
+        let result = api_error_or_ok(response).await?;
+        Ok(result)
     }
 
-    pub async fn fetch_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
+    async fn fetch_best_bid(
+        &self,
+        bid_request: &BidRequest,
+    ) -> Result<SignedBuilderBid, BuilderError> {
         let target = format!(
             "/eth/v1/builder/header/{}/{}/{}",
             bid_request.slot, bid_request.parent_hash, bid_request.public_key
@@ -43,10 +58,10 @@ impl Relay {
         Ok(response.data)
     }
 
-    pub async fn accept_bid(
+    async fn open_bid(
         &self,
         signed_block: &SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<ExecutionPayload, BuilderError> {
         let response: VersionedValue<ExecutionPayload> = self
             .api
             .post("/eth/v1/builder/blinded_blocks", signed_block)

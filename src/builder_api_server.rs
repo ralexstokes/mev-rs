@@ -1,91 +1,27 @@
-use crate::relay_mux::{Error as RelayMuxError, RelayMux};
+use crate::builder::{Builder, Error};
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use axum::routing::{get, post};
 use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
+    routing::{get, post},
     Router,
 };
-use beacon_api_client::{ApiError, ConsensusVersion, Error as BeaconApiError, VersionedValue};
+use beacon_api_client::{ApiError, ConsensusVersion, VersionedValue};
 use std::net::{Ipv4Addr, SocketAddr};
-use thiserror::Error;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("unknown parent hash in proposal request")]
-    UnknownHash,
-    #[error("unknown validator with pubkey in proposal request")]
-    UnknownValidator,
-    #[error("unknown fee recipient for proposer given in proposal request")]
-    UnknownFeeRecipient,
-    #[error("block does not match the provided header")]
-    UnknownBlock,
-    #[error("invalid signature")]
-    InvalidSignature,
-    #[error("invalid timestamp")]
-    InvalidTimestamp,
-    #[error("issue with relay mux: {0}")]
-    Relay(#[from] RelayMuxError),
-    #[error("internal server error")]
-    Internal,
-}
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let message = self.to_string();
         let code = match self {
-            Self::UnknownHash => StatusCode::BAD_REQUEST,
-            Self::UnknownValidator => StatusCode::BAD_REQUEST,
-            Self::UnknownFeeRecipient => StatusCode::BAD_REQUEST,
-            Self::UnknownBlock => StatusCode::BAD_REQUEST,
-            Self::InvalidSignature => StatusCode::BAD_REQUEST,
-            Self::InvalidTimestamp => StatusCode::BAD_REQUEST,
-            Self::Relay(err) => match err {
-                RelayMuxError::Relay(BeaconApiError::Api(ApiError { code, .. })) => {
-                    StatusCode::from_u16(code).expect("constructed safely")
-                }
-                _ => StatusCode::BAD_REQUEST,
-            },
-            Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(..) => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::BAD_REQUEST,
         };
-        (
-            code,
-            Json(ApiError {
-                code: code.as_u16(),
-                message,
-            }),
-        )
-            .into_response()
+        (code, Json(ApiError { code, message })).into_response()
     }
-}
-
-async fn validate_registration(_registration: &SignedValidatorRegistration) -> Result<(), Error> {
-    // TODO validations
-    Ok(())
-}
-
-async fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
-    // TODO validations
-    Ok(())
-}
-
-async fn validate_bid(_bid: &SignedBuilderBid) -> Result<(), Error> {
-    // TODO validations
-    Ok(())
-}
-
-async fn validate_signed_block(_signed_block: &SignedBlindedBeaconBlock) -> Result<(), Error> {
-    // TODO validations
-    Ok(())
-}
-
-async fn validate_execution_payload(_execution_payload: &ExecutionPayload) -> Result<(), Error> {
-    // TODO validations
-    Ok(())
 }
 
 async fn handle_status_check() -> impl IntoResponse {
@@ -93,48 +29,39 @@ async fn handle_status_check() -> impl IntoResponse {
     StatusCode::OK
 }
 
-async fn handle_validator_registration(
+async fn handle_validator_registration<B: Builder>(
     Json(registration): Json<SignedValidatorRegistration>,
-    Extension(relay_mux): Extension<RelayMux>,
+    Extension(builder): Extension<B>,
 ) -> Result<(), Error> {
     tracing::debug!("processing registration {registration:?}");
 
-    validate_registration(&registration).await?;
-
-    relay_mux.register_validator(&registration).await?;
-
-    Ok(())
+    builder
+        .register_validator(&registration)
+        .await
+        .map_err(From::from)
 }
 
-async fn handle_fetch_bid(
+async fn handle_fetch_bid<B: Builder>(
     Path(bid_request): Path<BidRequest>,
-    Extension(relay_mux): Extension<RelayMux>,
+    Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     tracing::debug!("fetching best bid for block for request {bid_request:?}");
 
-    validate_bid_request(&bid_request).await?;
-
-    let bid = relay_mux.fetch_best_bid(&bid_request).await?;
-
-    validate_bid(&bid).await?;
+    let signed_bid = builder.fetch_best_bid(&bid_request).await?;
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
-        data: bid,
+        data: signed_bid,
     }))
 }
 
-async fn handle_accept_bid(
+async fn handle_open_bid<B: Builder>(
     Json(block): Json<SignedBlindedBeaconBlock>,
-    Extension(relay_mux): Extension<RelayMux>,
+    Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
-    tracing::debug!("accepting bid for block {block:?}");
+    tracing::debug!("opening bid for block {block:?}");
 
-    validate_signed_block(&block).await?;
-
-    let payload = relay_mux.accept_bid(&block).await?;
-
-    validate_execution_payload(&payload).await?;
+    let payload = builder.open_bid(&block).await?;
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
@@ -142,33 +69,38 @@ async fn handle_accept_bid(
     }))
 }
 
-pub struct Server {
+pub struct Server<B: Builder> {
     host: Ipv4Addr,
     port: u16,
+    builder: B,
 }
 
-impl Server {
-    pub fn new(host: Ipv4Addr, port: u16) -> Self {
-        Self { host, port }
+impl<B: Builder + Clone + Send + Sync + 'static> Server<B> {
+    pub fn new(host: Ipv4Addr, port: u16, builder: B) -> Self {
+        Self {
+            host,
+            port,
+            builder,
+        }
     }
 
-    pub async fn run(&self, relay_mux: RelayMux) {
+    pub async fn run(&self) {
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
             .route(
                 "/eth/v1/builder/validators",
-                post(handle_validator_registration),
+                post(handle_validator_registration::<B>),
             )
             .route(
                 "/eth/v1/builder/header/:slot/:parent_hash/:public_key",
-                get(handle_fetch_bid),
+                get(handle_fetch_bid::<B>),
             )
-            .route("/eth/v1/builder/blinded_blocks", post(handle_accept_bid))
-            .layer(Extension(relay_mux));
+            .route("/eth/v1/builder/blinded_blocks", post(handle_open_bid::<B>))
+            .layer(Extension(self.builder.clone()));
         let addr = SocketAddr::from((self.host, self.port));
         let server = axum::Server::bind(&addr).serve(router.into_make_service());
 
-        tracing::info!("listening at {addr}...");
+        tracing::info!("relay server listening at {addr}...");
         if let Err(err) = server.await {
             tracing::error!("error while listening for incoming: {err}")
         }

@@ -38,20 +38,19 @@ impl Service {
             .relays
             .iter()
             .cloned()
-            .map(|endpoint| Relay::new(Client::new(endpoint)))
-            .collect::<Vec<_>>();
+            .map(|endpoint| Relay::new(Client::new(endpoint)));
         let relay_mux = RelayMux::new(relays);
 
         let mut tasks = vec![];
 
         let relay_mux_clone = relay_mux.clone();
         tasks.push(tokio::spawn(async move {
-            relay_mux.run().await;
+            relay_mux_clone.run().await;
         }));
 
-        let builder_api = ApiServer::new(self.config.host, self.config.port);
+        let builder_api = ApiServer::new(self.config.host, self.config.port, relay_mux);
         tasks.push(tokio::spawn(async move {
-            builder_api.run(relay_mux_clone).await;
+            builder_api.run().await;
         }));
 
         join_all(tasks).await;

@@ -1,4 +1,5 @@
-mod builder_api_server;
+pub mod builder;
+pub mod builder_api_server;
 mod relay;
 mod relay_mux;
 mod serde;

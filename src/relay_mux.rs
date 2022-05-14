@@ -1,8 +1,10 @@
-use crate::relay::Relay;
+use crate::builder::{Builder, Error as BuilderError};
+use crate::relay::{Error as RelayError, Relay};
 use crate::types::{
     BidRequest, ExecutionPayload, Hash32, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration, Slot,
 };
+use async_trait::async_trait;
 use beacon_api_client::Error as ApiError;
 use futures::future::join_all;
 use std::collections::HashMap;
@@ -19,14 +21,63 @@ pub enum Error {
     MissingOpenBid,
     #[error("could not register with any relay")]
     CouldNotRegister,
-    #[error("issue with relay: {0}")]
-    Relay(#[from] ApiError),
+    #[error("{0}")]
+    Relay(#[from] RelayError),
+}
+
+impl From<Error> for BuilderError {
+    fn from(err: Error) -> Self {
+        match err {
+            Error::NoBidsReturned => Self::Custom(err.to_string()),
+            Error::MissingOpenBid => Self::Custom(err.to_string()),
+            Error::CouldNotRegister => Self::Custom(err.to_string()),
+            Error::Relay(err) => match err {
+                ApiError::Api(err) => Self::Api(err),
+                err => Self::Internal(err.to_string()),
+            },
+        }
+    }
+}
+
+async fn validate_bid(_bid: &SignedBuilderBid) -> Result<(), Error> {
+    // TODO validations
+
+    // verify builder signature
+
+    // OPTIONAL:
+    // verify payload header
+    // -- parent_hash matches
+    // -- fee recip matches, maybe
+    // -- prev_randao matches
+    // -- block_number matches
+    // -- gas_limit is valid
+    // -- timestamp is valid
+    // -- base_fee_per_gas makes sense
+
+    Ok(())
+}
+
+async fn validate_execution_payload(_execution_payload: &ExecutionPayload) -> Result<(), Error> {
+    // TODO validations
+
+    // optional ish
+    // verify root matches root of corresponding header that was accepted
+
+    Ok(())
 }
 
 #[derive(Clone)]
 pub struct RelayMux(Arc<RelayMuxInner>);
 
-struct RelayMuxInner {
+impl std::ops::Deref for RelayMux {
+    type Target = RelayMuxInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct RelayMuxInner {
     relays: Vec<Relay>,
     state: Mutex<State>,
 }
@@ -38,9 +89,9 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(relays: Vec<Relay>) -> Self {
+    pub fn new(relays: impl Iterator<Item = Relay>) -> Self {
         let inner = RelayMuxInner {
-            relays,
+            relays: relays.collect(),
             state: Default::default(),
         };
         Self(Arc::new(inner))
@@ -56,17 +107,19 @@ impl RelayMux {
             tracing::info!("{:?}", state);
         }
     }
+}
 
-    pub async fn register_validator(
+#[async_trait]
+impl Builder for RelayMux {
+    async fn register_validator(
         &self,
         registration: &SignedValidatorRegistration,
-    ) -> Result<(), Error> {
-        let responses = join_all(self.0.relays.iter().map(|relay| async {
-            relay
-                .register_validator(registration)
-                .await
-                .map_err(Error::from)
-        }))
+    ) -> Result<(), BuilderError> {
+        let responses = join_all(
+            self.relays
+                .iter()
+                .map(|relay| async { relay.register_validator(registration).await }),
+        )
         .await;
 
         let mut failures = vec![];
@@ -82,21 +135,21 @@ impl RelayMux {
         if some_success {
             Ok(())
         } else {
-            Err(Error::CouldNotRegister)
+            Err(Error::CouldNotRegister.into())
         }
     }
 
-    pub async fn fetch_best_bid(
+    async fn fetch_best_bid(
         &self,
         bid_request: &BidRequest,
-    ) -> Result<SignedBuilderBid, Error> {
+    ) -> Result<SignedBuilderBid, BuilderError> {
         // TODO do not block on slow relays
+        // TODO validate higher up the stack?
         let bids = join_all(
-            self.0
-                .relays
+            self.relays
                 .iter()
                 .enumerate()
-                .map(|(i, relay)| async move { (i, relay.fetch_bid(bid_request).await) }),
+                .map(|(i, relay)| async move { (i, relay.fetch_best_bid(bid_request).await) }),
         )
         .await;
 
@@ -113,28 +166,34 @@ impl RelayMux {
             .max_by_key(|(_, bid)| bid.message.value.clone())
             .ok_or(Error::NoBidsReturned)?;
 
-        let mut state = self.0.state.lock().unwrap();
+        validate_bid(&best_bid).await?;
+
+        let mut state = self.state.lock().unwrap();
         let key = (bid_request.slot, bid_request.parent_hash.clone());
         state.outstanding_bids.insert(key, relay_index);
 
         Ok(best_bid)
     }
 
-    pub async fn accept_bid(
+    async fn open_bid(
         &self,
         signed_block: &SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<ExecutionPayload, BuilderError> {
         let relay_index = {
-            let mut state = self.0.state.lock().unwrap();
+            let mut state = self.state.lock().unwrap();
             let key = bid_key_from(signed_block);
             match state.outstanding_bids.remove(&key) {
                 Some(relay_index) => relay_index,
-                None => return Err(Error::MissingOpenBid),
+                None => return Err(Error::MissingOpenBid.into()),
             }
         };
 
-        let relay = &self.0.relays[relay_index];
-        Ok(relay.accept_bid(signed_block).await?)
+        let relay = &self.relays[relay_index];
+        let payload = relay.open_bid(signed_block).await?;
+
+        validate_execution_payload(&payload).await?;
+
+        Ok(payload)
     }
 }
 
