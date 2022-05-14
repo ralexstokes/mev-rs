@@ -6,10 +6,9 @@ use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistra
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::phase0::mainnet::Validator;
 use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
-use mev_boost_rs::{
-    builder::Builder, builder_api_server::Server as ApiServer, relay_server::Relay, BidRequest,
-    Relay as RelayClient, Service, ServiceConfig,
-};
+use mev_boost_rs::{Service, ServiceConfig};
+use mev_build_rs::{ApiServer, BidRequest, Builder};
+use mev_relay_rs::{Client as RelayClient, Relay};
 use rand;
 use rand::seq::SliceRandom;
 use url::Url;

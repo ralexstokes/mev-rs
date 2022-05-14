@@ -1,0 +1,19 @@
+[package]
+name = "mev-relay-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.60.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1.53"
+thiserror = "1.0.30"
+http = "0.2.7"
+
+ethereum_consensus = { git = "https://github.com/ralexstokes/ethereum_consensus" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
+ssz_rs = { git = "https://github.com/ralexstokes/ssz_rs" }
+
+mev-build-rs = { path = "../mev-build-rs"}

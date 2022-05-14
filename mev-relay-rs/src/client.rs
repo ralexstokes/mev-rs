@@ -1,27 +1,17 @@
-use crate::builder::{Builder, Error as BuilderError};
-use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
-};
 use async_trait::async_trait;
 use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, VersionedValue};
+use mev_build_rs::{
+    BidRequest, Builder, Error as BuilderError, ExecutionPayload, SignedBlindedBeaconBlock,
+    SignedBuilderBid, SignedValidatorRegistration,
+};
 
 pub type Error = beacon_api_client::Error;
 
-impl From<Error> for BuilderError {
-    fn from(err: Error) -> BuilderError {
-        match err {
-            Error::Api(err) => err.into(),
-            err => BuilderError::Internal(err.to_string()),
-        }
-    }
-}
-
-pub struct Relay {
+pub struct Client {
     api: BeaconApiClient,
 }
 
-impl Relay {
+impl Client {
     pub fn new(api_client: BeaconApiClient) -> Self {
         Self { api: api_client }
     }
@@ -33,7 +23,7 @@ impl Relay {
 }
 
 #[async_trait]
-impl Builder for Relay {
+impl Builder for Client {
     async fn register_validator(
         &self,
         registration: &SignedValidatorRegistration,

@@ -1,12 +1,12 @@
-use crate::builder::{Builder, Error as BuilderError};
-use crate::relay::{Error as RelayError, Relay};
-use crate::types::{
-    BidRequest, ExecutionPayload, Hash32, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration, Slot,
-};
 use async_trait::async_trait;
 use beacon_api_client::Error as ApiError;
+use ethereum_consensus::primitives::{Hash32, Slot};
 use futures::future::join_all;
+use mev_build_rs::{
+    BidRequest, Builder, Error as BuilderError, ExecutionPayload, SignedBlindedBeaconBlock,
+    SignedBuilderBid, SignedValidatorRegistration,
+};
+use mev_relay_rs::{Client as Relay, ClientError as RelayError};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
