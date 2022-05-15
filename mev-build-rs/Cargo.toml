@@ -1,0 +1,23 @@
+[package]
+name = "mev-build-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.60.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = ["serde", "api"]
+api = ["axum", "beacon-api-client", "tracing"]
+
+[dependencies]
+axum = { version =  "0.5.4", optional = true }
+tracing = { version = "0.1", optional = true }
+async-trait = "0.1.53"
+serde = { version = "1.0", features = ["derive"], optional = true }
+thiserror = "1.0.30"
+
+ethereum_consensus = { git = "https://github.com/ralexstokes/ethereum_consensus" }
+ssz_rs = { git = "https://github.com/ralexstokes/ssz_rs" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }

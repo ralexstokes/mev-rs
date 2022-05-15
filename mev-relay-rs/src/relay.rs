@@ -1,12 +1,13 @@
-use crate::builder::{Builder, Error as BuilderError};
-use crate::types::{
-    BidRequest, BlsPublicKey, BuilderBid, ExecutionAddress, ExecutionPayload,
-    ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration, U256,
-};
 use async_trait::async_trait;
-use axum::http::StatusCode;
 use beacon_api_client::ApiError;
+use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress};
+use http::StatusCode;
+use mev_build_rs::{
+    BidRequest, Builder, BuilderBid, Error as BuilderError, ExecutionPayload,
+    ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration,
+};
+use ssz_rs::prelude::U256;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
