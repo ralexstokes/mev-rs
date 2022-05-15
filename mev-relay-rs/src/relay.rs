@@ -138,7 +138,7 @@ impl Builder for Relay {
             public_key,
         };
 
-        let signature = signing_key.sign(&mut bid.hash_tree_root().unwrap().as_ref());
+        let signature = signing_key.sign(bid.hash_tree_root().unwrap().as_ref());
 
         let signed_bid = SignedBuilderBid {
             message: bid,
