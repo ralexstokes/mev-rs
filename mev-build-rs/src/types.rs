@@ -14,7 +14,7 @@ pub struct BidRequest {
     pub public_key: BlsPublicKey,
 }
 
-#[derive(Debug, Default, SimpleSerialize)]
+#[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BuilderBid {
     pub header: ExecutionPayloadHeader,
@@ -22,7 +22,7 @@ pub struct BuilderBid {
     pub public_key: BlsPublicKey,
 }
 
-#[derive(Debug, Default, SimpleSerialize)]
+#[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedBuilderBid {
     pub message: BuilderBid,

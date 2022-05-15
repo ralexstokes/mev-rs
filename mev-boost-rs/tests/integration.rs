@@ -80,7 +80,7 @@ async fn test_end_to_end() {
 
     let mut rng = rand::thread_rng();
 
-    let mut proposers = create_proposers(&mut rng, 2);
+    let mut proposers = create_proposers(&mut rng, 4);
 
     beacon_node.check_status().await.unwrap();
 

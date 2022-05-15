@@ -7,10 +7,12 @@ use mev_build_rs::{
     ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use ssz_rs::prelude::U256;
+use ssz_rs::prelude::{Merkleized, U256};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+// temporary for testing
+use ethereum_consensus::crypto::SecretKey;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -122,19 +124,25 @@ impl Builder for Relay {
             .get(public_key)
             .ok_or(Error::UnknownValidator)?;
 
-        let bid = BuilderBid {
+        // temporary for testing
+        let signing_key = SecretKey::from_bytes(&[1u8; 32]).unwrap();
+        let public_key = signing_key.public_key();
+
+        let mut bid = BuilderBid {
             header: ExecutionPayloadHeader {
                 parent_hash: bid_request.parent_hash.clone(),
                 fee_recipient: fee_recipient.clone(),
                 ..Default::default()
             },
             value: U256::from_bytes_le([1u8; 32]),
-            public_key: Default::default(),
+            public_key,
         };
+
+        let signature = signing_key.sign(bid.hash_tree_root().unwrap().as_ref());
 
         let signed_bid = SignedBuilderBid {
             message: bid,
-            ..Default::default()
+            signature,
         };
 
         // TODO validate?
