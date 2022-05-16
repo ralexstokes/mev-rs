@@ -92,7 +92,7 @@ impl RelayMux {
         loop {
             interval.tick().await;
             let state = self.0.state.lock().unwrap();
-            tracing::info!("{:?}", state);
+            tracing::debug!("outstanding bids: {:?}", state.outstanding_bids);
         }
     }
 }
