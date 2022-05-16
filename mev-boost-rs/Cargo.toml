@@ -31,6 +31,3 @@ mev-relay-rs = { path = "../mev-relay-rs" }
 
 [dev-dependencies]
 rand = "0.8.5"
-
-[[bin]]
-name = "main"
