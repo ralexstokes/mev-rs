@@ -1,7 +1,7 @@
 pub use ethereum_consensus::bellatrix::mainnet::{
     ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
 };
-pub use ethereum_consensus::builder::SignedValidatorRegistration;
+pub use ethereum_consensus::builder::{compute_builder_domain, SignedValidatorRegistration};
 use ethereum_consensus::primitives::{BlsPublicKey, BlsSignature, Hash32, Slot};
 use ssz_rs::prelude::*;
 
