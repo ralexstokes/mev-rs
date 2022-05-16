@@ -100,7 +100,7 @@ impl<B: Builder + Clone + Send + Sync + 'static> Server<B> {
         let addr = SocketAddr::from((self.host, self.port));
         let server = axum::Server::bind(&addr).serve(router.into_make_service());
 
-        tracing::info!("relay server listening at {addr}...");
+        tracing::info!("listening at {addr}...");
         if let Err(err) = server.await {
             tracing::error!("error while listening for incoming: {err}")
         }
