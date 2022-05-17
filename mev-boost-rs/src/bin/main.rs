@@ -1,38 +1,14 @@
 use clap::Parser;
-use mev_boost_rs::{Service, ServiceConfig};
-use std::net::Ipv4Addr;
+use mev_boost_rs::{Config, Service};
+use std::fs;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
-const DEFAULT_HOST: Ipv4Addr = Ipv4Addr::UNSPECIFIED;
-const DEFAULT_PORT: u16 = 18550;
-
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[clap(version, about, long_about=None)]
 struct Args {
-    #[clap(long, default_value_t = DEFAULT_HOST)]
-    host: Ipv4Addr,
-
-    #[clap(long, default_value_t = DEFAULT_PORT)]
-    port: u16,
-
-    #[clap(long, default_value = "")]
-    /// a comma-separated list of relay endpoints
-    relays: String,
-}
-
-fn parse_relay(input: &str) -> Option<url::Url> {
-    if input.is_empty() {
-        None
-    } else {
-        input
-            .parse()
-            .map_err(|err| {
-                tracing::warn!("error parsing relay from config: {err}");
-                err
-            })
-            .ok()
-    }
+    #[clap(long, env, default_value = "config.toml")]
+    config_file: String,
 }
 
 #[tokio::main]
@@ -46,15 +22,21 @@ async fn main() {
 
     let args = Args::parse();
 
-    let config = ServiceConfig {
-        host: args.host,
-        port: args.port,
-        relays: args.relays.split(',').filter_map(parse_relay).collect(),
+    let config_file = &args.config_file;
+    let config_data = match fs::read(config_file) {
+        Ok(file) => file,
+        Err(err) => {
+            tracing::error!("could not read file `{config_file}`: {err}");
+            return;
+        }
     };
-
-    if config.relays.is_empty() {
-        tracing::error!("no relays provided, please restart with at least one relay provided")
-    }
+    let config: Config = match toml::from_slice(&config_data) {
+        Ok(config) => config,
+        Err(err) => {
+            tracing::error!("could not parse TOML: {err}");
+            return;
+        }
+    };
 
     let service = Service::from(config);
     service.run().await;
