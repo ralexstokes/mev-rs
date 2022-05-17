@@ -3,38 +3,64 @@ use beacon_api_client::Client;
 use futures::future::join_all;
 use mev_build_rs::ApiServer;
 use mev_relay_rs::Client as Relay;
+use serde::Deserialize;
 use std::net::Ipv4Addr;
 use url::Url;
 
-#[derive(Debug)]
-pub struct ServiceConfig {
+#[derive(Debug, Deserialize)]
+pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
-    pub relays: Vec<Url>,
+    pub relays: Vec<String>,
 }
 
-impl Default for ServiceConfig {
+impl Default for Config {
     fn default() -> Self {
         Self {
-            host: "127.0.0.1".parse().unwrap(),
+            host: Ipv4Addr::UNSPECIFIED,
             port: 18550,
             relays: vec![],
         }
     }
 }
 
+fn parse_url(input: &str) -> Option<url::Url> {
+    if input.is_empty() {
+        None
+    } else {
+        input
+            .parse()
+            .map_err(|err| {
+                tracing::warn!("error parsing relay from URL: `{err}`");
+                err
+            })
+            .ok()
+    }
+}
+
 pub struct Service {
-    config: ServiceConfig,
+    host: Ipv4Addr,
+    port: u16,
+    relays: Vec<Url>,
 }
 
 impl Service {
-    pub fn from(config: ServiceConfig) -> Self {
-        Self { config }
+    pub fn from(config: Config) -> Self {
+        let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
+
+        if relays.is_empty() {
+            tracing::error!("no valid relays provided; please restart with correct configuration");
+        }
+
+        Self {
+            host: config.host,
+            port: config.port,
+            relays,
+        }
     }
 
     pub async fn run(&self) {
         let relays = self
-            .config
             .relays
             .iter()
             .cloned()
@@ -48,7 +74,7 @@ impl Service {
             relay_mux_clone.run().await;
         }));
 
-        let builder_api = ApiServer::new(self.config.host, self.config.port, relay_mux);
+        let builder_api = ApiServer::new(self.host, self.port, relay_mux);
         tasks.push(tokio::spawn(async move {
             builder_api.run().await;
         }));

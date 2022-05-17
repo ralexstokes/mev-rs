@@ -6,7 +6,7 @@ use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistra
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::phase0::mainnet::Validator;
 use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
-use mev_boost_rs::{Service, ServiceConfig};
+use mev_boost_rs::{Config, Service};
 use mev_build_rs::{ApiServer, BidRequest, Builder};
 use mev_relay_rs::{Client as RelayClient, Relay};
 use rand;
@@ -63,10 +63,8 @@ async fn test_end_to_end() {
     tokio::spawn(async move { relay_server.run().await });
 
     // start mux server
-    let mut config = ServiceConfig::default();
-    config
-        .relays
-        .push(Url::parse("http://127.0.0.1:8080").unwrap());
+    let mut config = Config::default();
+    config.relays.push("http://127.0.0.1:8080".to_string());
 
     let service = Service::from(config);
     tokio::spawn(async move { service.run().await });
