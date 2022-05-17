@@ -94,7 +94,7 @@ async fn test_end_to_end() {
     tokio::task::yield_now().await;
 
     let beacon_node = RelayClient::new(ApiClient::new(
-        Url::parse(format!("http://127.0.0.1:{mux_port}")).unwrap(),
+        Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
     ));
 
     let mut rng = rand::thread_rng();
