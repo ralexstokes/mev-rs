@@ -77,14 +77,16 @@ async fn test_end_to_end() {
     setup_logging();
 
     // start upstream relay
+    let port = 28545;
     let relay = Relay::default();
-    let relay_server = ApiServer::new("127.0.0.1".parse().unwrap(), 8080, relay);
+    let relay_server = ApiServer::new("127.0.0.1".parse().unwrap(), port, relay);
     tokio::spawn(async move { relay_server.run().await });
 
     // start mux server
     let mut config = Config::default();
-    config.relays.push("http://127.0.0.1:8080".to_string());
+    config.relays.push(format!("http://127.0.0.1:{port}"));
 
+    let mux_port = config.port;
     let service = Service::from(config);
     tokio::spawn(async move { service.run().await });
 
@@ -92,7 +94,7 @@ async fn test_end_to_end() {
     tokio::task::yield_now().await;
 
     let beacon_node = RelayClient::new(ApiClient::new(
-        Url::parse("http://127.0.0.1:18550").unwrap(),
+        Url::parse(format!("http://127.0.0.1:{mux_port}")).unwrap(),
     ));
 
     let mut rng = rand::thread_rng();
