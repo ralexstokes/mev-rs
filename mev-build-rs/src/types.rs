@@ -19,6 +19,7 @@ pub struct BidRequest {
 pub struct BuilderBid {
     pub header: ExecutionPayloadHeader,
     pub value: U256,
+    #[serde(rename = "pubkey")]
     pub public_key: BlsPublicKey,
 }
 
