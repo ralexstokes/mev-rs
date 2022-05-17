@@ -1,6 +1,7 @@
 use clap::Parser;
 use mev_boost_rs::{Config, Service};
 use std::fs;
+use tokio::signal;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
@@ -39,5 +40,8 @@ async fn main() {
     };
 
     let service = Service::from(config);
-    service.run().await;
+    tokio::select! {
+        _ = service.run()=> {},
+        _ = signal::ctrl_c() => {},
+    }
 }
