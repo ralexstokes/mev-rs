@@ -2,15 +2,20 @@ use beacon_api_client::Client as ApiClient;
 use ethereum_consensus::bellatrix::mainnet::{
     BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock,
 };
-use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistration};
+use ethereum_consensus::builder::{
+    compute_builder_domain, SignedValidatorRegistration, ValidatorRegistration,
+};
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::phase0::mainnet::Validator;
-use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
+use ethereum_consensus::phase0::mainnet::{Context, Validator};
+use ethereum_consensus::phase0::sign_with_domain;
+use ethereum_consensus::primitives::{BlsSignature, ExecutionAddress, Hash32, Slot};
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{ApiServer, BidRequest, Builder};
 use mev_relay_rs::{Client as RelayClient, Relay};
 use rand;
 use rand::seq::SliceRandom;
+use ssz_rs::prelude::SimpleSerialize;
+use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
 fn setup_logging() {
@@ -25,10 +30,15 @@ fn setup_logging() {
         .init();
 }
 
+fn get_time() -> u64 {
+    let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+    duration.as_secs()
+}
+
 struct Proposer {
     index: usize,
     validator: Validator,
-    _signing_key: SecretKey,
+    signing_key: SecretKey,
     fee_recipient: ExecutionAddress,
 }
 
@@ -46,11 +56,20 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             Proposer {
                 index: i,
                 validator,
-                _signing_key: signing_key,
+                signing_key,
                 fee_recipient,
             }
         })
         .collect()
+}
+
+fn sign_message<T: SimpleSerialize>(
+    message: &mut T,
+    signing_key: &SecretKey,
+    context: &Context,
+) -> BlsSignature {
+    let domain = compute_builder_domain(context).unwrap();
+    sign_with_domain(message, signing_key, domain).unwrap()
 }
 
 #[tokio::test]
@@ -82,15 +101,19 @@ async fn test_end_to_end() {
 
     beacon_node.check_status().await.unwrap();
 
+    let context = Context::for_mainnet();
     for proposer in &proposers {
-        let registration = ValidatorRegistration {
+        let timestamp = get_time();
+        let mut registration = ValidatorRegistration {
             fee_recipient: proposer.fee_recipient.clone(),
+            gas_limit: 30_000_000,
+            timestamp,
             public_key: proposer.validator.pubkey.clone(),
-            ..Default::default()
         };
+        let signature = sign_message(&mut registration, &proposer.signing_key, &context);
         let signed_registration = SignedValidatorRegistration {
             message: registration,
-            ..Default::default()
+            signature,
         };
         beacon_node
             .register_validator(&signed_registration)
@@ -103,11 +126,16 @@ async fn test_end_to_end() {
     proposers.shuffle(&mut rng);
 
     for (i, proposer) in proposers.iter().enumerate() {
-        propose_block(&beacon_node, proposer, i).await;
+        propose_block(&beacon_node, proposer, i, &context).await;
     }
 }
 
-async fn propose_block(beacon_node: &RelayClient, proposer: &Proposer, shuffling_index: usize) {
+async fn propose_block(
+    beacon_node: &RelayClient,
+    proposer: &Proposer,
+    shuffling_index: usize,
+    context: &Context,
+) {
     let current_slot = 32 + shuffling_index as Slot;
     let parent_hash = Hash32::try_from_bytes(&[shuffling_index as u8; 32]).unwrap();
 
@@ -124,16 +152,16 @@ async fn propose_block(beacon_node: &RelayClient, proposer: &Proposer, shuffling
         execution_payload_header: bid.header.clone(),
         ..Default::default()
     };
-    let beacon_block = BlindedBeaconBlock {
+    let mut beacon_block = BlindedBeaconBlock {
         slot: current_slot,
         proposer_index: proposer.index,
         body: beacon_block_body,
         ..Default::default()
     };
-    // TODO sign full block
+    let signature = sign_message(&mut beacon_block, &proposer.signing_key, context);
     let signed_block = SignedBlindedBeaconBlock {
         message: beacon_block,
-        ..Default::default()
+        signature,
     };
 
     beacon_node.check_status().await.unwrap();
