@@ -30,3 +30,6 @@ mev-relay-rs = { path = "../mev-relay-rs" }
 
 [dev-dependencies]
 rand = "0.8.5"
+reqwest = "0.11.10"
+serde_json = "1.0.81"
+hex = "0.4.3"
