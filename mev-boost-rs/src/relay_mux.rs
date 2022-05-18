@@ -7,8 +7,8 @@ use mev_build_rs::{
     SignedBuilderBid, SignedValidatorRegistration,
 };
 use mev_relay_rs::{Client as Relay, ClientError as RelayError};
+use ssz_rs::prelude::MerkleizationError;
 use ssz_rs::prelude::U256;
-use ssz_rs::prelude::{MerkleizationError, Merkleized};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
@@ -45,15 +45,8 @@ impl From<Error> for BuilderError {
     }
 }
 
-async fn validate_bid(bid: &mut SignedBuilderBid) -> Result<(), Error> {
-    let root = { bid.message.hash_tree_root()? };
-    let message = &bid.message;
-    let signature = &bid.signature;
-    if signature.verify(&message.public_key, root.as_ref()) {
-        Ok(())
-    } else {
-        Err(Error::InvalidSignature)
-    }
+async fn validate_bid(_bid: &mut SignedBuilderBid) -> Result<(), Error> {
+    Ok(())
 }
 
 #[derive(Clone)]
