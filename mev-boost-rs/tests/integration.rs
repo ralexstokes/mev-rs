@@ -49,7 +49,7 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             let public_key = signing_key.public_key();
 
             let mut validator = Validator::default();
-            validator.pubkey = public_key;
+            validator.public_key = public_key;
 
             let fee_recipient = ExecutionAddress::try_from_bytes(&[i as u8; 20]).unwrap();
 
@@ -110,7 +110,7 @@ async fn test_end_to_end() {
             fee_recipient: proposer.fee_recipient.clone(),
             gas_limit: 30_000_000,
             timestamp,
-            public_key: proposer.validator.pubkey.clone(),
+            public_key: proposer.validator.public_key.clone(),
         };
         let signature = sign_message(&mut registration, &proposer.signing_key, &context);
         let signed_registration = SignedValidatorRegistration {
@@ -144,7 +144,7 @@ async fn propose_block(
     let request = BidRequest {
         slot: current_slot,
         parent_hash: parent_hash.clone(),
-        public_key: proposer.validator.pubkey.clone(),
+        public_key: proposer.validator.public_key.clone(),
     };
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
     let bid = &signed_bid.message;

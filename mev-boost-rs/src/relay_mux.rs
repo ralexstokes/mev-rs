@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use beacon_api_client::Error as ApiError;
+use ethereum_consensus::clock;
 use ethereum_consensus::primitives::Hash32;
 use futures::future::join_all;
+use futures::StreamExt;
 use mev_build_rs::{
     BidRequest, Builder, Error as BuilderError, ExecutionPayload, SignedBlindedBeaconBlock,
     SignedBuilderBid, SignedValidatorRegistration,
@@ -11,9 +13,7 @@ use ssz_rs::prelude::U256;
 use ssz_rs::prelude::{MerkleizationError, Merkleized};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 use thiserror::Error;
-use tokio::time;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -88,11 +88,17 @@ impl RelayMux {
     }
 
     pub async fn run(&self) {
-        let mut interval = time::interval(Duration::from_secs(12));
-        loop {
-            interval.tick().await;
+        let clock = clock::for_mainnet();
+        let slots = clock.stream_slots();
+
+        tokio::pin!(slots);
+
+        while let Some(slot) = slots.next().await {
             let state = self.0.state.lock().unwrap();
-            tracing::debug!("outstanding bids: {:?}", state.outstanding_bids);
+            tracing::debug!(
+                "slot {slot}: outstanding bids: {:?}",
+                state.outstanding_bids
+            );
         }
     }
 }
