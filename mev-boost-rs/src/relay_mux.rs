@@ -1,14 +1,13 @@
 use async_trait::async_trait;
-use beacon_api_client::Error as ApiError;
 use ethereum_consensus::clock;
+use ethereum_consensus::phase0::mainnet::{Context, Error as ConsensusError};
 use ethereum_consensus::primitives::Hash32;
 use futures::StreamExt;
 use mev_build_rs::{
-    ApiClient as Relay, BidRequest, Builder, ClientError as RelayError, Error as BuilderError,
+    verify_signed_builder_message, ApiClient as Relay, BidRequest, Builder, Error as BuilderError,
     ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use ssz_rs::prelude::U256;
-use ssz_rs::prelude::{MerkleizationError, Merkleized};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -24,34 +23,24 @@ pub enum Error {
     #[error("no payload returned for opened bid with block hash {0}")]
     MissingPayload(Hash32),
     #[error("{0}")]
-    Relay(#[from] RelayError),
-    #[error("{0}")]
-    Merkleization(#[from] MerkleizationError),
-    #[error("invalid signature")]
-    InvalidSignature,
+    Consensus(#[from] ConsensusError),
 }
 
 impl From<Error> for BuilderError {
     fn from(err: Error) -> Self {
         match err {
-            Error::Relay(err) => match err {
-                ApiError::Api(err) => Self::Api(err),
-                err => Self::Internal(err.to_string()),
-            },
+            Error::Consensus(err) => err.into(),
+            // TODO conform to API errors
             err => Self::Custom(err.to_string()),
         }
     }
 }
 
-async fn validate_bid(bid: &mut SignedBuilderBid) -> Result<(), Error> {
-    let root = { bid.message.hash_tree_root()? };
-    let message = &bid.message;
-    let signature = &bid.signature;
-    if signature.verify(&message.public_key, root.as_ref()) {
-        Ok(())
-    } else {
-        Err(Error::InvalidSignature)
-    }
+async fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
+    let message = &mut bid.message;
+    let public_key = message.public_key.clone();
+    verify_signed_builder_message(message, &bid.signature, &public_key, context)?;
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -67,6 +56,7 @@ impl std::ops::Deref for RelayMux {
 
 pub struct RelayMuxInner {
     relays: Vec<Relay>,
+    context: Arc<Context>,
     state: Mutex<State>,
 }
 
@@ -77,9 +67,10 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(relays: impl Iterator<Item = Relay>) -> Self {
+    pub fn new(relays: impl Iterator<Item = Relay>, context: Arc<Context>) -> Self {
         let inner = RelayMuxInner {
             relays: relays.collect(),
+            context,
             state: Default::default(),
         };
         Self(Arc::new(inner))
@@ -136,7 +127,7 @@ impl Builder for RelayMux {
         for (i, bid) in bids.into_iter().enumerate() {
             match bid {
                 Ok(mut bid) => {
-                    if let Err(err) = validate_bid(&mut bid).await {
+                    if let Err(err) = validate_bid(&mut bid, &self.context).await {
                         tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                         continue;
                     }

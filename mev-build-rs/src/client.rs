@@ -1,12 +1,11 @@
-use crate::builder::{Builder, Error as BuilderError};
+use crate::builder::Builder;
+use crate::error::Error;
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
 use async_trait::async_trait;
 use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, VersionedValue};
-
-pub type Error = beacon_api_client::Error;
 
 pub struct Client {
     api: BeaconApiClient,
@@ -17,7 +16,7 @@ impl Client {
         Self { api: api_client }
     }
 
-    pub async fn check_status(&self) -> Result<(), Error> {
+    pub async fn check_status(&self) -> Result<(), beacon_api_client::Error> {
         let response = self.api.http_get("/eth/v1/builder/status").await?;
         api_error_or_ok(response).await
     }
@@ -28,7 +27,7 @@ impl Builder for Client {
     async fn register_validator(
         &self,
         registration: &mut SignedValidatorRegistration,
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), Error> {
         let response = self
             .api
             .http_post("/eth/v1/builder/validators", registration)
@@ -40,7 +39,7 @@ impl Builder for Client {
     async fn fetch_best_bid(
         &self,
         bid_request: &mut BidRequest,
-    ) -> Result<SignedBuilderBid, BuilderError> {
+    ) -> Result<SignedBuilderBid, Error> {
         let target = format!(
             "/eth/v1/builder/header/{}/{}/{}",
             bid_request.slot, bid_request.parent_hash, bid_request.public_key
@@ -52,7 +51,7 @@ impl Builder for Client {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, BuilderError> {
+    ) -> Result<ExecutionPayload, Error> {
         let response: VersionedValue<ExecutionPayload> = self
             .api
             .post("/eth/v1/builder/blinded_blocks", signed_block)

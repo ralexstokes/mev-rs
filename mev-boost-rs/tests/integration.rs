@@ -2,19 +2,17 @@ use beacon_api_client::Client as ApiClient;
 use ethereum_consensus::bellatrix::mainnet::{
     BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock,
 };
-use ethereum_consensus::builder::{
-    compute_builder_domain, SignedValidatorRegistration, ValidatorRegistration,
-};
+use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistration};
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::phase0::mainnet::{Context, Validator};
+use ethereum_consensus::domains::DomainType;
+use ethereum_consensus::phase0::mainnet::{compute_domain, Context, Validator};
 use ethereum_consensus::phase0::sign_with_domain;
-use ethereum_consensus::primitives::{BlsSignature, ExecutionAddress, Hash32, Slot};
+use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
 use mev_boost_rs::{Config, Service};
-use mev_build_rs::{ApiClient as RelayClient, BidRequest, Builder};
+use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest, Builder};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;
-use ssz_rs::prelude::SimpleSerialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 use url::Url;
 
@@ -63,15 +61,6 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
         .collect()
 }
 
-fn sign_message<T: SimpleSerialize>(
-    message: &mut T,
-    signing_key: &SecretKey,
-    context: &Context,
-) -> BlsSignature {
-    let domain = compute_builder_domain(context).unwrap();
-    sign_with_domain(message, signing_key, domain).unwrap()
-}
-
 #[tokio::test]
 async fn test_end_to_end() {
     setup_logging();
@@ -112,7 +101,8 @@ async fn test_end_to_end() {
             timestamp,
             public_key: proposer.validator.public_key.clone(),
         };
-        let signature = sign_message(&mut registration, &proposer.signing_key, &context);
+        let signature =
+            sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
         let mut signed_registration = SignedValidatorRegistration {
             message: registration,
             signature,
@@ -160,7 +150,9 @@ async fn propose_block(
         body: beacon_block_body,
         ..Default::default()
     };
-    let signature = sign_message(&mut beacon_block, &proposer.signing_key, context);
+    // TODO provide realistic values
+    let domain = compute_domain(DomainType::BeaconProposer, None, None, context).unwrap();
+    let signature = sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
     let mut signed_block = SignedBlindedBeaconBlock {
         message: beacon_block,
         signature,

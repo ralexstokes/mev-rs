@@ -1,4 +1,5 @@
-use crate::builder::{Builder, Error};
+use crate::builder::Builder;
+use crate::error::Error;
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,

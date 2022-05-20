@@ -1,17 +1,15 @@
 use async_trait::async_trait;
-use beacon_api_client::ApiError;
-use ethereum_consensus::builder::{compute_builder_domain, ValidatorRegistration};
+use ethereum_consensus::builder::ValidatorRegistration;
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::phase0::mainnet::Context;
-use ethereum_consensus::phase0::verify_signed_data;
+use ethereum_consensus::phase0::mainnet::{Context, Error as ConsensusError};
 use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress};
-use http::StatusCode;
 use mev_build_rs::{
+    sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, Builder, BuilderBid, Error as BuilderError, ExecutionPayload,
     ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use ssz_rs::prelude::{Merkleized, U256};
+use ssz_rs::prelude::U256;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -31,17 +29,15 @@ pub enum Error {
     #[error("invalid timestamp")]
     InvalidTimestamp,
     #[error("{0}")]
-    Custom(String),
+    Consensus(#[from] ConsensusError),
 }
 
 impl From<Error> for BuilderError {
     fn from(err: Error) -> Self {
         match err {
-            Error::Custom(msg) => Self::Custom(msg),
-            err => Self::Api(ApiError {
-                code: StatusCode::BAD_REQUEST,
-                message: err.to_string(),
-            }),
+            Error::Consensus(err) => err.into(),
+            // TODO conform to API errors
+            err => Self::Custom(err.to_string()),
         }
     }
 }
@@ -60,17 +56,10 @@ async fn validate_registration(
     // pubkey is active or in entry queue
     // -- `is_eligible_for_activation` || `is_active_validator`
 
-    // TODO: avoid clones here (?)
-    let public_key = registration.message.public_key.clone();
-    // TODO: error handling
-    let domain = compute_builder_domain(context).map_err(|err| Error::Custom(err.to_string()))?;
-    verify_signed_data(
-        &mut registration.message,
-        &registration.signature,
-        &public_key,
-        domain,
-    )
-    .map_err(|err| Error::Custom(err.to_string()))
+    let message = &mut registration.message;
+    let public_key = message.public_key.clone();
+    verify_signed_builder_message(message, &registration.signature, &public_key, context)?;
+    Ok(())
 }
 
 async fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
@@ -85,11 +74,19 @@ async fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
     Ok(())
 }
 
-async fn validate_signed_block(_signed_block: &mut SignedBlindedBeaconBlock) -> Result<(), Error> {
+async fn validate_signed_block(
+    signed_block: &mut SignedBlindedBeaconBlock,
+    context: &Context,
+) -> Result<(), Error> {
     // TODO validations
 
     // verify signature
+    let message = &mut signed_block.message;
+    // TODO get real public key
     // NOTE: need access to validator set
+    let public_key = BlsPublicKey::default();
+    // TODO restore verification once public key is fixed
+    let _ = verify_signed_consensus_message(message, &signed_block.signature, &public_key, context);
 
     // OPTIONAL:
     // verify slot is timely
@@ -149,19 +146,18 @@ impl Builder for Relay {
         &self,
         registration: &mut SignedValidatorRegistration,
     ) -> Result<(), BuilderError> {
-        let public_key = registration.message.public_key.clone();
-
         let latest_timestamp = {
             let state = self.state.lock().expect("can lock");
             state
                 .validator_preferences
-                .get(&public_key)
+                .get(&registration.message.public_key)
                 .map(|preferences| preferences.timestamp)
         };
 
         validate_registration(registration, latest_timestamp, &self.context).await?;
 
         let preferences = ValidatorPreferences::from(&registration.message);
+        let public_key = registration.message.public_key.clone();
 
         let mut state = self.state.lock().expect("can lock");
         state.validator_preferences.insert(public_key, preferences);
@@ -193,15 +189,14 @@ impl Builder for Relay {
             public_key: self.builder_key.clone(),
         };
 
-        let signature = self.secret_key.sign(bid.hash_tree_root().unwrap().as_ref());
+        // TODO validate gas_limit
+
+        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
         let signed_bid = SignedBuilderBid {
             message: bid,
             signature,
         };
-
-        // TODO validate gas_limit
-
         Ok(signed_bid)
     }
 
@@ -209,7 +204,7 @@ impl Builder for Relay {
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BuilderError> {
-        validate_signed_block(signed_block).await?;
+        validate_signed_block(signed_block, &self.context).await?;
 
         let block = &signed_block.message;
         let header = &block.body.execution_payload_header;
