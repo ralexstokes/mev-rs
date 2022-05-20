@@ -15,6 +15,6 @@ RUN cargo build --release
 FROM debian:bullseye-slim
 WORKDIR /app
 EXPOSE 18550
-COPY --from=builder /app/target/release/main /usr/local/bin
+COPY --from=builder /app/target/release/mev /usr/local/bin
 
-CMD ["/usr/local/bin/main"]
+ENTRYPOINT [ "/usr/local/bin/mev" ]

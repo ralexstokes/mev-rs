@@ -24,7 +24,7 @@ impl Default for Config {
     }
 }
 
-fn parse_url(input: &str) -> Option<url::Url> {
+fn parse_url(input: &str) -> Option<Url> {
     if input.is_empty() {
         None
     } else {
