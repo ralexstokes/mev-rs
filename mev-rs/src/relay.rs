@@ -9,7 +9,7 @@ use mev_relay_rs::Service;
     subcommand_negates_reqs = true
 )]
 pub(crate) struct Command {
-    #[clap(required = true)]
+    #[clap(env, required = true)]
     config_file: Option<String>,
 
     #[clap(subcommand)]
