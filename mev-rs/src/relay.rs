@@ -5,7 +5,7 @@ use mev_relay_rs::Service;
 
 #[derive(Debug, Args)]
 #[clap(
-    about = "connecting builders to proposers",
+    about = "🏗 connecting builders to proposers",
     subcommand_negates_reqs = true
 )]
 pub(crate) struct Command {

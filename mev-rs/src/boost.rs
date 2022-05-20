@@ -4,7 +4,7 @@ use clap::Args;
 use mev_boost_rs::Service;
 
 #[derive(Debug, Args)]
-#[clap(about = "connecting proposers to the external builder network")]
+#[clap(about = "🚀 connecting proposers to the external builder network")]
 pub(crate) struct Command {
     #[clap(env, default_value = "config.toml")]
     config_file: String,
