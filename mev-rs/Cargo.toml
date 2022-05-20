@@ -1,0 +1,26 @@
+[package]
+name = "mev-rs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+rust-version = "1.60.0"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+mev-boost-rs = { path = "../mev-boost-rs" }
+mev-relay-rs = { path = "../mev-relay-rs" }
+
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.5.9"
+
+clap = { version = "3.1.18", features = ["derive", "env"] }
+anyhow = "1.0.57"
+
+[[bin]]
+name = "mev"
+path = "src/main.rs"

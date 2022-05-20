@@ -1,10 +1,16 @@
 # mev-rs
 
-(experimental) tooling for blockspace.
+(experimental) utilities for block space.
 
-# `mev-boost-rs`
+# About
 
-this repo currently provides a builder multiplexer in `mev-boost-rs`.
+`mev-rs` bundles a series of utilities for interacting with an external builder network.
+
+## Subcommands
+
+# `boost`
+
+runs a builder multiplexer.
 
 the binary takes a path to a configuration file as a command line argument.
 
@@ -20,18 +26,21 @@ to run the multiplexer, you have the following options:
 
 just run with `cargo`:
 
-`$ cargo run -- --config-file config.toml`
+`$ cargo run boost example.config.toml`
 
 ### run with docker
 
 you can build the image defined in the `Dockerfile`:
 
-`$ docker build -t mev-boost-rs .`
+`$ docker build -t mev-rs .`
 
 and then run as usual.
 
-to supply the config, mount your local file into the container and use the environment variable setting.
+to supply the config, mount your local file into the container (e.g. at `/config.toml`) and either use the environment
+variable setting or provide the path in the container as a trailing arguemnt:
 
-you can supply the absolute file path of the mounted config but using an environment variable is more convenient.
+`$ docker <other options> --env CONFIG_FILE=/path/to/config.toml mev-rs boost`
 
-`$ docker <other options> --env CONFIG_FILE=/path/to/config.toml mev-boost-rs`
+or
+
+`$ docker <other options> mev-rs boost /config.toml`
