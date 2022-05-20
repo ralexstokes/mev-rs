@@ -1,9 +1,11 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
+use ethereum_consensus::phase0::mainnet::Context;
 use futures::future::join_all;
 use mev_build_rs::{ApiClient as Relay, ApiServer};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
+use std::sync::Arc;
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -59,12 +61,13 @@ impl Service {
     }
 
     pub async fn run(&self) {
+        let context = Context::for_mainnet();
         let relays = self
             .relays
             .iter()
             .cloned()
             .map(|endpoint| Relay::new(Client::new(endpoint)));
-        let relay_mux = RelayMux::new(relays);
+        let relay_mux = RelayMux::new(relays, Arc::new(context));
 
         let mut tasks = vec![];
 
