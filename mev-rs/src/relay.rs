@@ -32,6 +32,7 @@ impl Command {
         };
 
         let config = Config::from_toml_file(config_file)?;
+
         if let Some(config) = config.relay {
             // TODO separate mock and "real" modes
             Service::from(config).run().await;

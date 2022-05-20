@@ -13,6 +13,8 @@ pub(crate) struct Config {
 
 impl Config {
     pub fn from_toml_file<P: AsRef<Path> + fmt::Display + Clone>(path: P) -> Result<Config> {
+        tracing::info!("loading config from `{path}`...");
+
         let config_data = std::fs::read(path.as_ref())
             .with_context(|| format!("could not read config from `{path}`"))?;
 

@@ -200,7 +200,7 @@ impl Builder for Relay {
             signature,
         };
 
-        // TODO validate?
+        // TODO validate gas_limit
 
         Ok(signed_bid)
     }

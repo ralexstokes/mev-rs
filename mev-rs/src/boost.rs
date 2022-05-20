@@ -14,8 +14,6 @@ impl Command {
     pub(crate) async fn execute(&self) -> Result<()> {
         let config_file = &self.config_file;
 
-        tracing::info!("loading config from {config_file}...");
-
         let config = Config::from_toml_file(config_file)?;
 
         if let Some(config) = config.boost {
