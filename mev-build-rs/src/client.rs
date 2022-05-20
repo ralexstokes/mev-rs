@@ -1,9 +1,10 @@
+use crate::builder::{Builder, Error as BuilderError};
+use crate::types::{
+    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration,
+};
 use async_trait::async_trait;
 use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, VersionedValue};
-use mev_build_rs::{
-    BidRequest, Builder, Error as BuilderError, ExecutionPayload, SignedBlindedBeaconBlock,
-    SignedBuilderBid, SignedValidatorRegistration,
-};
 
 pub type Error = beacon_api_client::Error;
 
@@ -26,7 +27,7 @@ impl Client {
 impl Builder for Client {
     async fn register_validator(
         &self,
-        registration: &SignedValidatorRegistration,
+        registration: &mut SignedValidatorRegistration,
     ) -> Result<(), BuilderError> {
         let response = self
             .api
@@ -38,7 +39,7 @@ impl Builder for Client {
 
     async fn fetch_best_bid(
         &self,
-        bid_request: &BidRequest,
+        bid_request: &mut BidRequest,
     ) -> Result<SignedBuilderBid, BuilderError> {
         let target = format!(
             "/eth/v1/builder/header/{}/{}/{}",
@@ -50,7 +51,7 @@ impl Builder for Client {
 
     async fn open_bid(
         &self,
-        signed_block: &SignedBlindedBeaconBlock,
+        signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BuilderError> {
         let response: VersionedValue<ExecutionPayload> = self
             .api

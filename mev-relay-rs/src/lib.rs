@@ -1,5 +1,4 @@
-mod client;
 mod relay;
+mod service;
 
-pub use client::{Client, Error as ClientError};
-pub use relay::Relay;
+pub use service::{Config, Service};

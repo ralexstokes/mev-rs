@@ -1,4 +1,5 @@
 mod boost;
+mod config;
 mod relay;
 
 use anyhow::Result;

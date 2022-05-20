@@ -1,8 +1,7 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
 use futures::future::join_all;
-use mev_build_rs::ApiServer;
-use mev_relay_rs::Client as Relay;
+use mev_build_rs::{ApiClient as Relay, ApiServer};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
 use url::Url;

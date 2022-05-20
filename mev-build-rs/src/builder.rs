@@ -32,13 +32,14 @@ impl From<ApiClientError> for Error {
 pub trait Builder {
     async fn register_validator(
         &self,
-        registration: &SignedValidatorRegistration,
+        registration: &mut SignedValidatorRegistration,
     ) -> Result<(), Error>;
 
-    async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error>;
+    async fn fetch_best_bid(&self, bid_request: &mut BidRequest)
+        -> Result<SignedBuilderBid, Error>;
 
     async fn open_bid(
         &self,
-        signed_block: &SignedBlindedBeaconBlock,
+        signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error>;
 }
