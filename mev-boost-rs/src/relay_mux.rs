@@ -2,13 +2,11 @@ use async_trait::async_trait;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::clock;
 use ethereum_consensus::primitives::Hash32;
-use futures::future::join_all;
 use futures::StreamExt;
 use mev_build_rs::{
-    BidRequest, Builder, Error as BuilderError, ExecutionPayload, SignedBlindedBeaconBlock,
-    SignedBuilderBid, SignedValidatorRegistration,
+    ApiClient as Relay, BidRequest, Builder, ClientError as RelayError, Error as BuilderError,
+    ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use mev_relay_rs::{Client as Relay, ClientError as RelayError};
 use ssz_rs::prelude::U256;
 use ssz_rs::prelude::{MerkleizationError, Merkleized};
 use std::collections::HashMap;
@@ -107,14 +105,13 @@ impl RelayMux {
 impl Builder for RelayMux {
     async fn register_validator(
         &self,
-        registration: &SignedValidatorRegistration,
+        registration: &mut SignedValidatorRegistration,
     ) -> Result<(), BuilderError> {
-        let responses = join_all(
-            self.relays
-                .iter()
-                .map(|relay| async { relay.register_validator(registration).await }),
-        )
-        .await;
+        // TODO (and below) do this concurrently?
+        let mut responses = vec![];
+        for relay in &self.relays {
+            responses.push(relay.register_validator(registration).await)
+        }
 
         let failures = responses.iter().filter(|r| r.is_err());
 
@@ -127,14 +124,12 @@ impl Builder for RelayMux {
 
     async fn fetch_best_bid(
         &self,
-        bid_request: &BidRequest,
+        bid_request: &mut BidRequest,
     ) -> Result<SignedBuilderBid, BuilderError> {
-        let bids = join_all(
-            self.relays
-                .iter()
-                .map(|relay| async move { relay.fetch_best_bid(bid_request).await }),
-        )
-        .await;
+        let mut bids = vec![];
+        for relay in &self.relays {
+            bids.push(relay.fetch_best_bid(bid_request).await)
+        }
 
         let mut best_bid_value = U256::default();
         let mut best_bids = vec![];
@@ -185,7 +180,7 @@ impl Builder for RelayMux {
 
     async fn open_bid(
         &self,
-        signed_block: &SignedBlindedBeaconBlock,
+        signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BuilderError> {
         let relay_indices = {
             let mut state = self.state.lock().unwrap();
@@ -196,11 +191,11 @@ impl Builder for RelayMux {
             }
         };
 
-        let responses = join_all(relay_indices.into_iter().map(|i| async move {
+        let mut responses = vec![];
+        for i in relay_indices {
             let relay = &self.relays[i];
-            relay.open_bid(signed_block).await
-        }))
-        .await;
+            responses.push(relay.open_bid(signed_block).await);
+        }
 
         let mut opened_payload = None;
         let expected_block_hash = &signed_block

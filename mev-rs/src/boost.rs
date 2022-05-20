@@ -1,7 +1,7 @@
-use anyhow::{Context, Result};
+use crate::config::Config;
+use anyhow::{anyhow, Result};
 use clap::Args;
-use mev_boost_rs::{Config, Service};
-use std::fs;
+use mev_boost_rs::Service;
 
 #[derive(Debug, Args)]
 #[clap(about = "connecting proposers to the external builder network")]
@@ -15,12 +15,14 @@ impl Command {
         let config_file = &self.config_file;
 
         tracing::info!("loading config from {config_file}...");
-        let config_data = fs::read(config_file)
-            .with_context(|| format!("could not read config from `{config_file}`"))?;
 
-        let config: Config = toml::from_slice(&config_data).context("could not parse TOML")?;
+        let config = Config::from_toml_file(config_file)?;
 
-        Service::from(config).run().await;
-        Ok(())
+        if let Some(config) = config.boost {
+            Service::from(config).run().await;
+            Ok(())
+        } else {
+            Err(anyhow!("missing boost config from file provided"))
+        }
     }
 }

@@ -30,24 +30,24 @@ async fn handle_status_check() -> impl IntoResponse {
 }
 
 async fn handle_validator_registration<B: Builder>(
-    Json(registration): Json<SignedValidatorRegistration>,
+    Json(mut registration): Json<SignedValidatorRegistration>,
     Extension(builder): Extension<B>,
 ) -> Result<(), Error> {
     tracing::debug!("processing registration {registration:?}");
 
     builder
-        .register_validator(&registration)
+        .register_validator(&mut registration)
         .await
         .map_err(From::from)
 }
 
 async fn handle_fetch_bid<B: Builder>(
-    Path(bid_request): Path<BidRequest>,
+    Path(mut bid_request): Path<BidRequest>,
     Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     tracing::debug!("fetching best bid for block for request {bid_request:?}");
 
-    let signed_bid = builder.fetch_best_bid(&bid_request).await?;
+    let signed_bid = builder.fetch_best_bid(&mut bid_request).await?;
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,
@@ -56,12 +56,12 @@ async fn handle_fetch_bid<B: Builder>(
 }
 
 async fn handle_open_bid<B: Builder>(
-    Json(block): Json<SignedBlindedBeaconBlock>,
+    Json(mut block): Json<SignedBlindedBeaconBlock>,
     Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
     tracing::debug!("opening bid for block {block:?}");
 
-    let payload = builder.open_bid(&block).await?;
+    let payload = builder.open_bid(&mut block).await?;
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,

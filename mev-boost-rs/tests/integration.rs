@@ -10,8 +10,8 @@ use ethereum_consensus::phase0::mainnet::{Context, Validator};
 use ethereum_consensus::phase0::sign_with_domain;
 use ethereum_consensus::primitives::{BlsSignature, ExecutionAddress, Hash32, Slot};
 use mev_boost_rs::{Config, Service};
-use mev_build_rs::{ApiServer, BidRequest, Builder};
-use mev_relay_rs::{Client as RelayClient, Relay};
+use mev_build_rs::{ApiClient as RelayClient, BidRequest, Builder};
+use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;
 use ssz_rs::prelude::SimpleSerialize;
@@ -77,10 +77,10 @@ async fn test_end_to_end() {
     setup_logging();
 
     // start upstream relay
-    let port = 28545;
-    let relay = Relay::default();
-    let relay_server = ApiServer::new("127.0.0.1".parse().unwrap(), port, relay);
-    tokio::spawn(async move { relay_server.run().await });
+    let relay_config = RelayConfig::default();
+    let port = relay_config.port;
+    let relay = Relay::from(relay_config);
+    tokio::spawn(async move { relay.run().await });
 
     // start mux server
     let mut config = Config::default();
@@ -113,12 +113,12 @@ async fn test_end_to_end() {
             public_key: proposer.validator.public_key.clone(),
         };
         let signature = sign_message(&mut registration, &proposer.signing_key, &context);
-        let signed_registration = SignedValidatorRegistration {
+        let mut signed_registration = SignedValidatorRegistration {
             message: registration,
             signature,
         };
         beacon_node
-            .register_validator(&signed_registration)
+            .register_validator(&mut signed_registration)
             .await
             .unwrap();
     }
@@ -141,12 +141,12 @@ async fn propose_block(
     let current_slot = 32 + shuffling_index as Slot;
     let parent_hash = Hash32::try_from_bytes(&[shuffling_index as u8; 32]).unwrap();
 
-    let request = BidRequest {
+    let mut request = BidRequest {
         slot: current_slot,
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.public_key.clone(),
     };
-    let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
+    let signed_bid = beacon_node.fetch_best_bid(&mut request).await.unwrap();
     let bid = &signed_bid.message;
     assert_eq!(bid.header.parent_hash, parent_hash);
 
@@ -161,14 +161,14 @@ async fn propose_block(
         ..Default::default()
     };
     let signature = sign_message(&mut beacon_block, &proposer.signing_key, context);
-    let signed_block = SignedBlindedBeaconBlock {
+    let mut signed_block = SignedBlindedBeaconBlock {
         message: beacon_block,
         signature,
     };
 
     beacon_node.check_status().await.unwrap();
 
-    let payload = beacon_node.open_bid(&signed_block).await.unwrap();
+    let payload = beacon_node.open_bid(&mut signed_block).await.unwrap();
 
     assert_eq!(payload.parent_hash, parent_hash);
     assert_eq!(payload.fee_recipient, proposer.fee_recipient);

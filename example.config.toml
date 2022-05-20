@@ -1,5 +1,10 @@
+[boost]
 host = "0.0.0.0"
 port = 18550
 relays = [
     "http://127.0.0.1:28545",
 ]
+
+[relay]
+host = "0.0.0.0"
+port = 28545
