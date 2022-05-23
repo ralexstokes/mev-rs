@@ -16,6 +16,6 @@ serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
-ssz_rs = { git = "https://github.com/ralexstokes/ssz_rs" }
+ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
 
 mev-build-rs = { path = "../mev-build-rs"}
