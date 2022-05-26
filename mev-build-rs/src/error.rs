@@ -1,7 +1,7 @@
 use beacon_api_client::ApiError;
 #[cfg(feature = "api")]
 use beacon_api_client::Error as ApiClientError;
-use ethereum_consensus::phase0::mainnet::Error as ConsensusError;
+use ethereum_consensus::state_transition::Error as ConsensusError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

@@ -1,6 +1,6 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
-use ethereum_consensus::phase0::mainnet::Context;
+use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
 use mev_build_rs::{ApiClient as Relay, ApiServer};
 use serde::Deserialize;

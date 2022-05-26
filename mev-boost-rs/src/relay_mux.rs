@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ethereum_consensus::clock;
-use ethereum_consensus::phase0::mainnet::{Context, Error as ConsensusError};
 use ethereum_consensus::primitives::Hash32;
+use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::StreamExt;
 use mev_build_rs::{
     verify_signed_builder_message, ApiClient as Relay, BidRequest, Builder, Error as BuilderError,

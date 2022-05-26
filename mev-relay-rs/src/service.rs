@@ -1,5 +1,5 @@
 use crate::relay::Relay;
-use ethereum_consensus::phase0::mainnet::Context;
+use ethereum_consensus::state_transition::Context;
 use mev_build_rs::ApiServer;
 use serde::Deserialize;
 use std::net::Ipv4Addr;
