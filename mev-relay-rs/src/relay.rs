@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 use ethereum_consensus::builder::ValidatorRegistration;
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::phase0::mainnet::{Context, Error as ConsensusError};
 use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress};
+use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, Builder, BuilderBid, Error as BuilderError, ExecutionPayload,
@@ -107,7 +107,7 @@ pub struct Relay {
 impl Relay {
     pub fn new(context: Arc<Context>) -> Self {
         let key_bytes = [1u8; 32];
-        let secret_key = SecretKey::from_bytes(&key_bytes).unwrap();
+        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
         let builder_key = secret_key.public_key();
         Self {
             state: Default::default(),
