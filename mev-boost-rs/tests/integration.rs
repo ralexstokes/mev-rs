@@ -4,10 +4,10 @@ use ethereum_consensus::bellatrix::mainnet::{
 };
 use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistration};
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::domains::DomainType;
-use ethereum_consensus::phase0::mainnet::{compute_domain, Context, Validator};
+use ethereum_consensus::phase0::mainnet::{compute_domain, Validator};
 use ethereum_consensus::phase0::sign_with_domain;
-use ethereum_consensus::primitives::{ExecutionAddress, Hash32, Slot};
+use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot};
+use ethereum_consensus::state_transition::Context;
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest, Builder};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
@@ -49,7 +49,7 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             let mut validator = Validator::default();
             validator.public_key = public_key;
 
-            let fee_recipient = ExecutionAddress::try_from_bytes(&[i as u8; 20]).unwrap();
+            let fee_recipient = ExecutionAddress::try_from([i as u8; 20].as_ref()).unwrap();
 
             Proposer {
                 index: i,
@@ -129,7 +129,7 @@ async fn propose_block(
     context: &Context,
 ) {
     let current_slot = 32 + shuffling_index as Slot;
-    let parent_hash = Hash32::try_from_bytes(&[shuffling_index as u8; 32]).unwrap();
+    let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
 
     let mut request = BidRequest {
         slot: current_slot,
