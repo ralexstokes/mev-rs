@@ -2,8 +2,8 @@ use ethereum_consensus::builder::compute_builder_domain;
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::domains::DomainType;
 use ethereum_consensus::phase0::mainnet::compute_domain;
-use ethereum_consensus::phase0::{sign_with_domain, verify_signed_data};
 use ethereum_consensus::primitives::{BlsPublicKey, BlsSignature};
+use ethereum_consensus::signing::{sign_with_domain, verify_signed_data};
 use ethereum_consensus::state_transition::{Context, Error};
 use ssz_rs::prelude::SimpleSerialize;
 

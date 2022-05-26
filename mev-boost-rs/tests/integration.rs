@@ -5,8 +5,8 @@ use ethereum_consensus::bellatrix::mainnet::{
 use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistration};
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::phase0::mainnet::{compute_domain, Validator};
-use ethereum_consensus::phase0::sign_with_domain;
 use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot};
+use ethereum_consensus::signing::sign_with_domain;
 use ethereum_consensus::state_transition::Context;
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest, Builder};
