@@ -8,7 +8,7 @@ build:
     cargo build
 run-ci: lint build test
 docker-build:
-    docker build -t mev-rs .
+    docker build -t ralexstokes/mev-rs .
 docker-push:
     docker push ralexstokes/mev-rs
 docker-update: docker-build docker-push
