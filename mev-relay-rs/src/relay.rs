@@ -144,23 +144,26 @@ impl From<&ValidatorRegistration> for ValidatorPreferences {
 impl Builder for Relay {
     async fn register_validator(
         &self,
-        registration: &mut SignedValidatorRegistration,
+        registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BuilderError> {
-        let latest_timestamp = {
-            let state = self.state.lock().expect("can lock");
-            state
-                .validator_preferences
-                .get(&registration.message.public_key)
-                .map(|preferences| preferences.timestamp)
-        };
+        // TODO parallelize?
+        for registration in registrations.iter_mut() {
+            let latest_timestamp = {
+                let state = self.state.lock().expect("can lock");
+                state
+                    .validator_preferences
+                    .get(&registration.message.public_key)
+                    .map(|preferences| preferences.timestamp)
+            };
 
-        validate_registration(registration, latest_timestamp, &self.context).await?;
+            validate_registration(registration, latest_timestamp, &self.context).await?;
 
-        let preferences = ValidatorPreferences::from(&registration.message);
-        let public_key = registration.message.public_key.clone();
+            let preferences = ValidatorPreferences::from(&registration.message);
+            let public_key = registration.message.public_key.clone();
 
-        let mut state = self.state.lock().expect("can lock");
-        state.validator_preferences.insert(public_key, preferences);
+            let mut state = self.state.lock().expect("can lock");
+            state.validator_preferences.insert(public_key, preferences);
+        }
         Ok(())
     }
 

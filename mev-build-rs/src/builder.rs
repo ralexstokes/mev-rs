@@ -9,7 +9,7 @@ use async_trait::async_trait;
 pub trait Builder {
     async fn register_validator(
         &self,
-        registration: &mut SignedValidatorRegistration,
+        registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error>;
 
     async fn fetch_best_bid(&self, bid_request: &mut BidRequest)

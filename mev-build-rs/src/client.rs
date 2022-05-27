@@ -26,11 +26,11 @@ impl Client {
 impl Builder for Client {
     async fn register_validator(
         &self,
-        registration: &mut SignedValidatorRegistration,
+        registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let response = self
             .api
-            .http_post("/eth/v1/builder/validators", registration)
+            .http_post("/eth/v1/builder/validators", &registrations)
             .await?;
         let result = api_error_or_ok(response).await?;
         Ok(result)

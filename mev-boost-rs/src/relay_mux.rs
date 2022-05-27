@@ -96,12 +96,12 @@ impl RelayMux {
 impl Builder for RelayMux {
     async fn register_validator(
         &self,
-        registration: &mut SignedValidatorRegistration,
+        registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BuilderError> {
         // TODO (and below) do this concurrently?
         let mut responses = vec![];
         for relay in &self.relays {
-            responses.push(relay.register_validator(registration).await)
+            responses.push(relay.register_validator(registrations).await)
         }
 
         let failures = responses.iter().filter(|r| r.is_err());

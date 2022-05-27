@@ -93,25 +93,28 @@ async fn test_end_to_end() {
     beacon_node.check_status().await.unwrap();
 
     let context = Context::for_mainnet();
-    for proposer in &proposers {
-        let timestamp = get_time();
-        let mut registration = ValidatorRegistration {
-            fee_recipient: proposer.fee_recipient.clone(),
-            gas_limit: 30_000_000,
-            timestamp,
-            public_key: proposer.validator.public_key.clone(),
-        };
-        let signature =
-            sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
-        let mut signed_registration = SignedValidatorRegistration {
-            message: registration,
-            signature,
-        };
-        beacon_node
-            .register_validator(&mut signed_registration)
-            .await
-            .unwrap();
-    }
+    let mut registrations = proposers
+        .iter()
+        .map(|proposer| {
+            let timestamp = get_time();
+            let mut registration = ValidatorRegistration {
+                fee_recipient: proposer.fee_recipient.clone(),
+                gas_limit: 30_000_000,
+                timestamp,
+                public_key: proposer.validator.public_key.clone(),
+            };
+            let signature =
+                sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
+            SignedValidatorRegistration {
+                message: registration,
+                signature,
+            }
+        })
+        .collect::<Vec<_>>();
+    beacon_node
+        .register_validator(&mut registrations)
+        .await
+        .unwrap();
 
     beacon_node.check_status().await.unwrap();
 

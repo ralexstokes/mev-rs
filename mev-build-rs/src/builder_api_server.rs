@@ -31,13 +31,13 @@ async fn handle_status_check() -> impl IntoResponse {
 }
 
 async fn handle_validator_registration<B: Builder>(
-    Json(mut registration): Json<SignedValidatorRegistration>,
+    Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
     Extension(builder): Extension<B>,
 ) -> Result<(), Error> {
-    tracing::debug!("processing registration {registration:?}");
+    tracing::debug!("processing registrations {registrations:?}");
 
     builder
-        .register_validator(&mut registration)
+        .register_validator(&mut registrations)
         .await
         .map_err(From::from)
 }
