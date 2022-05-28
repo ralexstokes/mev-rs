@@ -43,12 +43,12 @@ async fn handle_validator_registration<B: Builder>(
 }
 
 async fn handle_fetch_bid<B: Builder>(
-    Path(mut bid_request): Path<BidRequest>,
+    Path(bid_request): Path<BidRequest>,
     Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     tracing::debug!("fetching best bid for block for request {bid_request:?}");
 
-    let signed_bid = builder.fetch_best_bid(&mut bid_request).await?;
+    let signed_bid = builder.fetch_best_bid(&bid_request).await?;
 
     Ok(Json(VersionedValue {
         version: ConsensusVersion::Bellatrix,

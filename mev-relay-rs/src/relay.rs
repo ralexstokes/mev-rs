@@ -169,7 +169,7 @@ impl Builder for Relay {
 
     async fn fetch_best_bid(
         &self,
-        bid_request: &mut BidRequest,
+        bid_request: &BidRequest,
     ) -> Result<SignedBuilderBid, BuilderError> {
         validate_bid_request(bid_request).await?;
 

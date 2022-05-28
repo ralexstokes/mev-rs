@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use ethereum_consensus::clock;
 use ethereum_consensus::primitives::Hash32;
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
-use futures::StreamExt;
+use futures::{stream, StreamExt};
 use mev_build_rs::{
     verify_signed_builder_message, ApiClient as Relay, BidRequest, Builder, Error as BuilderError,
     ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
@@ -55,6 +55,8 @@ impl std::ops::Deref for RelayMux {
 }
 
 pub struct RelayMuxInner {
+    // TODO: this can likely be faster by just having a list of URLs
+    // and one shared API client
     relays: Vec<Relay>,
     context: Arc<Context>,
     state: Mutex<State>,
@@ -98,11 +100,12 @@ impl Builder for RelayMux {
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BuilderError> {
-        // TODO (and below) do this concurrently?
-        let mut responses = vec![];
-        for relay in &self.relays {
-            responses.push(relay.register_validator(registrations).await)
-        }
+        let registrations = &registrations;
+        let responses = stream::iter(self.relays.iter().cloned())
+            .map(|relay| async move { relay.register_validator(registrations).await })
+            .buffer_unordered(self.relays.len())
+            .collect::<Vec<_>>()
+            .await;
 
         let failures = responses.iter().filter(|r| r.is_err());
 
@@ -115,12 +118,13 @@ impl Builder for RelayMux {
 
     async fn fetch_best_bid(
         &self,
-        bid_request: &mut BidRequest,
+        bid_request: &BidRequest,
     ) -> Result<SignedBuilderBid, BuilderError> {
-        let mut bids = vec![];
-        for relay in &self.relays {
-            bids.push(relay.fetch_best_bid(bid_request).await)
-        }
+        let bids = stream::iter(self.relays.iter().cloned())
+            .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
+            .buffer_unordered(self.relays.len())
+            .collect::<Vec<_>>()
+            .await;
 
         let mut best_bid_value = U256::zero();
         let mut best_bids = vec![];
@@ -182,11 +186,13 @@ impl Builder for RelayMux {
             }
         };
 
-        let mut responses = vec![];
-        for i in relay_indices {
-            let relay = &self.relays[i];
-            responses.push(relay.open_bid(signed_block).await);
-        }
+        let signed_block = &signed_block;
+        let relays = relay_indices.into_iter().map(|i| self.relays[i].clone());
+        let responses = stream::iter(relays)
+            .map(|relay| async move { relay.open_bid(signed_block).await })
+            .buffer_unordered(self.relays.len())
+            .collect::<Vec<_>>()
+            .await;
 
         let expected_block_hash = &signed_block
             .message
