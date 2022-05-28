@@ -188,7 +188,6 @@ impl Builder for RelayMux {
             responses.push(relay.open_bid(signed_block).await);
         }
 
-        let mut opened_payload = None;
         let expected_block_hash = &signed_block
             .message
             .body
@@ -198,18 +197,18 @@ impl Builder for RelayMux {
             match response {
                 Ok(payload) => {
                     if &payload.block_hash == expected_block_hash {
-                        opened_payload = Some(payload);
+                        return Ok(payload);
                     } else {
-                        tracing::warn!("error opening bid: the returned payload from relay {i} did not match the expected block hash: {expected_block_hash:?}");
+                        tracing::warn!("error opening bid from relay {i}: the returned payload did not match the expected block hash: {expected_block_hash}");
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("error opening bid: {err}");
+                    tracing::warn!("error opening bid from relay {i}: {err}");
                 }
             }
         }
 
-        opened_payload.ok_or_else(|| Error::MissingPayload(expected_block_hash.clone()).into())
+        Err(Error::MissingPayload(expected_block_hash.clone()).into())
     }
 }
 
