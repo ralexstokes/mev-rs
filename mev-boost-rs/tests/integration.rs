@@ -9,7 +9,7 @@ use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot}
 use ethereum_consensus::signing::sign_with_domain;
 use ethereum_consensus::state_transition::Context;
 use mev_boost_rs::{Config, Service};
-use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest, Builder};
+use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;
@@ -93,7 +93,7 @@ async fn test_end_to_end() {
     beacon_node.check_status().await.unwrap();
 
     let context = Context::for_mainnet();
-    let mut registrations = proposers
+    let registrations = proposers
         .iter()
         .map(|proposer| {
             let timestamp = get_time();
@@ -112,7 +112,7 @@ async fn test_end_to_end() {
         })
         .collect::<Vec<_>>();
     beacon_node
-        .register_validator(&mut registrations)
+        .register_validator(&registrations)
         .await
         .unwrap();
 
