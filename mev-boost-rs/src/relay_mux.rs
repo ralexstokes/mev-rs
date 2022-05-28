@@ -122,7 +122,7 @@ impl Builder for RelayMux {
             bids.push(relay.fetch_best_bid(bid_request).await)
         }
 
-        let mut best_bid_value = U256::default();
+        let mut best_bid_value = U256::zero();
         let mut best_bids = vec![];
         for (i, bid) in bids.into_iter().enumerate() {
             match bid {
