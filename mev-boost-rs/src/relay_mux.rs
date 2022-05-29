@@ -249,10 +249,101 @@ fn bid_key_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
-    fn test_bid_selection() {
-        // ensure max value is kept
-        // ensure values are all the same
-        // if diff payloads, then pick by block hash
+    fn test_bid_selection_by_value() {
+        let one: U256 = 1.into();
+        let two: U256 = 2.into();
+        let three: U256 = 3.into();
+        let four: U256 = 4.into();
+
+        let test_cases = [
+            (vec![], Vec::<usize>::new()),
+            (vec![(&one, 0)], vec![0]),
+            (vec![(&one, 11), (&one, 22)], vec![11, 22]),
+            (vec![(&one, 11), (&two, 22)], vec![22]),
+            (vec![(&one, 11), (&two, 22), (&three, 33)], vec![33]),
+            (vec![(&two, 22), (&three, 33), (&one, 11)], vec![33]),
+            (vec![(&three, 33), (&two, 22), (&one, 11)], vec![33]),
+            (
+                vec![(&three, 33), (&two, 22), (&three, 44), (&one, 11)],
+                vec![33, 44],
+            ),
+            (
+                vec![
+                    (&four, 44),
+                    (&three, 33),
+                    (&two, 22),
+                    (&three, 44),
+                    (&two, 22),
+                    (&two, 22),
+                    (&two, 22),
+                    (&one, 11),
+                ],
+                vec![44],
+            ),
+            (
+                vec![
+                    (&four, 44),
+                    (&four, 45),
+                    (&three, 33),
+                    (&two, 22),
+                    (&three, 44),
+                    (&two, 22),
+                    (&two, 22),
+                    (&two, 22),
+                    (&one, 11),
+                ],
+                vec![44, 45],
+            ),
+            (
+                vec![
+                    (&four, 45),
+                    (&three, 33),
+                    (&two, 22),
+                    (&three, 44),
+                    (&two, 22),
+                    (&two, 22),
+                    (&two, 22),
+                    (&one, 11),
+                    (&four, 44),
+                ],
+                vec![45, 44],
+            ),
+            (
+                vec![
+                    (&three, 33),
+                    (&two, 22),
+                    (&three, 44),
+                    (&two, 22),
+                    (&two, 22),
+                    (&four, 45),
+                    (&two, 22),
+                    (&one, 11),
+                    (&four, 44),
+                ],
+                vec![45, 44],
+            ),
+            (
+                vec![
+                    (&three, 33),
+                    (&two, 22),
+                    (&two, 22),
+                    (&two, 22),
+                    (&two, 22),
+                    (&one, 11),
+                    (&three, 44),
+                    (&four, 45),
+                    (&four, 44),
+                ],
+                vec![45, 44],
+            ),
+        ];
+
+        for (input, expected) in test_cases.into_iter() {
+            let output = select_best_bids(input.into_iter());
+            assert_eq!(expected, output);
+        }
     }
 }
