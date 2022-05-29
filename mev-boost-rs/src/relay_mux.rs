@@ -45,7 +45,7 @@ fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Err
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
 fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<usize> {
     let mut best_value = U256::zero();
-    let best_indices = bids.fold(vec![], |mut relay_indices, (value, index)| {
+    bids.fold(vec![], |mut relay_indices, (value, index)| {
         if value > &best_value {
             best_value = value.clone();
             relay_indices.clear();
@@ -54,9 +54,7 @@ fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<us
             relay_indices.push(index);
         }
         relay_indices
-    });
-
-    best_indices
+    })
 }
 
 #[derive(Clone)]
@@ -174,7 +172,7 @@ impl Builder for RelayMux {
         let (best_index, rest) = best_indices.split_first().unwrap();
         let best_block_hash = &bids[*best_index].0.message.header.block_hash;
         let mut relay_indices = vec![*best_index];
-        for index in rest.into_iter() {
+        for index in rest.iter() {
             let block_hash = &bids[*index].0.message.header.block_hash;
             if block_hash == best_block_hash {
                 relay_indices.push(*index);
