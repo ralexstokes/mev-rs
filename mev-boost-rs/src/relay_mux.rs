@@ -1,13 +1,12 @@
 use async_trait::async_trait;
 use ethereum_consensus::clock;
-use ethereum_consensus::primitives::Hash32;
+use ethereum_consensus::primitives::{Hash32, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
     verify_signed_builder_message, ApiClient as Relay, BidRequest, Builder, Error as BuilderError,
     ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use ssz_rs::prelude::U256;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -15,7 +14,7 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("no valid bids returned for proposal")]
-    NoBidsReturned,
+    NoBids,
     #[error("could not find relay with outstanding bid to accept")]
     MissingOpenBid,
     #[error("could not register with any relay")]
@@ -36,11 +35,28 @@ impl From<Error> for BuilderError {
     }
 }
 
-async fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
+fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
     let message = &mut bid.message;
     let public_key = message.public_key.clone();
     verify_signed_builder_message(message, &bid.signature, &public_key, context)?;
     Ok(())
+}
+
+// Select the most valuable bids in `bids`, breaking ties by `block_hash`
+fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<usize> {
+    let mut best_value = U256::zero();
+    let best_indices = bids.fold(vec![], |mut relay_indices, (value, index)| {
+        if value > &best_value {
+            best_value = value.clone();
+            relay_indices.clear();
+        }
+        if value == &best_value {
+            relay_indices.push(index);
+        }
+        relay_indices
+    });
+
+    best_indices
 }
 
 #[derive(Clone)]
@@ -120,46 +136,48 @@ impl Builder for RelayMux {
         &self,
         bid_request: &BidRequest,
     ) -> Result<SignedBuilderBid, BuilderError> {
-        let bids = stream::iter(self.relays.iter().cloned())
+        let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
-        let mut best_bid_value = U256::zero();
-        let mut best_bids = vec![];
-        for (i, bid) in bids.into_iter().enumerate() {
-            match bid {
+        // ideally can fuse the filtering into the prior async fetch but
+        // several attempts lead to opaque compiler errors...
+        let bids = responses
+            .into_iter()
+            .enumerate()
+            .filter_map(|(relay_index, response)| match response {
                 Ok(mut bid) => {
-                    if let Err(err) = validate_bid(&mut bid, &self.context).await {
+                    if let Err(err) = validate_bid(&mut bid, &self.context) {
                         tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
-                        continue;
-                    }
-
-                    let value = &bid.message.value;
-                    if value > &best_bid_value {
-                        best_bid_value = value.clone();
-                        best_bids.clear();
-                    }
-                    if value == &best_bid_value {
-                        best_bids.push((i, bid));
+                        None
+                    } else {
+                        Some((bid, relay_index))
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("issue with relay {i}: {err}");
+                    tracing::warn!("failed to get a bid from relay {relay_index}: {err}");
+                    None
                 }
-            }
+            })
+            .collect::<Vec<_>>();
+
+        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (&bid.message.value, *i)));
+
+        if best_indices.is_empty() {
+            return Err(Error::NoBids.into());
         }
 
-        if best_bids.is_empty() {
-            return Err(Error::NoBidsReturned.into());
-        }
-
-        let ((i, best_bid), rest) = best_bids.split_first().unwrap();
-        let mut relay_indices = vec![*i];
-        for (i, bid) in rest {
-            if bid.message.header.block_hash == best_bid.message.header.block_hash {
-                relay_indices.push(*i);
+        // for now, break any ties by picking the first bid,
+        // which currently corresponds to the fastest relay
+        let (best_index, rest) = best_indices.split_first().unwrap();
+        let best_block_hash = &bids[*best_index].0.message.header.block_hash;
+        let mut relay_indices = vec![*best_index];
+        for index in rest.into_iter() {
+            let block_hash = &bids[*index].0.message.header.block_hash;
+            if block_hash == best_block_hash {
+                relay_indices.push(*index);
             }
         }
 
@@ -170,7 +188,7 @@ impl Builder for RelayMux {
         };
         state.outstanding_bids.insert(key, relay_indices);
 
-        Ok(best_bid.clone())
+        Ok(bids[*best_index].0.clone())
     }
 
     async fn open_bid(
