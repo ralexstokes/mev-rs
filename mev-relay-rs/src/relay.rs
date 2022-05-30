@@ -100,7 +100,7 @@ async fn validate_signed_block(
 pub struct Relay {
     state: Arc<Mutex<State>>,
     secret_key: SecretKey,
-    builder_key: BlsPublicKey,
+    public_key: BlsPublicKey,
     context: Arc<Context>,
 }
 
@@ -108,11 +108,11 @@ impl Relay {
     pub fn new(context: Arc<Context>) -> Self {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let builder_key = secret_key.public_key();
+        let public_key = secret_key.public_key();
         Self {
             state: Default::default(),
             secret_key,
-            builder_key,
+            public_key,
             context,
         }
     }
@@ -189,7 +189,7 @@ impl Builder for Relay {
                 ..Default::default()
             },
             value: U256::from_bytes_le([1u8; 32]),
-            public_key: self.builder_key.clone(),
+            public_key: self.public_key.clone(),
         };
 
         // TODO validate gas_limit
