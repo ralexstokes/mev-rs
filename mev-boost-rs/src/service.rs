@@ -2,7 +2,7 @@ use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
-use mev_build_rs::{ApiClient as Relay, ApiServer};
+use mev_build_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
@@ -76,7 +76,7 @@ impl Service {
             relay_mux_clone.run().await;
         }));
 
-        let builder_api = ApiServer::new(self.host, self.port, relay_mux);
+        let builder_api = BlindedBlockProviderServer::new(self.host, self.port, relay_mux);
         tasks.push(tokio::spawn(async move {
             builder_api.run().await;
         }));

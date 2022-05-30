@@ -5,7 +5,7 @@ use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
-    BidRequest, Builder, BuilderBid, Error as BuilderError, ExecutionPayload,
+    BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, ExecutionPayload,
     ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
@@ -32,7 +32,7 @@ pub enum Error {
     Consensus(#[from] ConsensusError),
 }
 
-impl From<Error> for BuilderError {
+impl From<Error> for BlindedBlockProviderError {
     fn from(err: Error) -> Self {
         match err {
             Error::Consensus(err) => err.into(),
@@ -141,11 +141,11 @@ impl From<&ValidatorRegistration> for ValidatorPreferences {
 }
 
 #[async_trait]
-impl Builder for Relay {
+impl BlindedBlockProvider for Relay {
     async fn register_validator(
         &self,
         registrations: &mut [SignedValidatorRegistration],
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), BlindedBlockProviderError> {
         // TODO parallelize?
         for registration in registrations.iter_mut() {
             let latest_timestamp = {
@@ -170,7 +170,7 @@ impl Builder for Relay {
     async fn fetch_best_bid(
         &self,
         bid_request: &BidRequest,
-    ) -> Result<SignedBuilderBid, BuilderError> {
+    ) -> Result<SignedBuilderBid, BlindedBlockProviderError> {
         validate_bid_request(bid_request).await?;
 
         let public_key = &bid_request.public_key;
@@ -206,7 +206,7 @@ impl Builder for Relay {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, BuilderError> {
+    ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         validate_signed_block(signed_block, &self.context).await?;
 
         let block = &signed_block.message;

@@ -9,7 +9,7 @@ use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot}
 use ethereum_consensus::signing::sign_with_domain;
 use ethereum_consensus::state_transition::Context;
 use mev_boost_rs::{Config, Service};
-use mev_build_rs::{sign_builder_message, ApiClient as RelayClient, BidRequest};
+use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;

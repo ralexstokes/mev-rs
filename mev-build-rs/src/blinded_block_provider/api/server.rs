@@ -1,5 +1,4 @@
-use crate::builder::Builder;
-use crate::error::Error;
+use crate::blinded_block_provider::{BlindedBlockProvider, Error};
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
@@ -30,7 +29,7 @@ async fn handle_status_check() -> impl IntoResponse {
     StatusCode::OK
 }
 
-async fn handle_validator_registration<B: Builder>(
+async fn handle_validator_registration<B: BlindedBlockProvider>(
     Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
     Extension(builder): Extension<B>,
 ) -> Result<(), Error> {
@@ -42,7 +41,7 @@ async fn handle_validator_registration<B: Builder>(
         .map_err(From::from)
 }
 
-async fn handle_fetch_bid<B: Builder>(
+async fn handle_fetch_bid<B: BlindedBlockProvider>(
     Path(bid_request): Path<BidRequest>,
     Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
@@ -56,7 +55,7 @@ async fn handle_fetch_bid<B: Builder>(
     }))
 }
 
-async fn handle_open_bid<B: Builder>(
+async fn handle_open_bid<B: BlindedBlockProvider>(
     Json(mut block): Json<SignedBlindedBeaconBlock>,
     Extension(builder): Extension<B>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
@@ -70,13 +69,13 @@ async fn handle_open_bid<B: Builder>(
     }))
 }
 
-pub struct Server<B: Builder> {
+pub struct Server<B: BlindedBlockProvider> {
     host: Ipv4Addr,
     port: u16,
     builder: B,
 }
 
-impl<B: Builder + Clone + Send + Sync + 'static> Server<B> {
+impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
     pub fn new(host: Ipv4Addr, port: u16, builder: B) -> Self {
         Self {
             host,
