@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::blinded_block_provider::Error;
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,

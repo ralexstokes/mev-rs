@@ -4,8 +4,9 @@ use ethereum_consensus::primitives::{Hash32, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
-    verify_signed_builder_message, ApiClient as Relay, BidRequest, Builder, Error as BuilderError,
-    ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
+    verify_signed_builder_message, BidRequest, BlindedBlockProvider,
+    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload,
+    SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -25,7 +26,7 @@ pub enum Error {
     Consensus(#[from] ConsensusError),
 }
 
-impl From<Error> for BuilderError {
+impl From<Error> for BlindedBlockProviderError {
     fn from(err: Error) -> Self {
         match err {
             Error::Consensus(err) => err.into(),
@@ -109,11 +110,11 @@ impl RelayMux {
 }
 
 #[async_trait]
-impl Builder for RelayMux {
+impl BlindedBlockProvider for RelayMux {
     async fn register_validator(
         &self,
         registrations: &mut [SignedValidatorRegistration],
-    ) -> Result<(), BuilderError> {
+    ) -> Result<(), BlindedBlockProviderError> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move { relay.register_validator(registrations).await })
@@ -133,7 +134,7 @@ impl Builder for RelayMux {
     async fn fetch_best_bid(
         &self,
         bid_request: &BidRequest,
-    ) -> Result<SignedBuilderBid, BuilderError> {
+    ) -> Result<SignedBuilderBid, BlindedBlockProviderError> {
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
             .buffer_unordered(self.relays.len())
@@ -192,7 +193,7 @@ impl Builder for RelayMux {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, BuilderError> {
+    ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         let relay_indices = {
             let mut state = self.state.lock().unwrap();
             let key = bid_key_from(signed_block);
