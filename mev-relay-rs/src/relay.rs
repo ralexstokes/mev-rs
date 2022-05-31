@@ -142,7 +142,7 @@ impl From<&ValidatorRegistration> for ValidatorPreferences {
 
 #[async_trait]
 impl BlindedBlockProvider for Relay {
-    async fn register_validator(
+    async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {

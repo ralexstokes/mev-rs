@@ -24,7 +24,7 @@ impl Client {
         api_error_or_ok(response).await
     }
 
-    pub async fn register_validator(
+    pub async fn register_validators(
         &self,
         registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error> {

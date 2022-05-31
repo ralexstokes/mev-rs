@@ -36,7 +36,7 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
     tracing::debug!("processing registrations {registrations:?}");
 
     builder
-        .register_validator(&mut registrations)
+        .register_validators(&mut registrations)
         .await
         .map_err(From::from)
 }

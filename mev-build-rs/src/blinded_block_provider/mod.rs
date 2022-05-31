@@ -37,7 +37,7 @@ impl From<ClientError> for Error {
 
 #[async_trait]
 pub trait BlindedBlockProvider {
-    async fn register_validator(
+    async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error>;

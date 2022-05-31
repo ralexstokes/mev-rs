@@ -112,7 +112,7 @@ async fn test_end_to_end() {
         })
         .collect::<Vec<_>>();
     beacon_node
-        .register_validator(&registrations)
+        .register_validators(&registrations)
         .await
         .unwrap();
 

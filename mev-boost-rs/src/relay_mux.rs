@@ -111,13 +111,13 @@ impl RelayMux {
 
 #[async_trait]
 impl BlindedBlockProvider for RelayMux {
-    async fn register_validator(
+    async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.register_validator(registrations).await })
+            .map(|relay| async move { relay.register_validators(registrations).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
