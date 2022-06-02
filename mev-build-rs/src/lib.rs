@@ -1,4 +1,5 @@
 mod blinded_block_provider;
+mod builder;
 #[cfg(feature = "serde")]
 mod serde;
 mod signing;
@@ -9,6 +10,7 @@ pub use blinded_block_provider::{BlindedBlockProvider, Error as BlindedBlockProv
 pub use blinded_block_provider::{
     Client as BlindedBlockProviderClient, Server as BlindedBlockProviderServer,
 };
+pub use builder::{EngineBuilder, Error as BuilderError};
 pub use signing::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
 };
