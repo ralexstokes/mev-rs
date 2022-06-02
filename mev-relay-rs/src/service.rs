@@ -3,7 +3,6 @@ use ethereum_consensus::state_transition::Context;
 use mev_build_rs::BlindedBlockProviderServer;
 use serde::Deserialize;
 use std::net::Ipv4Addr;
-use std::sync::Arc;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -35,7 +34,7 @@ impl Service {
 
     pub async fn run(&self) {
         let context = Context::default();
-        let relay = Relay::new(Arc::new(context));
+        let relay = Relay::new(context);
         let api_server = BlindedBlockProviderServer::new(self.host, self.port, relay);
         api_server.run().await;
     }
