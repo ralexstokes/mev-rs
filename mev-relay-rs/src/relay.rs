@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use ethereum_consensus::builder::ValidatorRegistration;
+use ethereum_consensus::clock::get_current_unix_time_in_secs;
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
@@ -45,21 +46,46 @@ impl From<Error> for BlindedBlockProviderError {
     }
 }
 
+fn validate_registration_is_not_from_future(
+    timestamp: u64,
+    current_timestamp: u64,
+) -> Result<(), Error> {
+    if timestamp > current_timestamp + 10 {
+        Err(Error::InvalidTimestamp)
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_registration_is_new_or_current(
+    timestamp: u64,
+    latest_timestamp: u64,
+) -> Result<(), Error> {
+    if timestamp < latest_timestamp {
+        Err(Error::InvalidTimestamp)
+    } else {
+        Ok(())
+    }
+}
+
 fn validate_registration(
     registration: &mut SignedValidatorRegistration,
-    _latest_timestamp: Option<u64>,
+    current_timestamp: u64,
+    latest_timestamp: Option<u64>,
     context: &Context,
 ) -> Result<(), Error> {
-    // TODO validations
+    let message = &mut registration.message;
 
-    // track timestamps
-    // -- must be greater than previous successful announcement
-    // -- if more than 10 seconds in future, error
+    validate_registration_is_not_from_future(message.timestamp, current_timestamp)?;
 
+    if let Some(latest_timestamp) = latest_timestamp {
+        validate_registration_is_new_or_current(message.timestamp, latest_timestamp)?;
+    }
+
+    // TODO check once we have pubkey index
     // pubkey is active or in entry queue
     // -- `is_eligible_for_activation` || `is_active_validator`
 
-    let message = &mut registration.message;
     let public_key = message.public_key.clone();
     verify_signed_builder_message(message, &registration.signature, &public_key, context)?;
     Ok(())
@@ -188,21 +214,24 @@ impl BlindedBlockProvider for Relay {
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {
         // TODO parallelize?
+        let mut state = self.inner.state.lock().expect("can lock");
+        let current_time = get_current_unix_time_in_secs();
         for registration in registrations.iter_mut() {
-            let latest_timestamp = {
-                let state = self.inner.state.lock().expect("can lock");
-                state
-                    .validator_preferences
-                    .get(&registration.message.public_key)
-                    .map(|preferences| preferences.timestamp)
-            };
+            let latest_timestamp = state
+                .validator_preferences
+                .get(&registration.message.public_key)
+                .map(|preferences| preferences.timestamp);
 
-            validate_registration(registration, latest_timestamp, &self.inner.context)?;
+            // TODO one failure should not fail the others...
+            validate_registration(
+                registration,
+                current_time,
+                latest_timestamp,
+                &self.inner.context,
+            )?;
 
             let preferences = ValidatorPreferences::from(&registration.message);
             let public_key = registration.message.public_key.clone();
-
-            let mut state = self.inner.state.lock().expect("can lock");
             state.validator_preferences.insert(public_key, preferences);
         }
         Ok(())
