@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use ethereum_consensus::builder::ValidatorRegistration;
 use ethereum_consensus::clock::get_current_unix_time_in_secs;
 use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress, U256};
+use ethereum_consensus::primitives::{BlsPublicKey, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
@@ -10,6 +10,7 @@ use mev_build_rs::{
     EngineBuilder, ExecutionPayload, ExecutionPayloadHeader, ExecutionPayloadWithValue,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -30,6 +31,8 @@ pub enum Error {
     InvalidTimestamp,
     #[error("payload request does not match any outstanding bid")]
     UnknownBid,
+    #[error("payload gas limit does not match the proposer's preference")]
+    InvalidGasLimit,
     #[error("{0}")]
     Consensus(#[from] ConsensusError),
     #[error("{0}")]
@@ -57,15 +60,21 @@ fn validate_registration_is_not_from_future(
     }
 }
 
-fn validate_registration_is_new_or_current(
+fn determine_validator_registration_status(
     timestamp: u64,
     latest_timestamp: u64,
-) -> Result<(), Error> {
-    if timestamp < latest_timestamp {
-        Err(Error::InvalidTimestamp)
-    } else {
-        Ok(())
+) -> ValidatorRegistrationStatus {
+    match timestamp.cmp(&latest_timestamp) {
+        Ordering::Less => ValidatorRegistrationStatus::Outdated,
+        Ordering::Equal => ValidatorRegistrationStatus::Existing,
+        Ordering::Greater => ValidatorRegistrationStatus::New,
     }
+}
+
+enum ValidatorRegistrationStatus {
+    New,
+    Existing,
+    Outdated,
 }
 
 fn validate_registration(
@@ -73,14 +82,20 @@ fn validate_registration(
     current_timestamp: u64,
     latest_timestamp: Option<u64>,
     context: &Context,
-) -> Result<(), Error> {
+) -> Result<ValidatorRegistrationStatus, Error> {
     let message = &mut registration.message;
 
     validate_registration_is_not_from_future(message.timestamp, current_timestamp)?;
 
-    if let Some(latest_timestamp) = latest_timestamp {
-        validate_registration_is_new_or_current(message.timestamp, latest_timestamp)?;
-    }
+    let status = if let Some(latest_timestamp) = latest_timestamp {
+        let status = determine_validator_registration_status(message.timestamp, latest_timestamp);
+        if matches!(status, ValidatorRegistrationStatus::Outdated) {
+            return Err(Error::InvalidTimestamp);
+        }
+        status
+    } else {
+        ValidatorRegistrationStatus::New
+    };
 
     // TODO check once we have pubkey index
     // pubkey is active or in entry queue
@@ -88,7 +103,8 @@ fn validate_registration(
 
     let public_key = message.public_key.clone();
     verify_signed_builder_message(message, &registration.signature, &public_key, context)?;
-    Ok(())
+
+    Ok(status)
 }
 
 fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
@@ -104,13 +120,17 @@ fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
 }
 
 fn validate_execution_payload(
-    _execution_payload: &ExecutionPayload,
+    execution_payload: &ExecutionPayload,
     _value: &U256,
-    _preferences: &ValidatorPreferences,
+    preferences: &ValidatorRegistration,
 ) -> Result<(), Error> {
     // TODO validations
 
-    // verify gas limit respects validator preferences
+    // TODO allow for "adjustment cap" per the protocol rules
+    // towards the proposer's preference
+    if execution_payload.gas_limit != preferences.gas_limit {
+        return Err(Error::InvalidGasLimit);
+    }
 
     // verify payload is valid
 
@@ -147,23 +167,6 @@ fn validate_signed_block(
     Ok(())
 }
 
-#[derive(Debug)]
-struct ValidatorPreferences {
-    pub fee_recipient: ExecutionAddress,
-    pub _gas_limit: u64,
-    pub timestamp: u64,
-}
-
-impl From<&ValidatorRegistration> for ValidatorPreferences {
-    fn from(registration: &ValidatorRegistration) -> Self {
-        Self {
-            fee_recipient: registration.fee_recipient.clone(),
-            _gas_limit: registration.gas_limit,
-            timestamp: registration.timestamp,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct Relay {
     secret_key: SecretKey,
@@ -185,7 +188,7 @@ impl Relay {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct RelayInner {
     state: Mutex<State>,
     builder: EngineBuilder,
@@ -195,15 +198,16 @@ struct RelayInner {
 impl RelayInner {
     pub fn new(context: Context) -> Self {
         Self {
+            state: Default::default(),
+            builder: EngineBuilder::new(context.clone()),
             context,
-            ..Default::default()
         }
     }
 }
 
 #[derive(Debug, Default)]
 struct State {
-    validator_preferences: HashMap<BlsPublicKey, ValidatorPreferences>,
+    validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
     execution_payloads: HashMap<BidRequest, ExecutionPayload>,
 }
 
@@ -213,27 +217,37 @@ impl BlindedBlockProvider for Relay {
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {
-        // TODO parallelize?
-        let mut state = self.inner.state.lock().expect("can lock");
-        let current_time = get_current_unix_time_in_secs();
-        for registration in registrations.iter_mut() {
-            let latest_timestamp = state
-                .validator_preferences
-                .get(&registration.message.public_key)
-                .map(|preferences| preferences.timestamp);
+        let mut new_registrations = {
+            let mut state = self.inner.state.lock().expect("can lock");
+            let current_time = get_current_unix_time_in_secs();
+            let mut new_registrations = vec![];
+            for registration in registrations.iter_mut() {
+                let latest_timestamp = state
+                    .validator_preferences
+                    .get(&registration.message.public_key)
+                    .map(|registration| registration.message.timestamp);
 
-            // TODO one failure should not fail the others...
-            validate_registration(
-                registration,
-                current_time,
-                latest_timestamp,
-                &self.inner.context,
-            )?;
+                // TODO one failure should not fail the others...
+                let status = validate_registration(
+                    registration,
+                    current_time,
+                    latest_timestamp,
+                    &self.inner.context,
+                )?;
 
-            let preferences = ValidatorPreferences::from(&registration.message);
-            let public_key = registration.message.public_key.clone();
-            state.validator_preferences.insert(public_key, preferences);
-        }
+                if matches!(status, ValidatorRegistrationStatus::New) {
+                    let public_key = registration.message.public_key.clone();
+                    state
+                        .validator_preferences
+                        .insert(public_key.clone(), registration.clone());
+                    new_registrations.push(registration.clone());
+                }
+            }
+            new_registrations
+        };
+        self.inner
+            .builder
+            .register_validators(&mut new_registrations)?;
         Ok(())
     }
 
@@ -253,9 +267,7 @@ impl BlindedBlockProvider for Relay {
             .get(&bid_request.public_key)
             .ok_or(Error::UnknownValidator)?;
 
-        // TODO remove once this logic moves into the builder
-        payload.fee_recipient = preferences.fee_recipient.clone();
-        validate_execution_payload(&payload, &value, preferences)?;
+        validate_execution_payload(&payload, &value, &preferences.message)?;
 
         let header = ExecutionPayloadHeader::try_from(&mut payload)?;
 
