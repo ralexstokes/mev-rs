@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethereum_consensus::clock;
-use ethereum_consensus::primitives::{Hash32, U256};
+use ethereum_consensus::primitives::{BlsPublicKey, Hash32, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
@@ -81,6 +81,7 @@ pub struct RelayMuxInner {
 struct State {
     // map from bid requests to index of `Relay` in collection
     outstanding_bids: HashMap<BidRequest, Vec<usize>>,
+    latest_pubkey: BlsPublicKey,
 }
 
 impl RelayMux {
@@ -181,11 +182,12 @@ impl BlindedBlockProvider for RelayMux {
         }
 
         let mut state = self.state.lock().unwrap();
-        let key = BidRequest {
-            public_key: Default::default(),
-            ..bid_request.clone()
-        };
-        state.outstanding_bids.insert(key, relay_indices);
+        // assume the next request to open a bid corresponds to the current request
+        // TODO consider if the relay mux should have more knowledge about the proposal
+        state.latest_pubkey = bid_request.public_key.clone();
+        state
+            .outstanding_bids
+            .insert(bid_request.clone(), relay_indices);
 
         Ok(bids[*best_index].0.clone())
     }
@@ -196,7 +198,7 @@ impl BlindedBlockProvider for RelayMux {
     ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         let relay_indices = {
             let mut state = self.state.lock().unwrap();
-            let key = bid_key_from(signed_block);
+            let key = bid_key_from(signed_block, &state.latest_pubkey);
             match state.outstanding_bids.remove(&key) {
                 Some(indices) => indices,
                 None => return Err(Error::MissingOpenBid.into()),
@@ -235,14 +237,13 @@ impl BlindedBlockProvider for RelayMux {
     }
 }
 
-fn bid_key_from(signed_block: &SignedBlindedBeaconBlock) -> BidRequest {
+fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
     let block = &signed_block.message;
 
     BidRequest {
         slot: block.slot,
         parent_hash: block.body.execution_payload_header.parent_hash.clone(),
-        // TODO get public key
-        public_key: Default::default(),
+        public_key: public_key.clone(),
     }
 }
 
