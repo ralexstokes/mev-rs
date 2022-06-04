@@ -18,6 +18,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Install
       run: rustup update stable
+    - name: Rust Cache
+      uses: Swatinem/rust-cache@v1.3.0
     - name: Format
       run: cargo fmt -- --check
     - name: Run clippy
