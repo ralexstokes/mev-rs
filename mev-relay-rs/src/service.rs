@@ -1,6 +1,7 @@
 use crate::relay::Relay;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
+use futures::future::join_all;
 use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
@@ -27,8 +28,7 @@ impl Default for Config {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    _beacon_node: Client,
-    builder: EngineBuilder,
+    beacon_node: Client,
     context: Arc<Context>,
 }
 
@@ -37,19 +37,29 @@ impl Service {
         let endpoint: Url = config.beacon_node_url.parse().unwrap();
         let beacon_node = Client::new(endpoint);
         let context = Arc::new(Context::for_mainnet());
-        let builder = EngineBuilder::new(context.clone());
         Self {
             host: config.host,
             port: config.port,
-            _beacon_node: beacon_node,
-            builder,
+            beacon_node,
             context,
         }
     }
 
     pub async fn run(&self) {
-        let relay = Relay::new(self.builder.clone(), self.context.clone());
-        let api_server = BlindedBlockProviderServer::new(self.host, self.port, relay);
-        api_server.run().await;
+        let builder = EngineBuilder::new(self.context.clone());
+        let relay = Relay::new(builder, self.beacon_node.clone(), self.context.clone());
+        relay.initialize().await;
+
+        let block_provider = relay.clone();
+        let api_server = BlindedBlockProviderServer::new(self.host, self.port, block_provider);
+
+        let mut tasks = vec![];
+        tasks.push(tokio::spawn(async move {
+            api_server.run().await;
+        }));
+        tasks.push(tokio::spawn(async move {
+            relay.run().await;
+        }));
+        join_all(tasks).await;
     }
 }

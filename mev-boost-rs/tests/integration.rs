@@ -1,4 +1,4 @@
-use beacon_api_client::Client as ApiClient;
+use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::bellatrix::mainnet::{
     BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock,
 };
@@ -8,6 +8,7 @@ use ethereum_consensus::phase0::mainnet::{compute_domain, Validator};
 use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot};
 use ethereum_consensus::signing::sign_with_domain;
 use ethereum_consensus::state_transition::Context;
+use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
@@ -65,8 +66,39 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
 async fn test_end_to_end() {
     setup_logging();
 
+    let mut rng = rand::thread_rng();
+
+    let mut proposers = create_proposers(&mut rng, 4);
+
+    // start mock consensus node
+    let validator_mock_server = MockServer::start();
+    let balance = 32_000_000_000;
+    let validators = proposers
+        .iter()
+        .map(|proposer| ValidatorSummary {
+            index: proposer.index,
+            balance,
+            status: ValidatorStatus::Active,
+            validator: Validator {
+                public_key: proposer.signing_key.public_key(),
+                effective_balance: balance,
+                ..Default::default()
+            },
+        })
+        .collect::<Vec<_>>();
+    validator_mock_server.mock(|when, then| {
+        when.method(GET)
+            .path("/eth/v1/beacon/states/head/validators");
+        let response = serde_json::to_string(&Value { data: validators }).unwrap();
+        then.status(200).body(response);
+    });
+
     // start upstream relay
-    let relay_config = RelayConfig::default();
+    let validator_mock_server_url = validator_mock_server.url("");
+    let relay_config = RelayConfig {
+        beacon_node_url: validator_mock_server_url,
+        ..Default::default()
+    };
     let port = relay_config.port;
     let relay = Relay::from(relay_config);
     tokio::spawn(async move { relay.run().await });
@@ -85,10 +117,6 @@ async fn test_end_to_end() {
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
     ));
-
-    let mut rng = rand::thread_rng();
-
-    let mut proposers = create_proposers(&mut rng, 4);
 
     beacon_node.check_status().await.unwrap();
 

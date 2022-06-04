@@ -1,19 +1,27 @@
+use crate::validator_summary_provider::{
+    Error as ValidatorSummaryProviderError, ValidatorSummaryProvider,
+};
 use async_trait::async_trait;
-use ethereum_consensus::builder::ValidatorRegistration;
-use ethereum_consensus::clock::get_current_unix_time_in_secs;
-use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::primitives::{BlsPublicKey, U256};
-use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
+use beacon_api_client::{Client, ValidatorStatus};
+use ethereum_consensus::{
+    builder::ValidatorRegistration,
+    clock::get_current_unix_time_in_secs,
+    crypto::SecretKey,
+    primitives::{BlsPublicKey, U256},
+    state_transition::{Context, Error as ConsensusError},
+};
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, BuilderError,
     EngineBuilder, ExecutionPayload, ExecutionPayloadHeader, ExecutionPayloadWithValue,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::{
+    cmp::Ordering,
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -34,10 +42,14 @@ pub enum Error {
     UnknownBid,
     #[error("payload gas limit does not match the proposer's preference")]
     InvalidGasLimit,
+    #[error("validator {0} had an invalid status {1}")]
+    InactiveValidator(BlsPublicKey, ValidatorStatus),
     #[error("{0}")]
     Consensus(#[from] ConsensusError),
     #[error("{0}")]
     Builder(#[from] BuilderError),
+    #[error("{0}")]
+    Validators(#[from] ValidatorSummaryProviderError),
 }
 
 impl From<Error> for BlindedBlockProviderError {
@@ -78,7 +90,19 @@ enum ValidatorRegistrationStatus {
     Outdated,
 }
 
+fn validate_validator_status(
+    status: ValidatorStatus,
+    public_key: &BlsPublicKey,
+) -> Result<(), Error> {
+    if matches!(status, ValidatorStatus::Active | ValidatorStatus::Pending) {
+        Ok(())
+    } else {
+        Err(Error::InactiveValidator(public_key.clone(), status))
+    }
+}
+
 fn validate_registration(
+    validators: &ValidatorSummaryProvider,
     registration: &mut SignedValidatorRegistration,
     current_timestamp: u64,
     latest_timestamp: Option<u64>,
@@ -88,7 +112,7 @@ fn validate_registration(
 
     validate_registration_is_not_from_future(message.timestamp, current_timestamp)?;
 
-    let status = if let Some(latest_timestamp) = latest_timestamp {
+    let registration_status = if let Some(latest_timestamp) = latest_timestamp {
         let status = determine_validator_registration_status(message.timestamp, latest_timestamp);
         if matches!(status, ValidatorRegistrationStatus::Outdated) {
             return Err(Error::InvalidTimestamp);
@@ -98,14 +122,13 @@ fn validate_registration(
         ValidatorRegistrationStatus::New
     };
 
-    // TODO check once we have pubkey index
-    // pubkey is active or in entry queue
-    // -- `is_eligible_for_activation` || `is_active_validator`
+    let validator_status = validators.get_status(&message.public_key)?;
+    validate_validator_status(validator_status, &message.public_key)?;
 
     let public_key = message.public_key.clone();
     verify_signed_builder_message(message, &registration.signature, &public_key, context)?;
 
-    Ok(status)
+    Ok(registration_status)
 }
 
 fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
@@ -146,19 +169,13 @@ fn validate_signed_block(
     payload: &mut ExecutionPayload,
     context: &Context,
 ) -> Result<(), Error> {
-    // TODO validations
-
-    // verify payload header matches the one we sent out
-    // TODO can skip allocations if `impl PartialEq<Header> for Payload`
     let header = ExecutionPayloadHeader::try_from(payload)?;
     if signed_block.message.body.execution_payload_header != header {
         return Err(Error::UnknownBlock);
     }
 
-    // verify signature
     let message = &mut signed_block.message;
-    // TODO restore `?` once public keys are accurate
-    let _ = verify_signed_consensus_message(message, &signed_block.signature, public_key, context);
+    let _ = verify_signed_consensus_message(message, &signed_block.signature, public_key, context)?;
 
     // OPTIONAL:
     // -- verify w/ consensus?
@@ -183,18 +200,25 @@ pub struct RelayInner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
     builder: EngineBuilder,
+    validators: ValidatorSummaryProvider,
     context: Arc<Context>,
     state: Mutex<State>,
 }
 
 impl RelayInner {
-    pub fn new(secret_key: SecretKey, builder: EngineBuilder, context: Arc<Context>) -> Self {
+    pub fn new(
+        secret_key: SecretKey,
+        builder: EngineBuilder,
+        validators: ValidatorSummaryProvider,
+        context: Arc<Context>,
+    ) -> Self {
         let public_key = secret_key.public_key();
         Self {
             secret_key,
             public_key,
             context,
             builder,
+            validators,
             state: Default::default(),
         }
     }
@@ -207,11 +231,23 @@ struct State {
 }
 
 impl Relay {
-    pub fn new(builder: EngineBuilder, context: Arc<Context>) -> Self {
+    pub fn new(builder: EngineBuilder, beacon_node: Client, context: Arc<Context>) -> Self {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let inner = RelayInner::new(secret_key, builder, context);
+        let validators = ValidatorSummaryProvider::new(beacon_node);
+        let inner = RelayInner::new(secret_key, builder, validators, context);
         Self(Arc::new(inner))
+    }
+
+    pub async fn initialize(&self) {
+        if let Err(err) = self.validators.load().await {
+            tracing::error!("could not load validator set from provided beacon node; please check config and restart: {err}");
+        }
+    }
+
+    pub async fn run(&self) {
+        // TODO update the validator cache every epoch
+        // TODO garbage collect stale payloads
     }
 }
 
@@ -233,6 +269,7 @@ impl BlindedBlockProvider for Relay {
 
                 // TODO one failure should not fail the others...
                 let status = validate_registration(
+                    &self.validators,
                     registration,
                     current_time,
                     latest_timestamp,
@@ -273,14 +310,9 @@ impl BlindedBlockProvider for Relay {
 
         let header = ExecutionPayloadHeader::try_from(&mut payload)?;
 
-        // TODO restore public key once we can look them up correctly
-        // let bid_request = bid_request.clone();
-        let bid_request = BidRequest {
-            slot: bid_request.slot,
-            parent_hash: bid_request.parent_hash.clone(),
-            ..Default::default()
-        };
-        state.execution_payloads.insert(bid_request, payload);
+        state
+            .execution_payloads
+            .insert(bid_request.clone(), payload);
 
         let mut bid = BuilderBid {
             header,
@@ -302,13 +334,14 @@ impl BlindedBlockProvider for Relay {
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         let block = &signed_block.message;
-        // TODO get correct public key for proposer
-        // NOTE: need access to validator set
-        let proposer_public_key = BlsPublicKey::default();
+        let public_key = self
+            .validators
+            .get_public_key(block.proposer_index)
+            .map_err(Error::from)?;
         let bid_request = BidRequest {
             slot: block.slot,
             parent_hash: block.body.execution_payload_header.parent_hash.clone(),
-            public_key: proposer_public_key,
+            public_key,
         };
 
         let mut state = self.state.lock().expect("can lock");
