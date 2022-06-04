@@ -9,6 +9,7 @@ use mev_build_rs::{
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -61,7 +62,7 @@ fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<us
 #[derive(Clone)]
 pub struct RelayMux(Arc<RelayMuxInner>);
 
-impl std::ops::Deref for RelayMux {
+impl Deref for RelayMux {
     type Target = RelayMuxInner;
 
     fn deref(&self) -> &Self::Target {
@@ -101,7 +102,7 @@ impl RelayMux {
         tokio::pin!(slots);
 
         while let Some(slot) = slots.next().await {
-            let state = self.0.state.lock().unwrap();
+            let state = self.state.lock().unwrap();
             tracing::debug!(
                 "slot {slot}: outstanding bids: {:?}",
                 state.outstanding_bids

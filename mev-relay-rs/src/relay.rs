@@ -12,6 +12,7 @@ use mev_build_rs::{
 };
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
 
@@ -167,40 +168,44 @@ fn validate_signed_block(
     Ok(())
 }
 
-#[derive(Debug, Clone)]
-pub struct Relay {
-    secret_key: SecretKey,
-    public_key: BlsPublicKey,
-    inner: Arc<RelayInner>,
+#[derive(Clone)]
+pub struct Relay(Arc<RelayInner>);
+
+impl Deref for Relay {
+    type Target = RelayInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl Relay {
     pub fn new(context: Context) -> Self {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let public_key = secret_key.public_key();
-        let inner = RelayInner::new(context);
-        Self {
-            secret_key,
-            public_key,
-            inner: Arc::new(inner),
-        }
+        let inner = RelayInner::new(secret_key, context);
+        Self(Arc::new(inner))
     }
 }
 
-#[derive(Debug)]
-struct RelayInner {
-    state: Mutex<State>,
+pub struct RelayInner {
+    secret_key: SecretKey,
+    public_key: BlsPublicKey,
     builder: EngineBuilder,
     context: Context,
+    state: Mutex<State>,
 }
 
 impl RelayInner {
-    pub fn new(context: Context) -> Self {
+    pub fn new(secret_key: SecretKey, context: Context) -> Self {
+        let public_key = secret_key.public_key();
+        let builder = EngineBuilder::new(context.clone());
         Self {
-            state: Default::default(),
-            builder: EngineBuilder::new(context.clone()),
+            secret_key,
+            public_key,
             context,
+            builder,
+            state: Default::default(),
         }
     }
 }
@@ -218,7 +223,7 @@ impl BlindedBlockProvider for Relay {
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {
         let mut new_registrations = {
-            let mut state = self.inner.state.lock().expect("can lock");
+            let mut state = self.state.lock().expect("can lock");
             let current_time = get_current_unix_time_in_secs();
             let mut new_registrations = vec![];
             for registration in registrations.iter_mut() {
@@ -232,7 +237,7 @@ impl BlindedBlockProvider for Relay {
                     registration,
                     current_time,
                     latest_timestamp,
-                    &self.inner.context,
+                    &self.context,
                 )?;
 
                 if matches!(status, ValidatorRegistrationStatus::New) {
@@ -245,9 +250,7 @@ impl BlindedBlockProvider for Relay {
             }
             new_registrations
         };
-        self.inner
-            .builder
-            .register_validators(&mut new_registrations)?;
+        self.builder.register_validators(&mut new_registrations)?;
         Ok(())
     }
 
@@ -258,9 +261,9 @@ impl BlindedBlockProvider for Relay {
         validate_bid_request(bid_request)?;
 
         let ExecutionPayloadWithValue { mut payload, value } =
-            self.inner.builder.get_payload_with_value(bid_request)?;
+            self.builder.get_payload_with_value(bid_request)?;
 
-        let mut state = self.inner.state.lock().expect("can lock");
+        let mut state = self.state.lock().expect("can lock");
 
         let preferences = state
             .validator_preferences
@@ -286,7 +289,7 @@ impl BlindedBlockProvider for Relay {
             public_key: self.public_key.clone(),
         };
 
-        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.inner.context)?;
+        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
         let signed_bid = SignedBuilderBid {
             message: bid,
@@ -309,7 +312,7 @@ impl BlindedBlockProvider for Relay {
             public_key: proposer_public_key,
         };
 
-        let mut state = self.inner.state.lock().expect("can lock");
+        let mut state = self.state.lock().expect("can lock");
         let mut payload = state
             .execution_payloads
             .remove(&bid_request)
@@ -319,7 +322,7 @@ impl BlindedBlockProvider for Relay {
             signed_block,
             &bid_request.public_key,
             &mut payload,
-            &self.inner.context,
+            &self.context,
         )?;
 
         Ok(payload)
