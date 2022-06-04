@@ -10,26 +10,37 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use std::collections::HashMap;
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 
-#[derive(Debug, Clone)]
-pub struct EngineBuilder {
-    _secret_key: SecretKey,
-    _public_key: BlsPublicKey,
-    inner: Arc<EngineBuilderInner>,
+#[derive(Clone)]
+pub struct EngineBuilder(Arc<EngineBuilderInner>);
+
+impl Deref for EngineBuilder {
+    type Target = EngineBuilderInner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
-#[derive(Debug)]
-struct EngineBuilderInner {
+pub struct EngineBuilderInner {
+    _secret_key: SecretKey,
+    _public_key: BlsPublicKey,
+    _context: Arc<Context>,
     state: Mutex<State>,
-    _context: Context,
 }
 
 impl EngineBuilderInner {
-    pub fn new(context: Context) -> Self {
+    pub fn new(context: Arc<Context>) -> Self {
+        let key_bytes = [2u8; 32];
+        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+        let public_key = secret_key.public_key();
         Self {
-            state: Default::default(),
+            _secret_key: secret_key,
+            _public_key: public_key,
             _context: context,
+            state: Default::default(),
         }
     }
 }
@@ -40,16 +51,9 @@ struct State {
 }
 
 impl EngineBuilder {
-    pub fn new(context: Context) -> Self {
-        let key_bytes = [2u8; 32];
-        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let public_key = secret_key.public_key();
+    pub fn new(context: Arc<Context>) -> Self {
         let inner = EngineBuilderInner::new(context);
-        Self {
-            _secret_key: secret_key,
-            _public_key: public_key,
-            inner: Arc::new(inner),
-        }
+        Self(Arc::new(inner))
     }
 
     pub async fn run(&mut self) {}
@@ -58,7 +62,7 @@ impl EngineBuilder {
         &self,
         request: &PayloadRequest,
     ) -> Result<ExecutionPayloadWithValue, Error> {
-        let state = self.inner.state.lock().expect("can lock");
+        let state = self.state.lock().expect("can lock");
         let preferences = state
             .validator_preferences
             .get(&request.public_key)
@@ -88,7 +92,7 @@ impl EngineBuilder {
     ) -> Result<(), BlindedBlockProviderError> {
         // TODO this assumes registrations have already been validated by relay
         // will eventually remove this assumption
-        let mut state = self.inner.state.lock().expect("can lock");
+        let mut state = self.state.lock().expect("can lock");
         for registration in registrations {
             let public_key = registration.message.public_key.clone();
             state

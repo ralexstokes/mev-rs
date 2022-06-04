@@ -11,11 +11,11 @@ rust-version = "1.60.0"
 async-trait = "0.1.53"
 thiserror = "1.0.30"
 http = "0.2.7"
+url = { version = "2.2.2", default-features = false }
 
 serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
-ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
 
 mev-build-rs = { path = "../mev-build-rs"}

@@ -179,27 +179,17 @@ impl Deref for Relay {
     }
 }
 
-impl Relay {
-    pub fn new(context: Context) -> Self {
-        let key_bytes = [1u8; 32];
-        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let inner = RelayInner::new(secret_key, context);
-        Self(Arc::new(inner))
-    }
-}
-
 pub struct RelayInner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
     builder: EngineBuilder,
-    context: Context,
+    context: Arc<Context>,
     state: Mutex<State>,
 }
 
 impl RelayInner {
-    pub fn new(secret_key: SecretKey, context: Context) -> Self {
+    pub fn new(secret_key: SecretKey, builder: EngineBuilder, context: Arc<Context>) -> Self {
         let public_key = secret_key.public_key();
-        let builder = EngineBuilder::new(context.clone());
         Self {
             secret_key,
             public_key,
@@ -214,6 +204,15 @@ impl RelayInner {
 struct State {
     validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
     execution_payloads: HashMap<BidRequest, ExecutionPayload>,
+}
+
+impl Relay {
+    pub fn new(builder: EngineBuilder, context: Arc<Context>) -> Self {
+        let key_bytes = [1u8; 32];
+        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+        let inner = RelayInner::new(secret_key, builder, context);
+        Self(Arc::new(inner))
+    }
 }
 
 #[async_trait]
