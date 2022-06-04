@@ -14,7 +14,8 @@ use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient 
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tokio::time::sleep;
 use url::Url;
 
 fn setup_logging() {
@@ -112,7 +113,10 @@ async fn test_end_to_end() {
     tokio::spawn(async move { service.run().await });
 
     // let other tasks run so servers boot before we proceed
-    tokio::task::yield_now().await;
+    // NOTE: there are more races amongst the various services as we add more
+    // hardcode a sleep to ensure services are all booted before
+    // proceeding across multiple types of environments
+    sleep(Duration::from_secs(1)).await;
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
