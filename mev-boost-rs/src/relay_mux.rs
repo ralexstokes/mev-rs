@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use ethereum_consensus::clock;
-use ethereum_consensus::primitives::{BlsPublicKey, Hash32, U256};
+use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
@@ -12,6 +12,10 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
+
+// See note in the `mev-relay-rs::Relay` about this constant.
+// TODO likely drop this feature...
+const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -102,11 +106,10 @@ impl RelayMux {
         tokio::pin!(slots);
 
         while let Some(slot) = slots.next().await {
-            let state = self.state.lock().unwrap();
-            tracing::debug!(
-                "slot {slot}: outstanding bids: {:?}",
-                state.outstanding_bids
-            );
+            let mut state = self.state.lock().unwrap();
+            state
+                .outstanding_bids
+                .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
         }
     }
 }

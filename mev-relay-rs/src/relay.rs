@@ -5,11 +5,13 @@ use async_trait::async_trait;
 use beacon_api_client::{Client, ValidatorStatus};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
+    clock,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, U256},
+    primitives::{BlsPublicKey, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
+use futures::StreamExt;
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, BuilderError,
@@ -23,6 +25,13 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
+
+// `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
+// once they have been fetched from builders -- currently in response to an incoming request from a proposer.
+// Setting this to anything other than `0` incentivizes late proposals and setting it to `1` allows for latency
+// at the slot boundary while still enabling a successful proposal.
+// TODO likely drop this feature...
+const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -239,15 +248,35 @@ impl Relay {
         Self(Arc::new(inner))
     }
 
-    pub async fn initialize(&self) {
+    async fn load_full_validator_set(&self) {
         if let Err(err) = self.validators.load().await {
             tracing::error!("could not load validator set from provided beacon node; please check config and restart: {err}");
         }
     }
 
+    pub async fn initialize(&self) {
+        self.load_full_validator_set().await;
+    }
+
     pub async fn run(&self) {
-        // TODO update the validator cache every epoch
-        // TODO garbage collect stale payloads
+        let clock = clock::for_mainnet();
+        let slots = clock.stream_slots();
+
+        tokio::pin!(slots);
+
+        let mut current_epoch = clock.current_epoch();
+        while let Some(slot) = slots.next().await {
+            let epoch = clock.epoch_for(slot);
+            if epoch > current_epoch {
+                current_epoch = epoch;
+                // TODO grab validators more efficiently
+                self.load_full_validator_set().await;
+            }
+            let mut state = self.state.lock().unwrap();
+            state
+                .execution_payloads
+                .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+        }
     }
 }
 
