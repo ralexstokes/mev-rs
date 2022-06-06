@@ -5,13 +5,11 @@ use async_trait::async_trait;
 use beacon_api_client::{Client, ValidatorStatus};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
-    clock,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
     primitives::{BlsPublicKey, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
-use futures::StreamExt;
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, BuilderError,
@@ -25,6 +23,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
+use tokio::sync::broadcast;
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
 // once they have been fetched from builders -- currently in response to an incoming request from a proposer.
@@ -195,17 +194,17 @@ fn validate_signed_block(
 }
 
 #[derive(Clone)]
-pub struct Relay(Arc<RelayInner>);
+pub struct Relay(Arc<Inner>);
 
 impl Deref for Relay {
-    type Target = RelayInner;
+    type Target = Inner;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-pub struct RelayInner {
+pub struct Inner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
     builder: EngineBuilder,
@@ -214,7 +213,7 @@ pub struct RelayInner {
     state: Mutex<State>,
 }
 
-impl RelayInner {
+impl Inner {
     pub fn new(
         secret_key: SecretKey,
         builder: EngineBuilder,
@@ -225,9 +224,9 @@ impl RelayInner {
         Self {
             secret_key,
             public_key,
-            context,
             builder,
             validators,
+            context,
             state: Default::default(),
         }
     }
@@ -244,7 +243,7 @@ impl Relay {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
         let validators = ValidatorSummaryProvider::new(beacon_node);
-        let inner = RelayInner::new(secret_key, builder, validators, context);
+        let inner = Inner::new(secret_key, builder, validators, context);
         Self(Arc::new(inner))
     }
 
@@ -258,15 +257,10 @@ impl Relay {
         self.load_full_validator_set().await;
     }
 
-    pub async fn run(&self) {
-        let clock = clock::for_mainnet();
-        let slots = clock.stream_slots();
-
-        tokio::pin!(slots);
-
-        let mut current_epoch = clock.current_epoch();
-        while let Some(slot) = slots.next().await {
-            let epoch = clock.epoch_for(slot);
+    pub async fn run(&self, mut timer: broadcast::Receiver<Slot>, current_slot: Slot) {
+        let mut current_epoch = current_slot / self.context.slots_per_epoch;
+        while let Ok(slot) = timer.recv().await {
+            let epoch = slot / self.context.slots_per_epoch;
             if epoch > current_epoch {
                 current_epoch = epoch;
                 // TODO grab validators more efficiently
