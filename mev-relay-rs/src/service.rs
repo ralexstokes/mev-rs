@@ -93,8 +93,18 @@ impl Service {
             build_job_tx,
         );
 
-        let builder = EngineBuilder::new(build_job_rx, proposer_schedule_rx);
-        let mut builder_handle = builder.clone();
+        let genesis_time = match self.beacon_node.get_genesis_details().await {
+            Ok(details) => details.genesis_time,
+            Err(err) => {
+                tracing::warn!(
+                    "could not get `genesis_time` from beacon node; please restart after fixing"
+                );
+                return;
+            }
+        };
+
+        let builder = EngineBuilder::new(genesis_time, self.context.seconds_per_slot);
+        let builder_handle = builder.clone();
 
         let relay = Relay::new(builder, self.beacon_node.clone(), self.context.clone());
 
@@ -124,7 +134,7 @@ impl Service {
             api_server.run().await;
         }));
         tasks.push(tokio::spawn(async move {
-            builder_handle.run().await;
+            builder_handle.run(build_job_rx, proposer_schedule_rx).await;
         }));
         tasks.push(tokio::spawn(async move {
             proposer_scheduler.run().await;

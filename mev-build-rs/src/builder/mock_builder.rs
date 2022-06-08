@@ -17,9 +17,9 @@ use tokio::sync::mpsc;
 type PayloadId = u64;
 
 #[derive(Clone)]
-pub struct EngineBuilder(Arc<Inner>);
+pub struct MockBuilder(Arc<Inner>);
 
-impl Deref for EngineBuilder {
+impl Deref for MockBuilder {
     type Target = Inner;
 
     fn deref(&self) -> &Self::Target {
@@ -57,7 +57,7 @@ struct State {
     available_payloads: HashMap<PayloadRequest, PayloadId>,
 }
 
-impl EngineBuilder {
+impl MockBuilder {
     pub fn new(genesis_time: u64, seconds_per_slot: u64) -> Self {
         let inner = Inner::new(genesis_time, seconds_per_slot);
         Self(Arc::new(inner))
@@ -144,17 +144,21 @@ impl EngineBuilder {
     ) -> Result<ExecutionPayloadWithValue, Error> {
         let state = self.state.lock().expect("can lock");
 
-        let payload_id = state
-            .available_payloads
-            .get(request)
-            .ok_or_else(|| Error::NoPayloadPrepared(request.clone()))?;
+        let preferences = state
+            .validator_preferences
+            .get(&request.public_key)
+            .ok_or_else(|| Error::MissingPreferences(request.public_key.clone()))?;
 
-        // TODO:
-        // call `engine_getPayloadV1` with `payloadId` => `ExecutionPayload`
+        let fee_recipient = preferences.message.fee_recipient.clone();
+        let gas_limit = preferences.message.gas_limit;
 
-        let payload = ExecutionPayload::default();
-
-        // TODO figure out `value` to send
+        let payload = ExecutionPayload {
+            parent_hash: request.parent_hash.clone(),
+            fee_recipient,
+            gas_limit,
+            extra_data: ByteList::try_from(b"hello world".as_ref()).unwrap(),
+            ..Default::default()
+        };
 
         let bid = ExecutionPayloadWithValue {
             payload,

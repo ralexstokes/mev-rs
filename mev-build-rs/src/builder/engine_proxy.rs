@@ -3,10 +3,10 @@ use tokio::sync::mpsc;
 use url::Url;
 
 pub struct BuildJob {
-    head_block_hash: Hash32,
-    timestamp: u64,
-    suggested_fee_recipient: ExecutionAddress,
-    payload_id: u64,
+    pub head_block_hash: Hash32,
+    pub timestamp: u64,
+    pub suggested_fee_recipient: ExecutionAddress,
+    pub payload_id: u64,
 }
 
 pub struct EngineProxy {

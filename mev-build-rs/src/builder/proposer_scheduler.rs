@@ -30,7 +30,13 @@ struct State {}
 
 pub type ProposerPreparation = (ValidatorIndex, ExecutionAddress);
 
-pub type ProposerSchedule = (Vec<BlsPublicKey>, oneshot::Sender<Vec<ProposerPreparation>>);
+pub struct Duty {
+    pub slot: Slot,
+    pub public_key: BlsPublicKey,
+    pub validator_index: ValidatorIndex,
+}
+
+pub type ProposerSchedule = (Vec<Duty>, oneshot::Sender<Vec<ProposerPreparation>>);
 
 impl ProposerScheduler {
     pub fn new(
