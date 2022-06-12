@@ -253,11 +253,13 @@ impl Relay {
         }
     }
 
-    pub async fn initialize(&self) {
+    async fn initialize(&self) {
         self.load_full_validator_set().await;
     }
 
     pub async fn run(&self, mut timer: broadcast::Receiver<Slot>, current_slot: Slot) {
+        self.initialize().await;
+
         let mut current_epoch = current_slot / self.context.slots_per_epoch;
         while let Ok(slot) = timer.recv().await {
             let epoch = slot / self.context.slots_per_epoch;
@@ -320,7 +322,7 @@ impl BlindedBlockProvider for Relay {
         validate_bid_request(bid_request)?;
 
         let ExecutionPayloadWithValue { mut payload, value } =
-            self.builder.get_payload_with_value(bid_request)?;
+            self.builder.get_payload_with_value(bid_request).await?;
 
         let mut state = self.state.lock().expect("can lock");
 

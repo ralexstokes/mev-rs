@@ -80,12 +80,8 @@ impl Service {
 
         let clock = clock::for_mainnet();
 
-        let mut proposer_scheduler = ProposerScheduler::new(
-            proposer_timer,
-            proposer_schedule_tx,
-            self.beacon_node.clone(),
-            self.context.slots_per_epoch,
-        );
+        let proposer_scheduler =
+            ProposerScheduler::new(self.beacon_node.clone(), self.context.slots_per_epoch);
 
         let engine_proxy = EngineProxy::new(
             self.proxy_endpoint.clone(),
@@ -115,8 +111,8 @@ impl Service {
         let api_server = BlindedBlockProviderServer::new(self.host, self.port, block_provider);
 
         // initialize and launch each component:
-        relay.initialize().await;
         let current_slot = clock.current_slot();
+        let current_epoch = clock.epoch_for(current_slot);
         let timer_task = tokio::spawn(async move {
             let slots = clock.stream_slots();
 
@@ -140,7 +136,9 @@ impl Service {
             builder_handle.run(build_job_rx, proposer_schedule_rx).await;
         }));
         tasks.push(tokio::spawn(async move {
-            proposer_scheduler.run().await;
+            proposer_scheduler
+                .run(proposer_timer, proposer_schedule_tx, current_epoch)
+                .await;
         }));
         tasks.push(tokio::spawn(async move {
             relay.run(relay_timer, current_slot).await;

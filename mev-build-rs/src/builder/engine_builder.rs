@@ -1,12 +1,11 @@
 use crate::blinded_block_provider::Error as BlindedBlockProviderError;
-use crate::builder::{
-    BuildJob, Duty, Error, PayloadId, ProposerPreparation, ProposerSchedule, RpcResponse,
-};
+use crate::builder::{BuildJob, Error, PayloadId, ProposerSchedule, RpcResponse};
 use crate::types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue};
 use anvil_rpc::{
     request::{Id, RequestParams, RpcMethodCall, Version},
     response::ResponseResult,
 };
+use beacon_api_client::{BeaconProposerRegistration, ProposerDuty};
 use ethereum_consensus::{
     bellatrix::mainnet::ExecutionPayload,
     builder::SignedValidatorRegistration,
@@ -102,7 +101,7 @@ impl EngineBuilder {
             .get(&build_job.suggested_fee_recipient)
             .ok_or_else(|| Error::UnknownFeeRecipient(build_job.suggested_fee_recipient.clone()))?;
         let payload_request = derive_payload_request(
-            &build_job,
+            build_job,
             public_key,
             self.genesis_time,
             self.seconds_per_slot,
@@ -115,16 +114,16 @@ impl EngineBuilder {
 
     fn process_proposer_schedule(
         &self,
-        schedule: &[Duty],
-    ) -> Result<Vec<ProposerPreparation>, Error> {
+        schedule: &[ProposerDuty],
+    ) -> Result<Vec<BeaconProposerRegistration>, Error> {
         let state = self.state.lock().expect("can lock");
         let mut preparations = vec![];
         for duty in schedule {
             if let Some(registration) = state.validator_preferences.get(&duty.public_key) {
-                let preparation = (
-                    duty.validator_index,
-                    registration.message.fee_recipient.clone(),
-                );
+                let preparation = BeaconProposerRegistration {
+                    validator_index: duty.validator_index,
+                    fee_recipient: registration.message.fee_recipient.clone(),
+                };
                 preparations.push(preparation);
             }
         }
@@ -188,7 +187,7 @@ impl EngineBuilder {
             }
             ResponseResult::Error(rpc_error) => {
                 tracing::warn!("error with `engine_getPayloadV1` endpoint: {rpc_error}");
-                return Err(Error::Rpc(rpc_error.to_string()));
+                Err(Error::Rpc(rpc_error.to_string()))
             }
         }
     }

@@ -150,7 +150,6 @@ impl ProxyHandler {
 
                 if let Err(job) = self.build_jobs.send(job).await {
                     tracing::warn!("could not send build job to builder: {job}");
-                    return;
                 }
             }
         }
@@ -174,7 +173,7 @@ impl ProxyHandler {
             Ok(result) => result,
             Err(err) => {
                 tracing::warn!("error proxying engine API call: {err}");
-                return RpcError::parse_error().into();
+                RpcError::parse_error().into()
             }
         }
     }
