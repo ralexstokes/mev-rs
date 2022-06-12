@@ -3,7 +3,7 @@ use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, VersionedValue};
+use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, Value};
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -44,7 +44,7 @@ impl Client {
             "/eth/v1/builder/header/{}/{}/{}",
             bid_request.slot, bid_request.parent_hash, bid_request.public_key
         );
-        let response: VersionedValue<SignedBuilderBid> = self.api.get(&target).await?;
+        let response: Value<SignedBuilderBid> = self.api.get(&target).await?;
         Ok(response.data)
     }
 
@@ -52,7 +52,7 @@ impl Client {
         &self,
         signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let response: VersionedValue<ExecutionPayload> = self
+        let response: Value<ExecutionPayload> = self
             .api
             .post("/eth/v1/builder/blinded_blocks", signed_block)
             .await?;

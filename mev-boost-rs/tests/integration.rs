@@ -14,6 +14,7 @@ use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient 
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand;
 use rand::seq::SliceRandom;
+use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 use url::Url;
@@ -90,7 +91,11 @@ async fn test_end_to_end() {
     validator_mock_server.mock(|when, then| {
         when.method(GET)
             .path("/eth/v1/beacon/states/head/validators");
-        let response = serde_json::to_string(&Value { data: validators }).unwrap();
+        let response = serde_json::to_string(&Value {
+            data: validators,
+            meta: HashMap::new(),
+        })
+        .unwrap();
         then.status(200).body(response);
     });
 

@@ -10,7 +10,8 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use beacon_api_client::{ApiError, ConsensusVersion, VersionedValue};
+use beacon_api_client::{ApiError, ConsensusVersion, Value};
+use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr};
 
 impl IntoResponse for Error {
@@ -44,13 +45,14 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
 async fn handle_fetch_bid<B: BlindedBlockProvider>(
     Path(bid_request): Path<BidRequest>,
     Extension(builder): Extension<B>,
-) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
+) -> Result<Json<Value<SignedBuilderBid>>, Error> {
     tracing::debug!("fetching best bid for block for request {bid_request:?}");
 
     let signed_bid = builder.fetch_best_bid(&bid_request).await?;
 
-    Ok(Json(VersionedValue {
-        version: ConsensusVersion::Bellatrix,
+    let version = serde_json::to_value(ConsensusVersion::Bellatrix).unwrap();
+    Ok(Json(Value {
+        meta: HashMap::from_iter([("version".to_string(), version)]),
         data: signed_bid,
     }))
 }
@@ -58,13 +60,14 @@ async fn handle_fetch_bid<B: BlindedBlockProvider>(
 async fn handle_open_bid<B: BlindedBlockProvider>(
     Json(mut block): Json<SignedBlindedBeaconBlock>,
     Extension(builder): Extension<B>,
-) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
+) -> Result<Json<Value<ExecutionPayload>>, Error> {
     tracing::debug!("opening bid for block {block:?}");
 
     let payload = builder.open_bid(&mut block).await?;
 
-    Ok(Json(VersionedValue {
-        version: ConsensusVersion::Bellatrix,
+    let version = serde_json::to_value(ConsensusVersion::Bellatrix).unwrap();
+    Ok(Json(Value {
+        meta: HashMap::from_iter([("version".to_string(), version)]),
         data: payload,
     }))
 }
