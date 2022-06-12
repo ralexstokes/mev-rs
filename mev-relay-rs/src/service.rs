@@ -87,23 +87,26 @@ impl Service {
             self.context.slots_per_epoch,
         );
 
-        let mut engine_proxy = EngineProxy::new(
+        let engine_proxy = EngineProxy::new(
             self.proxy_endpoint.clone(),
             self.engine_api_endpoint.clone(),
-            build_job_tx,
         );
 
         let genesis_time = match self.beacon_node.get_genesis_details().await {
             Ok(details) => details.genesis_time,
             Err(err) => {
                 tracing::warn!(
-                    "could not get `genesis_time` from beacon node; please restart after fixing"
+                    "could not get `genesis_time` from beacon node; please restart after fixing: {err}"
                 );
                 return;
             }
         };
 
-        let builder = EngineBuilder::new(genesis_time, self.context.seconds_per_slot);
+        let builder = EngineBuilder::new(
+            genesis_time,
+            self.context.seconds_per_slot,
+            self.engine_api_endpoint.clone(),
+        );
         let builder_handle = builder.clone();
 
         let relay = Relay::new(builder, self.beacon_node.clone(), self.context.clone());
@@ -128,7 +131,7 @@ impl Service {
 
         let mut tasks = vec![timer_task];
         tasks.push(tokio::spawn(async move {
-            engine_proxy.run().await;
+            engine_proxy.run(build_job_tx).await;
         }));
         tasks.push(tokio::spawn(async move {
             api_server.run().await;

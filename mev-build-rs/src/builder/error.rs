@@ -10,4 +10,10 @@ pub enum Error {
     MissingPreferences(BlsPublicKey),
     #[error("no payload prepared for request: {0:?}")]
     NoPayloadPrepared(PayloadRequest),
+    #[error("error with rpc: {0}")]
+    Rpc(String),
+    #[error("error with http request: {0}")]
+    Http(#[from] reqwest::Error),
+    #[error("json error: {0}")]
+    Json(#[from] serde_json::Error),
 }
