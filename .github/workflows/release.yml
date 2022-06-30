@@ -18,12 +18,9 @@ jobs:
     name:   Build Release
     strategy:
       matrix:
-        arch: [aarch64-unknown-linux-gnu,
-               x86_64-unknown-linux-gnu,
+        arch: [x86_64-unknown-linux-gnu,
                x86_64-apple-darwin]
         include:
-          -   arch: aarch64-unknown-linux-gnu
-              platform: ubuntu-latest
           -   arch: x86_64-unknown-linux-gnu
               platform: ubuntu-latest
           -   arch: x86_64-apple-darwin
@@ -95,7 +92,7 @@ jobs:
 
       - name: Create Release Draft
         env:
-          GITHUB_USER: realbigsean
+          GITHUB_USER: ralexstokes
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
         # The formatting here is adapted from OpenEthereum: https://github.com/openethereum/openethereum/blob/main/.github/workflows/build.yml
@@ -113,7 +110,6 @@ jobs:
           |:---:|:---:|:---:|
           | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz) | 
           | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz) | 
-          | <img src="https://simpleicons.org/icons/raspberrypi.svg" style="width: 32px;"/> | aarch64 | [mev-rs-${{ env.VERSION }}-aarch64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-aarch64-unknown-linux-gnu.tar.gz) | 
 
           ENDBODY
           )
