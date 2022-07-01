@@ -15,7 +15,7 @@ jobs:
     outputs:
       VERSION: ${{ steps.extract_version.outputs.VERSION }}
   build:
-    name:   Build Release
+    name: Build Release
     strategy:
       matrix:
         arch: [x86_64-unknown-linux-gnu,
