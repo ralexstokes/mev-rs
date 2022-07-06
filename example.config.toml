@@ -8,3 +8,4 @@ relays = [
 [relay]
 host = "0.0.0.0"
 port = 28545
+beacon_node_url = "http://127.0.0.1:5052"

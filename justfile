@@ -4,8 +4,10 @@ run-integration-tests:
     cargo test --test '*'
 fmt:
     cargo fmt
-lint: fmt
+lint: fmt validate-example-config
     cargo clippy
+validate-example-config:
+    cargo run config example.config.toml
 build:
     cargo build
 run-ci: lint build test
