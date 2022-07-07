@@ -1,9 +1,11 @@
 use crate::blinded_block_provider::Error;
+use crate::builder::Error as BuilderError;
 use crate::types::{
     BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
-use beacon_api_client::{api_error_or_ok, Client as BeaconApiClient, Value};
+use axum::http::StatusCode;
+use beacon_api_client::{api_error_or_ok, ApiResult, Client as BeaconApiClient, Value};
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -43,8 +45,20 @@ impl Client {
             "/eth/v1/builder/header/{}/{}/{}",
             bid_request.slot, bid_request.parent_hash, bid_request.public_key
         );
-        let response: Value<SignedBuilderBid> = self.api.get(&target).await?;
-        Ok(response.data)
+        let response = self.api.http_get(&target).await?;
+
+        if response.status() == StatusCode::NO_CONTENT {
+            return Err(BuilderError::NoHeaderPrepared(bid_request.clone()).into());
+        }
+
+        let result: ApiResult<Value<SignedBuilderBid>> = response
+            .json()
+            .await
+            .map_err(beacon_api_client::Error::Http)?;
+        match result {
+            ApiResult::Ok(result) => Ok(result.data),
+            ApiResult::Err(err) => Err(err.into()),
+        }
     }
 
     pub async fn open_bid(
