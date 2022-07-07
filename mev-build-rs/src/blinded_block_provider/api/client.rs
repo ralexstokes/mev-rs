@@ -32,8 +32,7 @@ impl Client {
             .api
             .http_post("/eth/v1/builder/validators", &registrations)
             .await?;
-        let result = api_error_or_ok(response).await?;
-        Ok(result)
+        api_error_or_ok(response).await.map_err(From::from)
     }
 
     pub async fn fetch_best_bid(

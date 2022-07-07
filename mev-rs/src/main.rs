@@ -20,6 +20,7 @@ struct Cli {
 enum Commands {
     Boost(boost::Command),
     Relay(relay::Command),
+    Config(config::Command),
 }
 
 fn setup_logging() {
@@ -47,6 +48,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute()).await?,
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute()).await?,
+        Commands::Config(cmd) => run_task_until_signal(cmd.execute()).await?,
     }
     Ok(())
 }

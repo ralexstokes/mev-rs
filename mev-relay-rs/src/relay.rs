@@ -184,7 +184,7 @@ fn validate_signed_block(
     }
 
     let message = &mut signed_block.message;
-    let _ = verify_signed_consensus_message(message, &signed_block.signature, public_key, context)?;
+    verify_signed_consensus_message(message, &signed_block.signature, public_key, context)?;
 
     // OPTIONAL:
     // -- verify w/ consensus?
