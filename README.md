@@ -16,7 +16,7 @@ It has not been audited for security purposes and should not be used in producti
 
 # Status
 
-Implements `v0.1.0` of the [`builder-specs`](https://github.com/ethereum/builder-specs)
+Implements `v0.2.0` of the [`builder-specs`](https://github.com/ethereum/builder-specs)
 
 # Requirements
 
