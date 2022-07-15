@@ -203,10 +203,10 @@ impl BlindedBlockProvider for RelayMux {
         let relay_indices = {
             let mut state = self.state.lock().unwrap();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
-            match state.outstanding_bids.remove(&key) {
-                Some(indices) => indices,
-                None => return Err(Error::MissingOpenBid.into()),
-            }
+            state
+                .outstanding_bids
+                .remove(&key)
+                .ok_or_else(|| Error::MissingOpenBid.into())?
         };
 
         let signed_block = &signed_block;
