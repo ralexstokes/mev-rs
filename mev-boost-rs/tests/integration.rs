@@ -12,7 +12,7 @@ use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
-use rand;
+
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -49,8 +49,10 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             let signing_key = SecretKey::random(rng).unwrap();
             let public_key = signing_key.public_key();
 
-            let mut validator = Validator::default();
-            validator.public_key = public_key;
+            let validator = Validator {
+                public_key,
+                ..Default::default()
+            };
 
             let fee_recipient = ExecutionAddress::try_from([i as u8; 20].as_ref()).unwrap();
 
@@ -171,12 +173,12 @@ async fn propose_block(
     let current_slot = 32 + shuffling_index as Slot;
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
 
-    let mut request = BidRequest {
+    let request = BidRequest {
         slot: current_slot,
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.public_key.clone(),
     };
-    let signed_bid = beacon_node.fetch_best_bid(&mut request).await.unwrap();
+    let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
     let bid = &signed_bid.message;
     assert_eq!(bid.header.parent_hash, parent_hash);
 
@@ -193,14 +195,14 @@ async fn propose_block(
     // TODO provide realistic values
     let domain = compute_domain(DomainType::BeaconProposer, None, None, context).unwrap();
     let signature = sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
-    let mut signed_block = SignedBlindedBeaconBlock {
+    let signed_block = SignedBlindedBeaconBlock {
         message: beacon_block,
         signature,
     };
 
     beacon_node.check_status().await.unwrap();
 
-    let payload = beacon_node.open_bid(&mut signed_block).await.unwrap();
+    let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
     assert_eq!(payload.parent_hash, parent_hash);
     assert_eq!(payload.fee_recipient, proposer.fee_recipient);
