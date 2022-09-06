@@ -5,7 +5,9 @@ use crate::types::{
     SignedValidatorRegistration,
 };
 use axum::http::StatusCode;
-use beacon_api_client::{api_error_or_ok, ApiResult, Client as BeaconApiClient, Value};
+use beacon_api_client::{
+    api_error_or_ok, ApiResult, Client as BeaconApiClient, Error as BeaconApiError, Value,
+};
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -65,10 +67,15 @@ impl Client {
         &self,
         signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let response: Value<ExecutionPayload> = self
+        let response = self
             .api
-            .post("/eth/v1/builder/blinded_blocks", signed_block)
+            .http_post("/eth/v1/builder/blinded_blocks", signed_block)
             .await?;
+
+        let response: Value<ExecutionPayload> = response
+            .json()
+            .await
+            .map_err(|err| -> Error { BeaconApiError::Http(err).into() })?;
         Ok(response.data)
     }
 }

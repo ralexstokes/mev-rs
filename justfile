@@ -5,7 +5,7 @@ run-integration-tests:
 fmt:
     cargo fmt
 lint: fmt validate-example-config
-    cargo clippy
+    cargo clippy --all-targets --all-features
 validate-example-config:
     cargo run config example.config.toml
 build:
