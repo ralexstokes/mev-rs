@@ -19,7 +19,7 @@ url = { version = "2.2.2", default-features = false }
 
 serde = { version = "1.0", features = ["derive"] }
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "v0.1.1" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "69c3eda" }
 
 mev-build-rs = { path = "../mev-build-rs"}
