@@ -21,4 +21,4 @@ thiserror = "1.0.30"
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "bbfccc7f21d71465b38bc7910e3ea867d7facf4f",  optional = true }
