@@ -108,7 +108,7 @@ async fn test_end_to_end() {
         ..Default::default()
     };
     let port = relay_config.port;
-    let relay = Relay::from(relay_config);
+    let relay = Relay::from(relay_config, Default::default());
     tokio::spawn(async move { relay.run().await });
 
     // start mux server
@@ -116,7 +116,7 @@ async fn test_end_to_end() {
     config.relays.push(format!("http://127.0.0.1:{port}"));
 
     let mux_port = config.port;
-    let service = Service::from(config);
+    let service = Service::from(config, Default::default());
     tokio::spawn(async move { service.run().await });
 
     // let other tasks run so servers boot before we proceed

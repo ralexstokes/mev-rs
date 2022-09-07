@@ -1,11 +1,11 @@
 use async_trait::async_trait;
-use ethereum_consensus::clock;
+use ethereum_consensus::clock::{Clock, SystemTimeProvider};
 use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
     verify_signed_builder_message, BidRequest, BlindedBlockProvider,
-    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload,
+    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use std::collections::HashMap;
@@ -80,6 +80,7 @@ pub struct RelayMuxInner {
     relays: Vec<Relay>,
     context: Arc<Context>,
     state: Mutex<State>,
+    network: Network,
 }
 
 #[derive(Debug, Default)]
@@ -90,17 +91,22 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(relays: impl Iterator<Item = Relay>, context: Arc<Context>) -> Self {
+    pub fn new(
+        relays: impl Iterator<Item = Relay>,
+        context: Arc<Context>,
+        network: Network,
+    ) -> Self {
         let inner = RelayMuxInner {
             relays: relays.collect(),
             context,
             state: Default::default(),
+            network,
         };
         Self(Arc::new(inner))
     }
 
     pub async fn run(&self) {
-        let clock = clock::for_mainnet();
+        let clock: Clock<SystemTimeProvider> = self.network.into();
         let slots = clock.stream_slots();
 
         tokio::pin!(slots);

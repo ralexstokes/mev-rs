@@ -1,6 +1,7 @@
 use crate::config::Config;
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
+use mev_build_rs::Network;
 use mev_relay_rs::Service;
 
 #[derive(Debug, Args)]
@@ -22,7 +23,7 @@ pub(crate) enum Commands {
 }
 
 impl Command {
-    pub(crate) async fn execute(&self) -> Result<()> {
+    pub(crate) async fn execute(&self, network: Network) -> Result<()> {
         let (config_file, _mock) = if let Some(subcommand) = self.command.as_ref() {
             match subcommand {
                 Commands::Mock { config_file } => (config_file, true),
@@ -35,7 +36,7 @@ impl Command {
 
         if let Some(config) = config.relay {
             // TODO separate mock and "real" modes
-            Service::from(config).run().await;
+            Service::from(config, network).run().await;
             Ok(())
         } else {
             Err(anyhow!("missing relay config from file provided"))

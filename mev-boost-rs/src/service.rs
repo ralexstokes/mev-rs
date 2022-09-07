@@ -2,7 +2,7 @@ use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
-use mev_build_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer};
+use mev_build_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
@@ -43,10 +43,11 @@ pub struct Service {
     host: Ipv4Addr,
     port: u16,
     relays: Vec<Url>,
+    network: Network,
 }
 
 impl Service {
-    pub fn from(config: Config) -> Self {
+    pub fn from(config: Config, network: Network) -> Self {
         let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
 
         if relays.is_empty() {
@@ -57,17 +58,18 @@ impl Service {
             host: config.host,
             port: config.port,
             relays,
+            network,
         }
     }
 
     pub async fn run(&self) {
-        let context = Context::for_mainnet();
+        let context: Context = self.network.into();
         let relays = self
             .relays
             .iter()
             .cloned()
             .map(|endpoint| Relay::new(Client::new(endpoint)));
-        let relay_mux = RelayMux::new(relays, Arc::new(context));
+        let relay_mux = RelayMux::new(relays, Arc::new(context), self.network);
 
         let mut tasks = vec![];
 

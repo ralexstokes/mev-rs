@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Args;
 use mev_boost_rs::Config as BoostConfig;
+use mev_build_rs::Network;
 use mev_relay_rs::Config as RelayConfig;
 use serde::Deserialize;
 use std::fmt;
@@ -31,12 +32,16 @@ pub(crate) struct Command {
 }
 
 impl Command {
-    pub(crate) async fn execute(&self) -> Result<()> {
+    pub(crate) async fn execute(&self, network: Network) -> Result<()> {
         let config_file = &self.config_file;
 
         let config = Config::from_toml_file(config_file)?;
 
-        tracing::info!("{:?}", config);
+        tracing::info!(
+            "configured for network `{}` with configuration {:#?}",
+            network,
+            config
+        );
 
         Ok(())
     }

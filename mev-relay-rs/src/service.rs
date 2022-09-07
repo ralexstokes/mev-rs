@@ -2,7 +2,7 @@ use crate::relay::Relay;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
-use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder};
+use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder, Network};
 use serde::Deserialize;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
@@ -33,15 +33,15 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(config: Config) -> Self {
+    pub fn from(config: Config, network: Network) -> Self {
         let endpoint: Url = config.beacon_node_url.parse().unwrap();
         let beacon_node = Client::new(endpoint);
-        let context = Arc::new(Context::for_mainnet());
+        let context: Context = network.into();
         Self {
             host: config.host,
             port: config.port,
             beacon_node,
-            context,
+            context: Arc::new(context),
         }
     }
 
