@@ -1,8 +1,10 @@
-use crate::blinded_block_provider::Error;
-use crate::builder::Error as BuilderError;
-use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+use crate::{
+    blinded_block_provider::Error,
+    builder::Error as BuilderError,
+    types::{
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
+    },
 };
 use axum::http::StatusCode;
 use beacon_api_client::{
@@ -32,10 +34,7 @@ impl Client {
         &self,
         registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error> {
-        let response = self
-            .api
-            .http_post("/eth/v1/builder/validators", &registrations)
-            .await?;
+        let response = self.api.http_post("/eth/v1/builder/validators", &registrations).await?;
         api_error_or_ok(response).await.map_err(From::from)
     }
 
@@ -50,13 +49,11 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(BuilderError::NoHeaderPrepared(bid_request.clone()).into());
+            return Err(BuilderError::NoHeaderPrepared(bid_request.clone()).into())
         }
 
-        let result: ApiResult<Value<SignedBuilderBid>> = response
-            .json()
-            .await
-            .map_err(beacon_api_client::Error::Http)?;
+        let result: ApiResult<Value<SignedBuilderBid>> =
+            response.json().await.map_err(beacon_api_client::Error::Http)?;
         match result {
             ApiResult::Ok(result) => Ok(result.data),
             ApiResult::Err(err) => Err(err.into()),
@@ -67,15 +64,10 @@ impl Client {
         &self,
         signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let response = self
-            .api
-            .http_post("/eth/v1/builder/blinded_blocks", signed_block)
-            .await?;
+        let response = self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?;
 
-        let response: Value<ExecutionPayload> = response
-            .json()
-            .await
-            .map_err(|err| -> Error { BeaconApiError::Http(err).into() })?;
+        let response: Value<ExecutionPayload> =
+            response.json().await.map_err(|err| -> Error { BeaconApiError::Http(err).into() })?;
         Ok(response.data)
     }
 }

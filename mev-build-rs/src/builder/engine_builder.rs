@@ -1,6 +1,8 @@
-use crate::blinded_block_provider::Error as BlindedBlockProviderError;
-use crate::builder::Error;
-use crate::types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue};
+use crate::{
+    blinded_block_provider::Error as BlindedBlockProviderError,
+    builder::Error,
+    types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue},
+};
 use ethereum_consensus::{
     bellatrix::mainnet::ExecutionPayload,
     builder::SignedValidatorRegistration,
@@ -9,9 +11,11 @@ use ethereum_consensus::{
     ssz::ByteList,
     state_transition::Context,
 };
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 
 #[derive(Clone)]
 pub struct EngineBuilder(Arc<EngineBuilderInner>);
@@ -79,10 +83,7 @@ impl EngineBuilder {
             ..Default::default()
         };
 
-        let bid = ExecutionPayloadWithValue {
-            payload,
-            value: U256::from_bytes_le([1u8; 32]),
-        };
+        let bid = ExecutionPayloadWithValue { payload, value: U256::from_bytes_le([1u8; 32]) };
         Ok(bid)
     }
 
@@ -95,9 +96,7 @@ impl EngineBuilder {
         let mut state = self.state.lock().expect("can lock");
         for registration in registrations {
             let public_key = registration.message.public_key.clone();
-            state
-                .validator_preferences
-                .insert(public_key, registration.clone());
+            state.validator_preferences.insert(public_key, registration.clone());
         }
         Ok(())
     }

@@ -27,9 +27,9 @@ use std::{
 use thiserror::Error;
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
-// once they have been fetched from builders -- currently in response to an incoming request from a proposer.
-// Setting this to anything other than `0` incentivizes late proposals and setting it to `1` allows for latency
-// at the slot boundary while still enabling a successful proposal.
+// once they have been fetched from builders -- currently in response to an incoming request from a
+// proposer. Setting this to anything other than `0` incentivizes late proposals and setting it to
+// `1` allows for latency at the slot boundary while still enabling a successful proposal.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
@@ -124,7 +124,7 @@ fn validate_registration(
     let registration_status = if let Some(latest_timestamp) = latest_timestamp {
         let status = determine_validator_registration_status(message.timestamp, latest_timestamp);
         if matches!(status, ValidatorRegistrationStatus::Outdated) {
-            return Err(Error::InvalidTimestamp);
+            return Err(Error::InvalidTimestamp)
         }
         status
     } else {
@@ -162,7 +162,7 @@ fn validate_execution_payload(
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
     if execution_payload.gas_limit != preferences.gas_limit {
-        return Err(Error::InvalidGasLimit);
+        return Err(Error::InvalidGasLimit)
     }
 
     // verify payload is valid
@@ -180,7 +180,7 @@ fn validate_signed_block(
 ) -> Result<(), Error> {
     let header = ExecutionPayloadHeader::try_from(payload)?;
     if signed_block.message.body.execution_payload_header != header {
-        return Err(Error::UnknownBlock);
+        return Err(Error::UnknownBlock)
     }
 
     let message = &mut signed_block.message;
@@ -222,14 +222,7 @@ impl RelayInner {
         context: Arc<Context>,
     ) -> Self {
         let public_key = secret_key.public_key();
-        Self {
-            secret_key,
-            public_key,
-            context,
-            builder,
-            validators,
-            state: Default::default(),
-        }
+        Self { secret_key, public_key, context, builder, validators, state: Default::default() }
     }
 }
 
@@ -307,9 +300,7 @@ impl BlindedBlockProvider for Relay {
 
                 if matches!(status, ValidatorRegistrationStatus::New) {
                     let public_key = registration.message.public_key.clone();
-                    state
-                        .validator_preferences
-                        .insert(public_key.clone(), registration.clone());
+                    state.validator_preferences.insert(public_key.clone(), registration.clone());
                     new_registrations.push(registration.clone());
                 }
             }
@@ -339,22 +330,13 @@ impl BlindedBlockProvider for Relay {
 
         let header = ExecutionPayloadHeader::try_from(&mut payload)?;
 
-        state
-            .execution_payloads
-            .insert(bid_request.clone(), payload);
+        state.execution_payloads.insert(bid_request.clone(), payload);
 
-        let mut bid = BuilderBid {
-            header,
-            value,
-            public_key: self.public_key.clone(),
-        };
+        let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
 
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
-        let signed_bid = SignedBuilderBid {
-            message: bid,
-            signature,
-        };
+        let signed_bid = SignedBuilderBid { message: bid, signature };
         Ok(signed_bid)
     }
 
@@ -363,10 +345,8 @@ impl BlindedBlockProvider for Relay {
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         let block = &signed_block.message;
-        let public_key = self
-            .validators
-            .get_public_key(block.proposer_index)
-            .map_err(Error::from)?;
+        let public_key =
+            self.validators.get_public_key(block.proposer_index).map_err(Error::from)?;
         let bid_request = BidRequest {
             slot: block.slot,
             parent_hash: block.body.execution_payload_header.parent_hash.clone(),
@@ -374,17 +354,9 @@ impl BlindedBlockProvider for Relay {
         };
 
         let mut state = self.state.lock().expect("can lock");
-        let mut payload = state
-            .execution_payloads
-            .remove(&bid_request)
-            .ok_or(Error::UnknownBid)?;
+        let mut payload = state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?;
 
-        validate_signed_block(
-            signed_block,
-            &bid_request.public_key,
-            &mut payload,
-            &self.context,
-        )?;
+        validate_signed_block(signed_block, &bid_request.public_key, &mut payload, &self.context)?;
 
         Ok(payload)
     }

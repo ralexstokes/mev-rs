@@ -5,10 +5,7 @@ use mev_build_rs::Network;
 use mev_relay_rs::Service;
 
 #[derive(Debug, Args)]
-#[clap(
-    about = "🏗 connecting builders to proposers",
-    subcommand_negates_reqs = true
-)]
+#[clap(about = "🏗 connecting builders to proposers", subcommand_negates_reqs = true)]
 pub(crate) struct Command {
     #[clap(env, required = true)]
     config_file: Option<String>,

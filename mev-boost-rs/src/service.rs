@@ -4,8 +4,7 @@ use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
 use mev_build_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
 use serde::Deserialize;
-use std::net::Ipv4Addr;
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -17,11 +16,7 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            host: Ipv4Addr::UNSPECIFIED,
-            port: 18550,
-            relays: vec![],
-        }
+        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
     }
 }
 
@@ -54,21 +49,12 @@ impl Service {
             tracing::error!("no valid relays provided; please restart with correct configuration");
         }
 
-        Self {
-            host: config.host,
-            port: config.port,
-            relays,
-            network,
-        }
+        Self { host: config.host, port: config.port, relays, network }
     }
 
     pub async fn run(&self) {
         let context: Context = self.network.into();
-        let relays = self
-            .relays
-            .iter()
-            .cloned()
-            .map(|endpoint| Relay::new(Client::new(endpoint)));
+        let relays = self.relays.iter().cloned().map(|endpoint| Relay::new(Client::new(endpoint)));
         let relay_mux = RelayMux::new(relays, Arc::new(context), self.network);
 
         let mut tasks = vec![];

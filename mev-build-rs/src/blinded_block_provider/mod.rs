@@ -4,10 +4,12 @@ mod api;
 #[cfg(feature = "api")]
 pub use {api::client::Client, api::server::Server, beacon_api_client::Error as ClientError};
 
-use crate::builder::Error as BuilderError;
-use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+use crate::{
+    builder::Error as BuilderError,
+    types::{
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
+    },
 };
 use async_trait::async_trait;
 use beacon_api_client::ApiError;
