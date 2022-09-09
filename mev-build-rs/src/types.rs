@@ -1,5 +1,7 @@
-use ethereum_consensus::primitives::{BlsPublicKey, BlsSignature, Hash32, Slot, U256};
-pub use ethereum_consensus::{
+use beacon_api_client::ethereum_consensus::primitives::{
+    BlsPublicKey, BlsSignature, Hash32, Slot, U256,
+};
+pub use beacon_api_client::ethereum_consensus::{
     bellatrix::mainnet::{ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock},
     builder::SignedValidatorRegistration,
 };

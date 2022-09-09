@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use beacon_api_client::ethereum_consensus;
 use ethereum_consensus::clock::{Clock, SystemTimeProvider};
 use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot, U256};
 use ethereum_consensus::state_transition::{Context, Error as ConsensusError};

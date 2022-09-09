@@ -10,8 +10,8 @@ use crate::types::{
     SignedValidatorRegistration,
 };
 use async_trait::async_trait;
+use beacon_api_client::ethereum_consensus::state_transition::Error as ConsensusError;
 use beacon_api_client::ApiError;
-use ethereum_consensus::state_transition::Error as ConsensusError;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

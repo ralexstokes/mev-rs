@@ -1,5 +1,5 @@
 use crate::types::BidRequest as PayloadRequest;
-use ethereum_consensus::primitives::BlsPublicKey;
+use beacon_api_client::ethereum_consensus::primitives::BlsPublicKey;
 use thiserror::Error;
 
 #[derive(Debug, Error)]

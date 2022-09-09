@@ -1,7 +1,7 @@
 use crate::blinded_block_provider::Error as BlindedBlockProviderError;
 use crate::builder::Error;
 use crate::types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue};
-use ethereum_consensus::{
+use beacon_api_client::ethereum_consensus::{
     bellatrix::mainnet::ExecutionPayload,
     builder::SignedValidatorRegistration,
     crypto::SecretKey,

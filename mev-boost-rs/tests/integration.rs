@@ -1,3 +1,4 @@
+use beacon_api_client::ethereum_consensus;
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::bellatrix::mainnet::{
     BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock,

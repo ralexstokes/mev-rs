@@ -2,8 +2,7 @@ use crate::validator_summary_provider::{
     Error as ValidatorSummaryProviderError, ValidatorSummaryProvider,
 };
 use async_trait::async_trait;
-use beacon_api_client::{Client, ValidatorStatus};
-use ethereum_consensus::{
+use beacon_api_client::ethereum_consensus::{
     builder::ValidatorRegistration,
     clock,
     clock::get_current_unix_time_in_secs,
@@ -11,6 +10,7 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
+use beacon_api_client::{Client, ValidatorStatus};
 use futures::StreamExt;
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,

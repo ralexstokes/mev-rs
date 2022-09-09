@@ -1,5 +1,5 @@
+use beacon_api_client::ethereum_consensus::primitives::{BlsPublicKey, ValidatorIndex};
 use beacon_api_client::{Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary};
-use ethereum_consensus::primitives::{BlsPublicKey, ValidatorIndex};
 use std::{collections::HashMap, sync::Mutex};
 use thiserror::Error;
 

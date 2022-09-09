@@ -5,16 +5,16 @@ mod serde;
 mod signing;
 mod types;
 
+use beacon_api_client::ethereum_consensus::{
+    clock::{self, SystemTimeProvider},
+    state_transition::Context,
+};
 pub use blinded_block_provider::{BlindedBlockProvider, Error as BlindedBlockProviderError};
 #[cfg(feature = "api")]
 pub use blinded_block_provider::{
     Client as BlindedBlockProviderClient, Server as BlindedBlockProviderServer,
 };
 pub use builder::{EngineBuilder, Error as BuilderError};
-use ethereum_consensus::{
-    clock::{self, SystemTimeProvider},
-    state_transition::Context,
-};
 pub use signing::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
 };

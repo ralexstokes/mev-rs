@@ -1,3 +1,4 @@
+use beacon_api_client::ethereum_consensus;
 use ethereum_consensus::builder::compute_builder_domain;
 use ethereum_consensus::crypto::SecretKey;
 use ethereum_consensus::domains::DomainType;
