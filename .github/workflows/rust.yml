@@ -24,6 +24,8 @@ jobs:
       run: rustup update stable
     - name: Rust Cache
       uses: Swatinem/rust-cache@v1.3.0
+    - name: Install protobuf compiler for the libp2p-core dependency
+      uses: arduino/setup-protoc@v1
     - name: Format
       run: cargo fmt -- --check
     - name: Run clippy
