@@ -20,6 +20,7 @@ pub use builder::{EngineBuilder, Error as BuilderError};
 pub use signing::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
 };
+pub use ssz_rs;
 pub use types::*;
 
 #[derive(Default, Debug, Clone, Copy)]
