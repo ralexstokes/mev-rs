@@ -5,6 +5,8 @@ mod serde;
 mod signing;
 mod types;
 
+pub use beacon_api_client;
+pub use beacon_api_client::ethereum_consensus;
 use beacon_api_client::ethereum_consensus::{
     clock::{self, SystemTimeProvider},
     state_transition::Context,
