@@ -19,6 +19,6 @@ url = { version = "2.2.2", default-features = false }
 
 serde = { version = "1.0", features = ["derive"] }
 
-beacon-api-client = { git = "https://github.com/sigp/beacon-api-client", rev = "c1ce3f68cb1059f7fad96b89c9bd3b2c6c402513" }
+beacon-api-client = { git = "https://github.com/sigp/beacon-api-client", rev = "68a4eaf4e4f0bddd6d799810f3ed78dc702091c8" }
 
 mev-build-rs = { path = "../mev-build-rs"}
