@@ -24,6 +24,8 @@ jobs:
       run: rustup update stable
     - name: Rust Cache
       uses: Swatinem/rust-cache@v1
+      with:
+        cache-on-failure: true
     - name: Build
       run: cargo build --verbose
     - name: Run tests
@@ -58,5 +60,5 @@ jobs:
       - name: cargo clippy
         uses: actions-rs/clippy-check@v1
         with:
-          args: --all --all-features -- -D warnings
+          args: --all-features -- -D warnings
           token: ${{ secrets.GITHUB_TOKEN }}
