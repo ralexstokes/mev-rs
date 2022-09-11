@@ -49,7 +49,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(BuilderError::NoHeaderPrepared(bid_request.clone()).into())
+            return Err(BuilderError::NoHeaderPrepared(Box::new(bid_request.clone())).into())
         }
 
         let result: ApiResult<Value<SignedBuilderBid>> =
