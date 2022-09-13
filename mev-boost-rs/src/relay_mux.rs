@@ -1,16 +1,20 @@
 use async_trait::async_trait;
-use ethereum_consensus::clock::{Clock, SystemTimeProvider};
-use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot, U256};
-use ethereum_consensus::state_transition::{Context, Error as ConsensusError};
+use ethereum_consensus::{
+    clock::{Clock, SystemTimeProvider},
+    primitives::{BlsPublicKey, Hash32, Slot, U256},
+    state_transition::{Context, Error as ConsensusError},
+};
 use futures::{stream, StreamExt};
 use mev_build_rs::{
     verify_signed_builder_message, BidRequest, BlindedBlockProvider,
     BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use thiserror::Error;
 
 // See note in the `mev-relay-rs::Relay` about this constant.
@@ -96,12 +100,8 @@ impl RelayMux {
         context: Arc<Context>,
         network: Network,
     ) -> Self {
-        let inner = RelayMuxInner {
-            relays: relays.collect(),
-            context,
-            state: Default::default(),
-            network,
-        };
+        let inner =
+            RelayMuxInner { relays: relays.collect(), context, state: Default::default(), network };
         Self(Arc::new(inner))
     }
 
@@ -176,7 +176,7 @@ impl BlindedBlockProvider for RelayMux {
         let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (&bid.message.value, *i)));
 
         if best_indices.is_empty() {
-            return Err(Error::NoBids.into());
+            return Err(Error::NoBids.into())
         }
 
         // for now, break any ties by picking the first bid,
@@ -195,9 +195,7 @@ impl BlindedBlockProvider for RelayMux {
         // assume the next request to open a bid corresponds to the current request
         // TODO consider if the relay mux should have more knowledge about the proposal
         state.latest_pubkey = bid_request.public_key.clone();
-        state
-            .outstanding_bids
-            .insert(bid_request.clone(), relay_indices);
+        state.outstanding_bids.insert(bid_request.clone(), relay_indices);
 
         Ok(bids[*best_index].0.clone())
     }
@@ -223,16 +221,12 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        let expected_block_hash = &signed_block
-            .message
-            .body
-            .execution_payload_header
-            .block_hash;
+        let expected_block_hash = &signed_block.message.body.execution_payload_header.block_hash;
         for (i, response) in responses.into_iter().enumerate() {
             match response {
                 Ok(payload) => {
                     if &payload.block_hash == expected_block_hash {
-                        return Ok(payload);
+                        return Ok(payload)
                     } else {
                         tracing::warn!("error opening bid from relay {i}: the returned payload did not match the expected block hash: {expected_block_hash}");
                     }
@@ -276,10 +270,7 @@ mod tests {
             (vec![(&one, 11), (&two, 22), (&three, 33)], vec![33]),
             (vec![(&two, 22), (&three, 33), (&one, 11)], vec![33]),
             (vec![(&three, 33), (&two, 22), (&one, 11)], vec![33]),
-            (
-                vec![(&three, 33), (&two, 22), (&three, 44), (&one, 11)],
-                vec![33, 44],
-            ),
+            (vec![(&three, 33), (&two, 22), (&three, 44), (&one, 11)], vec![33, 44]),
             (
                 vec![
                     (&four, 44),

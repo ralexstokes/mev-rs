@@ -1,7 +1,9 @@
-use crate::blinded_block_provider::{BlindedBlockProvider, Error};
-use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+use crate::{
+    blinded_block_provider::{BlindedBlockProvider, Error},
+    types::{
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
+    },
 };
 use axum::{
     extract::{Extension, Json, Path},
@@ -11,8 +13,10 @@ use axum::{
     Router,
 };
 use beacon_api_client::{ApiError, ConsensusVersion, Value};
-use std::collections::HashMap;
-use std::net::{Ipv4Addr, SocketAddr};
+use std::{
+    collections::HashMap,
+    net::{Ipv4Addr, SocketAddr},
+};
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -36,10 +40,7 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
 ) -> Result<(), Error> {
     tracing::debug!("processing registrations {registrations:?}");
 
-    builder
-        .register_validators(&mut registrations)
-        .await
-        .map_err(From::from)
+    builder.register_validators(&mut registrations).await.map_err(From::from)
 }
 
 async fn handle_fetch_bid<B: BlindedBlockProvider>(
@@ -66,10 +67,7 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
     let payload = builder.open_bid(&mut block).await?;
 
     let version = serde_json::to_value(ConsensusVersion::Bellatrix).unwrap();
-    Ok(Json(Value {
-        meta: HashMap::from_iter([("version".to_string(), version)]),
-        data: payload,
-    }))
+    Ok(Json(Value { meta: HashMap::from_iter([("version".to_string(), version)]), data: payload }))
 }
 
 pub struct Server<B: BlindedBlockProvider> {
@@ -80,20 +78,13 @@ pub struct Server<B: BlindedBlockProvider> {
 
 impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
     pub fn new(host: Ipv4Addr, port: u16, builder: B) -> Self {
-        Self {
-            host,
-            port,
-            builder,
-        }
+        Self { host, port, builder }
     }
 
     pub async fn run(&self) {
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
-            .route(
-                "/eth/v1/builder/validators",
-                post(handle_validator_registration::<B>),
-            )
+            .route("/eth/v1/builder/validators", post(handle_validator_registration::<B>))
             .route(
                 "/eth/v1/builder/header/:slot/:parent_hash/:public_key",
                 get(handle_fetch_bid::<B>),

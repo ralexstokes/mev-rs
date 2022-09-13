@@ -6,8 +6,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::future::Future;
 use tokio::signal;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Default, Debug, Clone, clap::ValueEnum)]
 pub(crate) enum NetworkArg {
@@ -17,7 +16,8 @@ pub(crate) enum NetworkArg {
     Goerli,
 }
 
-// NOTE: define this mapping so only this crate needs the `clap` dependency while still being able to use the `clap::ValueEnum` machinery
+// NOTE: define this mapping so only this crate needs the `clap` dependency while still being able
+// to use the `clap::ValueEnum` machinery
 impl From<NetworkArg> for mev_build_rs::Network {
     fn from(arg: NetworkArg) -> Self {
         match arg {

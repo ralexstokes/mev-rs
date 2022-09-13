@@ -1,27 +1,28 @@
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
-use ethereum_consensus::bellatrix::mainnet::{
-    BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock,
+use ethereum_consensus::{
+    bellatrix::mainnet::{BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock},
+    builder::{SignedValidatorRegistration, ValidatorRegistration},
+    crypto::SecretKey,
+    phase0::mainnet::{compute_domain, Validator},
+    primitives::{DomainType, ExecutionAddress, Hash32, Slot},
+    signing::sign_with_domain,
+    state_transition::Context,
 };
-use ethereum_consensus::builder::{SignedValidatorRegistration, ValidatorRegistration};
-use ethereum_consensus::crypto::SecretKey;
-use ethereum_consensus::phase0::mainnet::{compute_domain, Validator};
-use ethereum_consensus::primitives::{DomainType, ExecutionAddress, Hash32, Slot};
-use ethereum_consensus::signing::sign_with_domain;
-use ethereum_consensus::state_transition::Context;
 use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
 use mev_build_rs::{sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 
 use rand::seq::SliceRandom;
-use std::collections::HashMap;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::time::sleep;
 use url::Url;
 
 fn setup_logging() {
-    use tracing_subscriber::layer::SubscriberExt;
-    use tracing_subscriber::util::SubscriberInitExt;
+    use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
@@ -49,19 +50,11 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             let signing_key = SecretKey::random(rng).unwrap();
             let public_key = signing_key.public_key();
 
-            let validator = Validator {
-                public_key,
-                ..Default::default()
-            };
+            let validator = Validator { public_key, ..Default::default() };
 
             let fee_recipient = ExecutionAddress::try_from([i as u8; 20].as_ref()).unwrap();
 
-            Proposer {
-                index: i,
-                validator,
-                signing_key,
-                fee_recipient,
-            }
+            Proposer { index: i, validator, signing_key, fee_recipient }
         })
         .collect()
 }
@@ -91,22 +84,16 @@ async fn test_end_to_end() {
         })
         .collect::<Vec<_>>();
     validator_mock_server.mock(|when, then| {
-        when.method(GET)
-            .path("/eth/v1/beacon/states/head/validators");
-        let response = serde_json::to_string(&Value {
-            data: validators,
-            meta: HashMap::new(),
-        })
-        .unwrap();
+        when.method(GET).path("/eth/v1/beacon/states/head/validators");
+        let response =
+            serde_json::to_string(&Value { data: validators, meta: HashMap::new() }).unwrap();
         then.status(200).body(response);
     });
 
     // start upstream relay
     let validator_mock_server_url = validator_mock_server.url("");
-    let relay_config = RelayConfig {
-        beacon_node_url: validator_mock_server_url,
-        ..Default::default()
-    };
+    let relay_config =
+        RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config, Default::default());
     tokio::spawn(async move { relay.run().await });
@@ -144,16 +131,10 @@ async fn test_end_to_end() {
             };
             let signature =
                 sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
-            SignedValidatorRegistration {
-                message: registration,
-                signature,
-            }
+            SignedValidatorRegistration { message: registration, signature }
         })
         .collect::<Vec<_>>();
-    beacon_node
-        .register_validators(&registrations)
-        .await
-        .unwrap();
+    beacon_node.register_validators(&registrations).await.unwrap();
 
     beacon_node.check_status().await.unwrap();
 
@@ -195,10 +176,7 @@ async fn propose_block(
     // TODO provide realistic values
     let domain = compute_domain(DomainType::BeaconProposer, None, None, context).unwrap();
     let signature = sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
-    let signed_block = SignedBlindedBeaconBlock {
-        message: beacon_block,
-        signature,
-    };
+    let signed_block = SignedBlindedBeaconBlock { message: beacon_block, signature };
 
     beacon_node.check_status().await.unwrap();
 

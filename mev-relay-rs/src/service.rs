@@ -4,8 +4,7 @@ use ethereum_consensus::state_transition::Context;
 use futures::future::join_all;
 use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder, Network};
 use serde::Deserialize;
-use std::net::Ipv4Addr;
-use std::sync::Arc;
+use std::{net::Ipv4Addr, sync::Arc};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -37,12 +36,7 @@ impl Service {
         let endpoint: Url = config.beacon_node_url.parse().unwrap();
         let beacon_node = Client::new(endpoint);
         let context: Context = network.into();
-        Self {
-            host: config.host,
-            port: config.port,
-            beacon_node,
-            context: Arc::new(context),
-        }
+        Self { host: config.host, port: config.port, beacon_node, context: Arc::new(context) }
     }
 
     pub async fn run(&self) {

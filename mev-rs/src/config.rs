@@ -4,8 +4,7 @@ use mev_boost_rs::Config as BoostConfig;
 use mev_build_rs::Network;
 use mev_relay_rs::Config as RelayConfig;
 use serde::Deserialize;
-use std::fmt;
-use std::path::Path;
+use std::{fmt, path::Path};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct Config {
@@ -37,11 +36,7 @@ impl Command {
 
         let config = Config::from_toml_file(config_file)?;
 
-        tracing::info!(
-            "configured for network `{}` with configuration {:#?}",
-            network,
-            config
-        );
+        tracing::info!("configured for network `{}` with configuration {:#?}", network, config);
 
         Ok(())
     }
