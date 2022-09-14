@@ -19,6 +19,6 @@ serde = { version = "1.0", features = ["derive"], optional = true }
 serde_json = { version = "1.0.81", optional = true }
 thiserror = "1.0.30"
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "e1188b1" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "a8110af76d97bf2bf27fb987a671808fcbdf1834" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "7d5d8dad1648f771573f42585ad8080a45b05689", optional = true }
 ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs", rev = "cb08f1" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "de34eeb", optional = true }
