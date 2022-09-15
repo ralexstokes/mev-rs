@@ -10,11 +10,8 @@ use mev_build_rs::{
     BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 use thiserror::Error;
 
 // See note in the `mev-relay-rs::Relay` about this constant.
@@ -112,7 +109,7 @@ impl RelayMux {
         tokio::pin!(slots);
 
         while let Some(slot) = slots.next().await {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state
                 .outstanding_bids
                 .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
@@ -191,11 +188,13 @@ impl BlindedBlockProvider for RelayMux {
             }
         }
 
-        let mut state = self.state.lock().unwrap();
-        // assume the next request to open a bid corresponds to the current request
-        // TODO consider if the relay mux should have more knowledge about the proposal
-        state.latest_pubkey = bid_request.public_key.clone();
-        state.outstanding_bids.insert(bid_request.clone(), relay_indices);
+        {
+            let mut state = self.state.lock();
+            // assume the next request to open a bid corresponds to the current request
+            // TODO consider if the relay mux should have more knowledge about the proposal
+            state.latest_pubkey = bid_request.public_key.clone();
+            state.outstanding_bids.insert(bid_request.clone(), relay_indices);
+        }
 
         Ok(bids[*best_index].0.clone())
     }
@@ -205,12 +204,9 @@ impl BlindedBlockProvider for RelayMux {
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
         let relay_indices = {
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
-            match state.outstanding_bids.remove(&key) {
-                Some(indices) => indices,
-                None => return Err(Error::MissingOpenBid.into()),
-            }
+            state.outstanding_bids.remove(&key).ok_or(Error::MissingOpenBid)?
         };
 
         let signed_block = &signed_block;
