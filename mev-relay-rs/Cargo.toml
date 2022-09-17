@@ -12,11 +12,11 @@ tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 futures = "0.3.21"
 async-trait = "0.1.53"
+parking_lot = "0.12.1"
 
 thiserror = "1.0.30"
 http = "0.2.7"
 url = { version = "2.2.2", default-features = false }
-
 serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "a8110af76d97bf2bf27fb987a671808fcbdf1834" }

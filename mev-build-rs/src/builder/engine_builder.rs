@@ -11,11 +11,8 @@ use ethereum_consensus::{
     ssz::ByteList,
     state_transition::Context,
 };
-use std::{
-    collections::HashMap,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 #[derive(Clone)]
 pub struct EngineBuilder(Arc<EngineBuilderInner>);
@@ -66,14 +63,15 @@ impl EngineBuilder {
         &self,
         request: &PayloadRequest,
     ) -> Result<ExecutionPayloadWithValue, Error> {
-        let state = self.state.lock().expect("can lock");
-        let preferences = state
+        let (fee_recipient, gas_limit) = self
+            .state
+            .lock()
             .validator_preferences
             .get(&request.public_key)
+            .map(|preferences| {
+                (preferences.message.fee_recipient.clone(), preferences.message.gas_limit)
+            })
             .ok_or_else(|| Error::MissingPreferences(request.public_key.clone()))?;
-
-        let fee_recipient = preferences.message.fee_recipient.clone();
-        let gas_limit = preferences.message.gas_limit;
 
         let payload = ExecutionPayload {
             parent_hash: request.parent_hash.clone(),
@@ -93,7 +91,7 @@ impl EngineBuilder {
     ) -> Result<(), BlindedBlockProviderError> {
         // TODO this assumes registrations have already been validated by relay
         // will eventually remove this assumption
-        let mut state = self.state.lock().expect("can lock");
+        let mut state = self.state.lock();
         for registration in registrations {
             let public_key = registration.message.public_key.clone();
             state.validator_preferences.insert(public_key, registration.clone());

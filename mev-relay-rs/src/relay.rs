@@ -18,12 +18,8 @@ use mev_build_rs::{
     EngineBuilder, ExecutionPayload, ExecutionPayloadHeader, ExecutionPayloadWithValue,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
-use std::{
-    cmp::Ordering,
-    collections::HashMap,
-    ops::Deref,
-    sync::{Arc, Mutex},
-};
+use parking_lot::Mutex;
+use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc};
 use thiserror::Error;
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
@@ -265,7 +261,7 @@ impl Relay {
                 // TODO grab validators more efficiently
                 self.load_full_validator_set().await;
             }
-            let mut state = self.state.lock().unwrap();
+            let mut state = self.state.lock();
             state
                 .execution_payloads
                 .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
@@ -280,7 +276,7 @@ impl BlindedBlockProvider for Relay {
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), BlindedBlockProviderError> {
         let mut new_registrations = {
-            let mut state = self.state.lock().expect("can lock");
+            let mut state = self.state.lock();
             let current_time = get_current_unix_time_in_secs();
             let mut new_registrations = vec![];
             for registration in registrations.iter_mut() {
@@ -319,18 +315,21 @@ impl BlindedBlockProvider for Relay {
         let ExecutionPayloadWithValue { mut payload, value } =
             self.builder.get_payload_with_value(bid_request)?;
 
-        let mut state = self.state.lock().expect("can lock");
+        let header = {
+            let mut state = self.state.lock();
 
-        let preferences = state
-            .validator_preferences
-            .get(&bid_request.public_key)
-            .ok_or(Error::UnknownValidator)?;
+            let preferences = state
+                .validator_preferences
+                .get(&bid_request.public_key)
+                .ok_or(Error::UnknownValidator)?;
 
-        validate_execution_payload(&payload, &value, &preferences.message)?;
+            validate_execution_payload(&payload, &value, &preferences.message)?;
 
-        let header = ExecutionPayloadHeader::try_from(&mut payload)?;
+            let header = ExecutionPayloadHeader::try_from(&mut payload)?;
 
-        state.execution_payloads.insert(bid_request.clone(), payload);
+            state.execution_payloads.insert(bid_request.clone(), payload);
+            header
+        };
 
         let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
 
@@ -353,8 +352,10 @@ impl BlindedBlockProvider for Relay {
             public_key,
         };
 
-        let mut state = self.state.lock().expect("can lock");
-        let mut payload = state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?;
+        let mut payload = {
+            let mut state = self.state.lock();
+            state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?
+        };
 
         validate_signed_block(signed_block, &bid_request.public_key, &mut payload, &self.context)?;
 
