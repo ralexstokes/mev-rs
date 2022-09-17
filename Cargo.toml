@@ -14,4 +14,4 @@ ethereum-consensus = { git = "https://github.com/ralexstokes//ethereum-consensus
 ssz-rs = { git = "https://github.com/ralexstokes//ssz-rs", rev = "cb08f18ca919cc1b685b861d0fa9e2daabe89737" }
 
 [patch."https://github.com/ralexstokes/beacon-api-client"]
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "7d5d8dad1648f771573f42585ad8080a45b05689" }
+beacon-api-client = { git = "https://github.com/ralexstokes//beacon-api-client", rev = "7d5d8dad1648f771573f42585ad8080a45b05689" }

@@ -314,7 +314,7 @@ dependencies = [
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/beacon-api-client#911215fd0e335d0b48a0d8c0dce6689402c5c398"
+source = "git+https://github.com/ralexstokes//beacon-api-client?rev=7d5d8dad1648f771573f42585ad8080a45b05689#7d5d8dad1648f771573f42585ad8080a45b05689"
 dependencies = [
  "ethereum-consensus",
  "http",
