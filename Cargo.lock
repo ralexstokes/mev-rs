@@ -1410,6 +1410,7 @@ dependencies = [
  "mev-build-rs",
  "mev-relay-rs",
  "parking_lot",
+ "pin-project",
  "rand",
  "serde",
  "serde_json",

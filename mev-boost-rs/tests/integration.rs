@@ -104,7 +104,7 @@ async fn test_end_to_end() {
 
     let mux_port = config.port;
     let service = Service::from(config, Default::default());
-    tokio::spawn(async move { service.run().await });
+    service.spawn();
 
     // let other tasks run so servers boot before we proceed
     // NOTE: there are more races amongst the various services as we add more
