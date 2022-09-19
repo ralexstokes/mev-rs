@@ -18,8 +18,8 @@ serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.30"
 parking_lot = "0.12.1"
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "a8110af76d97bf2bf27fb987a671808fcbdf1834" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "7d5d8dad1648f771573f42585ad8080a45b05689" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
 mev-build-rs = { path = "../mev-build-rs" }
 mev-relay-rs = { path = "../mev-relay-rs" }
