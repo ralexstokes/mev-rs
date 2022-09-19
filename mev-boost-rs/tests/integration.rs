@@ -16,9 +16,9 @@ use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
-use tokio::time::sleep;
+
 use url::Url;
 
 fn setup_logging() {
@@ -96,7 +96,7 @@ async fn test_end_to_end() {
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config, Default::default());
-    tokio::spawn(async move { relay.run().await });
+    relay.spawn().await;
 
     // start mux server
     let mut config = Config::default();
@@ -105,12 +105,6 @@ async fn test_end_to_end() {
     let mux_port = config.port;
     let service = Service::from(config, Default::default());
     service.spawn();
-
-    // let other tasks run so servers boot before we proceed
-    // NOTE: there are more races amongst the various services as we add more
-    // hardcode a sleep to ensure services are all booted before
-    // proceeding across multiple types of environments
-    sleep(Duration::from_secs(1)).await;
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),

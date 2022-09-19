@@ -1429,11 +1429,13 @@ dependencies = [
  "axum",
  "beacon-api-client",
  "ethereum-consensus",
+ "hyper",
  "parking_lot",
  "serde",
  "serde_json",
  "ssz-rs",
  "thiserror",
+ "tokio",
  "tracing",
 ]
 
@@ -1448,6 +1450,7 @@ dependencies = [
  "http",
  "mev-build-rs",
  "parking_lot",
+ "pin-project",
  "serde",
  "thiserror",
  "tokio",

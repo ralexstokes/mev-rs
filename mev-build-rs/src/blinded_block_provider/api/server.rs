@@ -9,14 +9,19 @@ use axum::{
     extract::{Extension, Json, Path},
     http::StatusCode,
     response::{IntoResponse, Response},
-    routing::{get, post},
+    routing::{get, post, IntoMakeService},
     Router,
 };
 use beacon_api_client::{ApiError, ConsensusVersion, Value};
+use hyper::server::conn::AddrIncoming;
 use std::{
     collections::HashMap,
     net::{Ipv4Addr, SocketAddr},
 };
+use tokio::task::JoinHandle;
+
+/// Type alias for the configured axum server
+pub type BlockProviderServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
 
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
@@ -81,7 +86,8 @@ impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
         Self { host, port, builder }
     }
 
-    pub async fn run(&self) {
+    /// Configures and returns the axum server
+    pub fn serve(&self) -> BlockProviderServer {
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
             .route("/eth/v1/builder/validators", post(handle_validator_registration::<B>))
@@ -92,11 +98,18 @@ impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
             .route("/eth/v1/builder/blinded_blocks", post(handle_open_bid::<B>))
             .layer(Extension(self.builder.clone()));
         let addr = SocketAddr::from((self.host, self.port));
-        let server = axum::Server::bind(&addr).serve(router.into_make_service());
+        axum::Server::bind(&addr).serve(router.into_make_service())
+    }
 
-        tracing::info!("listening at {addr}...");
-        if let Err(err) = server.await {
-            tracing::error!("error while listening for incoming: {err}")
-        }
+    /// Spawns the server on a new task returning the handle for it
+    pub fn spawn(&self) -> JoinHandle<()> {
+        let server = self.serve();
+        let address = server.local_addr();
+        tokio::spawn(async move {
+            tracing::info!("listening at {address}...");
+            if let Err(err) = server.await {
+                tracing::error!("error while listening for incoming: {err}")
+            }
+        })
     }
 }

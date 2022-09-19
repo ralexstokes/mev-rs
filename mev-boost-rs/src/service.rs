@@ -64,10 +64,7 @@ impl Service {
             relay_mux_clone.run().await;
         });
 
-        let server = tokio::spawn(async move {
-            let server = BlindedBlockProviderServer::new(host, port, relay_mux);
-            server.run().await;
-        });
+        let server = BlindedBlockProviderServer::new(host, port, relay_mux).spawn();
 
         ServiceHandle { relayer, server }
     }

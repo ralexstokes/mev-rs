@@ -1,10 +1,11 @@
 use crate::relay::Relay;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
-use futures::future::join_all;
+
 use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder, Network};
 use serde::Deserialize;
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use tokio::task::{JoinError, JoinHandle};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -39,21 +40,44 @@ impl Service {
         Self { host: config.host, port: config.port, beacon_node, context: Arc::new(context) }
     }
 
-    pub async fn run(&self) {
+    /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
+    /// individual tasks
+    pub async fn spawn(&self) -> ServiceHandle {
         let builder = EngineBuilder::new(self.context.clone());
         let relay = Relay::new(builder, self.beacon_node.clone(), self.context.clone());
         relay.initialize().await;
 
         let block_provider = relay.clone();
-        let api_server = BlindedBlockProviderServer::new(self.host, self.port, block_provider);
+        let server = BlindedBlockProviderServer::new(self.host, self.port, block_provider).spawn();
 
-        let mut tasks = vec![];
-        tasks.push(tokio::spawn(async move {
-            api_server.run().await;
-        }));
-        tasks.push(tokio::spawn(async move {
+        let relayer = tokio::spawn(async move {
             relay.run().await;
-        }));
-        join_all(tasks).await;
+        });
+
+        ServiceHandle { relayer, server }
+    }
+}
+
+/// Contains the handles to spawned [`Relay`] and [`BlindedBlockProviderServer`] tasks
+///
+/// This struct is created by the [`Service::spawn`] function
+#[pin_project::pin_project]
+pub struct ServiceHandle {
+    #[pin]
+    relayer: JoinHandle<()>,
+    #[pin]
+    server: JoinHandle<()>,
+}
+
+impl Future for ServiceHandle {
+    type Output = Result<(), JoinError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let relayer = this.relayer.poll(cx);
+        if relayer.is_ready() {
+            return relayer
+        }
+        this.server.poll(cx)
     }
 }
