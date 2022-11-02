@@ -61,7 +61,7 @@ you can build the image defined in the `Dockerfile`:
 and then run as usual.
 
 to supply the config, mount your local file into the container (e.g. at `/config.toml`) and either use the environment
-variable setting or provide the path in the container as a trailing arguemnt:
+variable setting or provide the path in the container as a trailing argument:
 
 `$ docker <other options> --env CONFIG_FILE=/path/to/config.toml mev-rs boost`
 
