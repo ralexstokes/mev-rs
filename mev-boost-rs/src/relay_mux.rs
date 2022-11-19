@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use backon::{ExponentialBackoff, Retryable};
 use ethereum_consensus::{
     clock::{Clock, SystemTimeProvider},
     primitives::{BlsPublicKey, Hash32, Slot, U256},
@@ -125,7 +126,11 @@ impl BlindedBlockProvider for RelayMux {
     ) -> Result<(), BlindedBlockProviderError> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.register_validators(registrations).await })
+            .map(|relay| async move {
+                (|| relay.register_validators(registrations))
+                    .retry(ExponentialBackoff::default())
+                    .await
+            })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
