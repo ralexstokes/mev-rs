@@ -6,6 +6,7 @@ pub use {api::client::Client, api::server::Server, beacon_api_client::Error as C
 
 use crate::{
     builder::Error as BuilderError,
+    validator_registration::validator_registrar::Error as ValidatorRegistrationError,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -24,6 +25,8 @@ pub enum Error {
     Api(#[from] ApiError),
     #[error("{0}")]
     Builder(#[from] BuilderError),
+    #[error("{0}")]
+    ValidatorRegistration(#[from] ValidatorRegistrationError),
     #[error("internal server error")]
     Internal(String),
     #[error("{0}")]

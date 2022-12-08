@@ -4,6 +4,7 @@ mod builder;
 mod serde;
 mod signing;
 mod types;
+mod validator_registration;
 
 pub use blinded_block_provider::{BlindedBlockProvider, Error as BlindedBlockProviderError};
 #[cfg(feature = "api")]
@@ -11,6 +12,12 @@ pub use blinded_block_provider::{
     Client as BlindedBlockProviderClient, Server as BlindedBlockProviderServer,
 };
 pub use builder::{EngineBuilder, Error as BuilderError};
+pub use validator_registration::{
+    validator_registrar::{ValidatorRegistrar, ValidatorRegistrationStatus, Error as ValidatorRegistrationError},
+    validator_summary_provider::{
+        Error as ValidatorSummaryProviderError, ValidatorSummaryProvider,
+    }
+};
 use ethereum_consensus::{
     clock::{self, SystemTimeProvider},
     state_transition::Context,
