@@ -13,9 +13,9 @@ test:
     # Partitions much heavier "integration tests" to a separate command
     cargo test --lib
 fmt:
-    cargo fmt
+    cargo +nightly fmt --all
 lint: fmt validate-example-config
     cargo clippy --all-targets --all-features
 build:
-    cargo build --all-features
+    cargo build --all-targets --all-features
 run-ci: lint build test
