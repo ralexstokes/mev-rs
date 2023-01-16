@@ -35,7 +35,7 @@ impl std::fmt::Display for Network {
             Self::Sepolia => "sepolia",
             Self::Goerli => "goerli",
         };
-        write!(f, "{}", repr)
+        write!(f, "{repr}")
     }
 }
 
