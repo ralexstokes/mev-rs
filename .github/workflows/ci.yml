@@ -1,0 +1,62 @@
+name: CI suite
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Read toolchain file
+        id: rust-toolchain
+        run: |
+          RUST_TOOLCHAIN=$(grep 'channel' rust-toolchain.toml | awk '{split($0,a," = "); print a[2]}' | tr -d '"')
+          echo "RUST_TOOLCHAIN=$RUST_TOOLCHAIN" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.rust-toolchain.outputs.RUST_TOOLCHAIN }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build
+        run: cargo build --all-targets --all-features --verbose
+
+      - name: Run tests
+        run: cargo test --verbose
+
+      - name: Validate config
+        run: cargo run config example.config.toml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Check format
+        run: cargo +nightly fmt --all --check
+
+      - name: Check clippy
+        run: cargo +nightly clippy --all-targets --all-features --verbose -- -D warnings

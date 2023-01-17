@@ -1,4 +1,4 @@
-name: Release Suite
+name: Release suite
 
 on:
   push:
@@ -99,17 +99,17 @@ jobs:
         run: |
           body=$(cat <<- "ENDBODY"
           ${{ env.VERSION }}
-         
+
           ## Changelog
-          
+
           ${{ steps.changelog.outputs.CHANGELOG }}
-          
+
           ## Binaries
-          
+
           | System | Architecture | Binary |
           |:---:|:---:|:---:|
-          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz) | 
-          | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz) | 
+          | <img src="https://simpleicons.org/icons/apple.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-apple-darwin.tar.gz) |
+          | <img src="https://simpleicons.org/icons/linux.svg" style="width: 32px;"/> | x86_64 | [mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz](https://github.com/${{ env.REPO_NAME }}/releases/download/${{ env.VERSION }}/mev-rs-${{ env.VERSION }}-x86_64-unknown-linux-gnu.tar.gz) |
 
           ENDBODY
           )
