@@ -50,11 +50,11 @@ impl Service {
         let block_provider = relay.clone();
         let server = BlindedBlockProviderServer::new(self.host, self.port, block_provider).spawn();
 
-        let relayer = tokio::spawn(async move {
+        let relay = tokio::spawn(async move {
             relay.run().await;
         });
 
-        ServiceHandle { relayer, server }
+        ServiceHandle { relay, server }
     }
 }
 
@@ -64,7 +64,7 @@ impl Service {
 #[pin_project::pin_project]
 pub struct ServiceHandle {
     #[pin]
-    relayer: JoinHandle<()>,
+    relay: JoinHandle<()>,
     #[pin]
     server: JoinHandle<()>,
 }
@@ -74,9 +74,9 @@ impl Future for ServiceHandle {
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let relayer = this.relayer.poll(cx);
-        if relayer.is_ready() {
-            return relayer
+        let relay = this.relay.poll(cx);
+        if relay.is_ready() {
+            return relay
         }
         this.server.poll(cx)
     }

@@ -60,13 +60,13 @@ impl Service {
         let relay_mux = RelayMux::new(relays, Arc::new(context), network);
 
         let relay_mux_clone = relay_mux.clone();
-        let relayer = tokio::spawn(async move {
-            relay_mux_clone.run().await;
+        let relay_mux = tokio::spawn(async move {
+            relay_mux.run().await;
         });
 
-        let server = BlindedBlockProviderServer::new(host, port, relay_mux).spawn();
+        let server = BlindedBlockProviderServer::new(host, port, relay_mux_clone).spawn();
 
-        ServiceHandle { relayer, server }
+        ServiceHandle { relay_mux, server }
     }
 }
 
@@ -76,7 +76,7 @@ impl Service {
 #[pin_project::pin_project]
 pub struct ServiceHandle {
     #[pin]
-    relayer: JoinHandle<()>,
+    relay_mux: JoinHandle<()>,
     #[pin]
     server: JoinHandle<()>,
 }
@@ -86,9 +86,9 @@ impl Future for ServiceHandle {
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        let relayer = this.relayer.poll(cx);
-        if relayer.is_ready() {
-            return relayer
+        let relay_mux = this.relay_mux.poll(cx);
+        if relay_mux.is_ready() {
+            return relay_mux
         }
         this.server.poll(cx)
     }
