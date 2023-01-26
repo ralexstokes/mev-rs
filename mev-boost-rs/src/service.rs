@@ -1,10 +1,10 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
-use futures::future::join_all;
 use mev_build_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
 use serde::Deserialize;
-use std::{net::Ipv4Addr, sync::Arc};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use tokio::task::{JoinError, JoinHandle};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -52,23 +52,44 @@ impl Service {
         Self { host: config.host, port: config.port, relays, network }
     }
 
-    pub async fn run(&self) {
+    /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
+    pub fn spawn(self) -> ServiceHandle {
+        let Self { host, port, relays, network } = self;
         let context: Context = self.network.into();
-        let relays = self.relays.iter().cloned().map(|endpoint| Relay::new(Client::new(endpoint)));
-        let relay_mux = RelayMux::new(relays, Arc::new(context), self.network);
-
-        let mut tasks = vec![];
+        let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
+        let relay_mux = RelayMux::new(relays, Arc::new(context), network);
 
         let relay_mux_clone = relay_mux.clone();
-        tasks.push(tokio::spawn(async move {
-            relay_mux_clone.run().await;
-        }));
+        let relay_mux = tokio::spawn(async move {
+            relay_mux.run().await;
+        });
 
-        let builder_api = BlindedBlockProviderServer::new(self.host, self.port, relay_mux);
-        tasks.push(tokio::spawn(async move {
-            builder_api.run().await;
-        }));
+        let server = BlindedBlockProviderServer::new(host, port, relay_mux_clone).spawn();
 
-        join_all(tasks).await;
+        ServiceHandle { relay_mux, server }
+    }
+}
+
+/// Contains the handles to spawned [`RelayMux`] and [`BlindedBlockProviderServer`] tasks
+///
+/// This struct is created by the [`Service::spawn`] function
+#[pin_project::pin_project]
+pub struct ServiceHandle {
+    #[pin]
+    relay_mux: JoinHandle<()>,
+    #[pin]
+    server: JoinHandle<()>,
+}
+
+impl Future for ServiceHandle {
+    type Output = Result<(), JoinError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+        let relay_mux = this.relay_mux.poll(cx);
+        if relay_mux.is_ready() {
+            return relay_mux
+        }
+        this.server.poll(cx)
     }
 }
