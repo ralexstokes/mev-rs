@@ -1,6 +1,6 @@
 # mev-rs
 
-[![build](https://github.com/ralexstokes/mev-rs/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/ralexstokes/mev-rs/actions/workflows/rust.yml)
+[![build](https://github.com/ralexstokes/mev-rs/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ralexstokes/mev-rs/actions/workflows/ci.yml)
 
 (experimental) utilities for block space.
 
