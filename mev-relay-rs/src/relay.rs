@@ -14,9 +14,10 @@ use ethereum_consensus::{
 use futures::StreamExt;
 use mev_build_rs::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
-    BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, BuilderError,
-    EngineBuilder, ExecutionPayload, ExecutionPayloadHeader, ExecutionPayloadWithValue,
+    BidRequest, BlindedBlockProvider, BlindedBlockProviderError,  BuilderError,
+    EngineBuilder, ExecutionPayload,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
+    types::bellatrix as bellatrix
 };
 use parking_lot::Mutex;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc};
@@ -312,8 +313,7 @@ impl BlindedBlockProvider for Relay {
     ) -> Result<SignedBuilderBid, BlindedBlockProviderError> {
         validate_bid_request(bid_request)?;
 
-        let ExecutionPayloadWithValue { mut payload, value } =
-            self.builder.get_payload_with_value(bid_request)?;
+        let (mut payload, value) = self.builder.get_payload_with_value(bid_request)?;
 
         let header = {
             let mut state = self.state.lock();
@@ -335,7 +335,7 @@ impl BlindedBlockProvider for Relay {
 
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
-        let signed_bid = SignedBuilderBid { message: bid, signature };
+        let signed_bid = SignedBuilderBid::Bellatrix() { message: bid, signature };
         Ok(signed_bid)
     }
 

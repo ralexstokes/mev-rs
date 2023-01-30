@@ -1,10 +1,10 @@
 use crate::{
     blinded_block_provider::Error as BlindedBlockProviderError,
     builder::Error,
-    types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue},
+    types::{BidRequest as PayloadRequest, ExecutionPayload},
 };
 use ethereum_consensus::{
-    bellatrix::mainnet::ExecutionPayload,
+    bellatrix::mainnet as spec,
     builder::SignedValidatorRegistration,
     crypto::SecretKey,
     primitives::{BlsPublicKey, U256},
@@ -62,7 +62,7 @@ impl EngineBuilder {
     pub fn get_payload_with_value(
         &self,
         request: &PayloadRequest,
-    ) -> Result<ExecutionPayloadWithValue, Error> {
+    ) -> Result<(ExecutionPayload, U256), Error> {
         let (fee_recipient, gas_limit) = self
             .state
             .lock()
@@ -73,16 +73,15 @@ impl EngineBuilder {
             })
             .ok_or_else(|| Error::MissingPreferences(request.public_key.clone()))?;
 
-        let payload = ExecutionPayload {
+        let payload = ExecutionPayload::Bellatrix(spec::ExecutionPayload {
             parent_hash: request.parent_hash.clone(),
             fee_recipient,
             gas_limit,
             extra_data: ByteList::try_from(b"hello world".as_ref()).unwrap(),
             ..Default::default()
-        };
+        });
 
-        let bid = ExecutionPayloadWithValue { payload, value: U256::from_bytes_le([1u8; 32]) };
-        Ok(bid)
+        Ok((payload, U256::from_bytes_le([1u8; 32])))
     }
 
     pub fn register_validators(
