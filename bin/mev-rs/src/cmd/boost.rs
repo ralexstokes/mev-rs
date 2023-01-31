@@ -17,8 +17,9 @@ impl Command {
 
         let config = Config::from_toml_file(config_file)?;
 
-        if let Some(config) = config.boost {
-            Ok(Service::from(config, network).spawn().await?)
+        if let Some(mut config) = config.boost {
+            config.network = network;
+            Ok(Service::from(config).spawn().await?)
         } else {
             Err(anyhow!("missing boost config from file provided"))
         }

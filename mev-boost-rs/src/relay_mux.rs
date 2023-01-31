@@ -1,14 +1,13 @@
 use async_trait::async_trait;
 use ethereum_consensus::{
-    clock::{Clock, SystemTimeProvider},
     primitives::{BlsPublicKey, Hash32, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
 use futures::{stream, StreamExt};
 use mev_lib::{
-    verify_signed_builder_message, BidRequest, BlindedBlockProvider,
-    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
-    SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
+    BidRequest, BlindedBlockProvider, BlindedBlockProviderClient as Relay,
+    BlindedBlockProviderError, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration,
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -43,10 +42,7 @@ impl From<Error> for BlindedBlockProviderError {
 }
 
 fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
-    let message = &mut bid.message;
-    let public_key = message.public_key.clone();
-    verify_signed_builder_message(message, &bid.signature, &public_key, context)?;
-    Ok(())
+    Ok(bid.verify_signature(context)?)
 }
 
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
@@ -76,12 +72,9 @@ impl Deref for RelayMux {
 }
 
 pub struct RelayMuxInner {
-    // TODO: this can likely be faster by just having a list of URLs
-    // and one shared API client
     relays: Vec<Relay>,
-    context: Arc<Context>,
+    context: Context,
     state: Mutex<State>,
-    network: Network,
 }
 
 #[derive(Debug, Default)]
@@ -92,28 +85,16 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(
-        relays: impl Iterator<Item = Relay>,
-        context: Arc<Context>,
-        network: Network,
-    ) -> Self {
-        let inner =
-            RelayMuxInner { relays: relays.collect(), context, state: Default::default(), network };
+    pub fn new(relays: impl Iterator<Item = Relay>, context: Context) -> Self {
+        let inner = RelayMuxInner { relays: relays.collect(), context, state: Default::default() };
         Self(Arc::new(inner))
     }
 
-    pub async fn run(&self) {
-        let clock: Clock<SystemTimeProvider> = self.network.into();
-        let slots = clock.stream_slots();
-
-        tokio::pin!(slots);
-
-        while let Some(slot) = slots.next().await {
-            let mut state = self.state.lock();
-            state
-                .outstanding_bids
-                .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
-        }
+    pub fn on_slot(&self, slot: Slot) {
+        let mut state = self.state.lock();
+        state
+            .outstanding_bids
+            .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
     }
 }
 
@@ -170,7 +151,7 @@ impl BlindedBlockProvider for RelayMux {
             })
             .collect::<Vec<_>>();
 
-        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (&bid.message.value, *i)));
+        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
             return Err(Error::NoBids.into())
@@ -179,10 +160,10 @@ impl BlindedBlockProvider for RelayMux {
         // for now, break any ties by picking the first bid,
         // which currently corresponds to the fastest relay
         let (best_index, rest) = best_indices.split_first().unwrap();
-        let best_block_hash = &bids[*best_index].0.message.header.block_hash;
+        let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
         for index in rest.iter() {
-            let block_hash = &bids[*index].0.message.header.block_hash;
+            let block_hash = &bids[*index].0.block_hash();
             if block_hash == best_block_hash {
                 relay_indices.push(*index);
             }
@@ -217,11 +198,11 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        let expected_block_hash = &signed_block.message.body.execution_payload_header.block_hash;
+        let expected_block_hash = signed_block.block_hash();
         for (i, response) in responses.into_iter().enumerate() {
             match response {
                 Ok(payload) => {
-                    if &payload.block_hash == expected_block_hash {
+                    if payload.block_hash() == expected_block_hash {
                         return Ok(payload)
                     } else {
                         tracing::warn!("error opening bid from relay {i}: the returned payload did not match the expected block hash: {expected_block_hash}");
@@ -238,13 +219,10 @@ impl BlindedBlockProvider for RelayMux {
 }
 
 fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
-    let block = &signed_block.message;
+    let slot = signed_block.slot();
+    let parent_hash = signed_block.parent_hash().clone();
 
-    BidRequest {
-        slot: block.slot,
-        parent_hash: block.body.execution_payload_header.parent_hash.clone(),
-        public_key: public_key.clone(),
-    }
+    BidRequest { slot, parent_hash, public_key: public_key.clone() }
 }
 
 #[cfg(test)]

@@ -1,9 +1,13 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
-use ethereum_consensus::state_transition::Context;
+use ethereum_consensus::{
+    clock::{Clock, SystemTimeProvider},
+    state_transition::Context,
+};
+use futures::StreamExt;
 use mev_lib::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use url::Url;
 
@@ -12,11 +16,18 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub relays: Vec<String>,
+    #[serde(skip)]
+    pub network: Network,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
+        Self {
+            host: Ipv4Addr::UNSPECIFIED,
+            port: 18550,
+            relays: vec![],
+            network: Network::default(),
+        }
     }
 }
 
@@ -42,31 +53,38 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(config: Config, network: Network) -> Self {
+    pub fn from(config: Config) -> Self {
         let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
         }
 
-        Self { host: config.host, port: config.port, relays, network }
+        Self { host: config.host, port: config.port, relays, network: config.network }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
     pub fn spawn(self) -> ServiceHandle {
         let Self { host, port, relays, network } = self;
-        let context: Context = self.network.into();
+        let context: Context = (&network).into();
         let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
-        let relay_mux = RelayMux::new(relays, Arc::new(context), network);
+        let relay_mux = RelayMux::new(relays, context);
 
         let relay_mux_clone = relay_mux.clone();
-        let relay_mux = tokio::spawn(async move {
-            relay_mux.run().await;
+        let relay_task = tokio::spawn(async move {
+            let clock: Clock<SystemTimeProvider> = (&network).into();
+            let slots = clock.stream_slots();
+
+            tokio::pin!(slots);
+
+            while let Some(slot) = slots.next().await {
+                relay_mux_clone.on_slot(slot);
+            }
         });
 
-        let server = BlindedBlockProviderServer::new(host, port, relay_mux_clone).spawn();
+        let server = BlindedBlockProviderServer::new(host, port, relay_mux).spawn();
 
-        ServiceHandle { relay_mux, server }
+        ServiceHandle { relay_mux: relay_task, server }
     }
 }
 
