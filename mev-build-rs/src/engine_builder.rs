@@ -1,5 +1,5 @@
 use ethereum_consensus::{
-    bellatrix::mainnet::ExecutionPayload,
+    bellatrix::mainnet as spec,
     builder::SignedValidatorRegistration,
     crypto::SecretKey,
     primitives::{BlsPublicKey, U256},
@@ -7,7 +7,8 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use mev_lib::{
-    blinded_block_provider::Error as BlindedBlockProviderError, types::BidRequest as PayloadRequest,
+    blinded_block_provider::Error as BlindedBlockProviderError,
+    types::{BidRequest as PayloadRequest, ExecutionPayload},
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -73,13 +74,13 @@ impl EngineBuilder {
                 BlindedBlockProviderError::MissingPreferences(request.public_key.clone())
             })?;
 
-        let payload = ExecutionPayload {
+        let payload = ExecutionPayload::Bellatrix(spec::ExecutionPayload {
             parent_hash: request.parent_hash.clone(),
             fee_recipient,
             gas_limit,
             extra_data: ByteList::try_from(b"hello world".as_ref()).unwrap(),
             ..Default::default()
-        };
+        });
 
         Ok((payload, U256::from_bytes_le([1u8; 32])))
     }

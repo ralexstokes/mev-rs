@@ -12,10 +12,9 @@ use ethereum_consensus::{
 };
 use mev_build_rs::EngineBuilder;
 use mev_lib::{
-    sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
-    BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, ExecutionPayload,
-    ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+    sign_builder_message, types::bellatrix as spec, verify_signed_builder_message, BidRequest,
+    BlindedBlockProvider, BlindedBlockProviderError, ExecutionPayload, ExecutionPayloadHeader,
+    SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use parking_lot::Mutex;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc};
@@ -154,7 +153,7 @@ fn validate_execution_payload(
 
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
-    if execution_payload.gas_limit != preferences.gas_limit {
+    if execution_payload.gas_limit() != preferences.gas_limit {
         return Err(Error::InvalidGasLimit)
     }
 
@@ -168,23 +167,21 @@ fn validate_execution_payload(
 fn validate_signed_block(
     signed_block: &mut SignedBlindedBeaconBlock,
     public_key: &BlsPublicKey,
-    payload: &mut ExecutionPayload,
+    local_payload: &mut ExecutionPayload,
     context: &Context,
 ) -> Result<(), Error> {
-    let header = ExecutionPayloadHeader::try_from(payload)?;
-    if signed_block.message.body.execution_payload_header != header {
+    let local_block_hash = local_payload.block_hash();
+    let block_hash = signed_block.block_hash();
+    if block_hash != local_block_hash {
         return Err(Error::UnknownBlock)
     }
-
-    let message = &mut signed_block.message;
-    verify_signed_consensus_message(message, &signed_block.signature, public_key, context)?;
 
     // OPTIONAL:
     // -- verify w/ consensus?
     // verify slot is timely
     // verify proposer_index is correct
     // verify parent_root matches
-    Ok(())
+    Ok(signed_block.verify_signature(public_key, context)?)
 }
 
 #[derive(Clone)]
@@ -317,26 +314,28 @@ impl BlindedBlockProvider for Relay {
             header
         };
 
-        let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
+        let mut bid = match header {
+            ExecutionPayloadHeader::Bellatrix(header) => {
+                spec::BuilderBid { header, value, public_key: self.public_key.clone() }
+            }
+            _ => unimplemented!("consider how to best handle polymorphism here..."),
+        };
 
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
-        let signed_bid = SignedBuilderBid { message: bid, signature };
-        Ok(signed_bid)
+        let signed_bid = spec::SignedBuilderBid { message: bid, signature };
+        Ok(SignedBuilderBid::Bellatrix(signed_bid))
     }
 
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
-        let block = &signed_block.message;
-        let public_key =
-            self.validators.get_public_key(block.proposer_index).map_err(Error::from)?;
-        let bid_request = BidRequest {
-            slot: block.slot,
-            parent_hash: block.body.execution_payload_header.parent_hash.clone(),
-            public_key,
-        };
+        let slot = signed_block.slot();
+        let parent_hash = signed_block.parent_hash().clone();
+        let proposer_index = signed_block.proposer_index();
+        let public_key = self.validators.get_public_key(proposer_index).map_err(Error::from)?;
+        let bid_request = BidRequest { slot, parent_hash, public_key };
 
         let mut payload = {
             let mut state = self.state.lock();

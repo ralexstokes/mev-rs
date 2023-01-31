@@ -1,6 +1,6 @@
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::{
-    bellatrix::mainnet::{BlindedBeaconBlock, BlindedBeaconBlockBody, SignedBlindedBeaconBlock},
+    bellatrix::mainnet::{self as spec, BlindedBeaconBlock, BlindedBeaconBlockBody},
     builder::{SignedValidatorRegistration, ValidatorRegistration},
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
@@ -10,7 +10,10 @@ use ethereum_consensus::{
 };
 use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
-use mev_lib::{sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient};
+use mev_lib::{
+    sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient, ExecutionPayload,
+    SignedBlindedBeaconBlock, SignedBuilderBid,
+};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 
 use rand::seq::SliceRandom;
@@ -154,12 +157,15 @@ async fn propose_block(
         public_key: proposer.validator.public_key.clone(),
     };
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
-    let bid = &signed_bid.message;
-    assert_eq!(bid.header.parent_hash, parent_hash);
+    let bid_parent_hash = signed_bid.parent_hash();
+    assert_eq!(bid_parent_hash, &parent_hash);
 
-    let beacon_block_body = BlindedBeaconBlockBody {
-        execution_payload_header: bid.header.clone(),
-        ..Default::default()
+    let beacon_block_body = match signed_bid {
+        SignedBuilderBid::Bellatrix(bid) => BlindedBeaconBlockBody {
+            execution_payload_header: bid.message.header,
+            ..Default::default()
+        },
+        _ => unimplemented!(),
     };
     let mut beacon_block = BlindedBeaconBlock {
         slot: current_slot,
@@ -170,14 +176,20 @@ async fn propose_block(
     // TODO provide realistic values
     let domain = compute_domain(DomainType::BeaconProposer, None, None, context).unwrap();
     let signature = sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
-    let signed_block = SignedBlindedBeaconBlock { message: beacon_block, signature };
+    let signed_block = spec::SignedBlindedBeaconBlock { message: beacon_block, signature };
 
     beacon_node.check_status().await.unwrap();
 
+    let signed_block = SignedBlindedBeaconBlock::Bellatrix(signed_block);
     let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
-    assert_eq!(payload.parent_hash, parent_hash);
-    assert_eq!(payload.fee_recipient, proposer.fee_recipient);
+    match payload {
+        ExecutionPayload::Bellatrix(payload) => {
+            assert_eq!(payload.parent_hash, parent_hash);
+            assert_eq!(payload.fee_recipient, proposer.fee_recipient);
+        }
+        _ => unimplemented!(),
+    }
 
     beacon_node.check_status().await.unwrap();
 }
