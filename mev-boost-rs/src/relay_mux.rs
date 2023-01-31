@@ -1,13 +1,12 @@
 use async_trait::async_trait;
 use ethereum_consensus::{
-    clock::{Clock, SystemTimeProvider},
     primitives::{BlsPublicKey, Hash32, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
 use futures::{stream, StreamExt};
 use mev_lib::{
     verify_signed_builder_message, BidRequest, BlindedBlockProvider,
-    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
+    BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
 use parking_lot::Mutex;
@@ -76,12 +75,9 @@ impl Deref for RelayMux {
 }
 
 pub struct RelayMuxInner {
-    // TODO: this can likely be faster by just having a list of URLs
-    // and one shared API client
     relays: Vec<Relay>,
-    context: Arc<Context>,
+    context: Context,
     state: Mutex<State>,
-    network: Network,
 }
 
 #[derive(Debug, Default)]
@@ -92,28 +88,16 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(
-        relays: impl Iterator<Item = Relay>,
-        context: Arc<Context>,
-        network: Network,
-    ) -> Self {
-        let inner =
-            RelayMuxInner { relays: relays.collect(), context, state: Default::default(), network };
+    pub fn new(relays: impl Iterator<Item = Relay>, context: Context) -> Self {
+        let inner = RelayMuxInner { relays: relays.collect(), context, state: Default::default() };
         Self(Arc::new(inner))
     }
 
-    pub async fn run(&self) {
-        let clock: Clock<SystemTimeProvider> = self.network.into();
-        let slots = clock.stream_slots();
-
-        tokio::pin!(slots);
-
-        while let Some(slot) = slots.next().await {
-            let mut state = self.state.lock();
-            state
-                .outstanding_bids
-                .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
-        }
+    pub fn on_slot(&self, slot: Slot) {
+        let mut state = self.state.lock();
+        state
+            .outstanding_bids
+            .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
     }
 }
 

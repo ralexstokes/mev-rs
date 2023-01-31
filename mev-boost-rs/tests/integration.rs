@@ -95,7 +95,7 @@ async fn test_end_to_end() {
     let relay_config =
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
-    let relay = Relay::from(relay_config, Default::default());
+    let relay = Relay::from(relay_config);
     relay.spawn().await;
 
     // start mux server
@@ -103,7 +103,7 @@ async fn test_end_to_end() {
     config.relays.push(format!("http://127.0.0.1:{port}"));
 
     let mux_port = config.port;
-    let service = Service::from(config, Default::default());
+    let service = Service::from(config);
     service.spawn();
 
     let beacon_node = RelayClient::new(ApiClient::new(

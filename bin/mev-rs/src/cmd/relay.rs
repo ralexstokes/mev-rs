@@ -31,9 +31,10 @@ impl Command {
 
         let config = Config::from_toml_file(config_file)?;
 
-        if let Some(config) = config.relay {
+        if let Some(mut config) = config.relay {
+            config.network = network;
             // TODO separate mock and "real" modes
-            let service = Service::from(config, network).spawn().await;
+            let service = Service::from(config).spawn().await;
             Ok(service.await?)
         } else {
             Err(anyhow!("missing relay config from file provided"))
