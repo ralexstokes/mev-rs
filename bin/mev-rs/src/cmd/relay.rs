@@ -1,12 +1,12 @@
-use crate::config::Config;
+use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
-use mev_build_rs::Network;
+use mev_lib::Network;
 use mev_relay_rs::Service;
 
 #[derive(Debug, Args)]
 #[clap(about = "🏗 connecting builders to proposers", subcommand_negates_reqs = true)]
-pub(crate) struct Command {
+pub struct Command {
     #[clap(env, required = true)]
     config_file: Option<String>,
 
@@ -15,12 +15,12 @@ pub(crate) struct Command {
 }
 
 #[derive(Debug, Subcommand)]
-pub(crate) enum Commands {
+pub enum Commands {
     Mock { config_file: String },
 }
 
 impl Command {
-    pub(crate) async fn execute(&self, network: Network) -> Result<()> {
+    pub async fn execute(&self, network: Network) -> Result<()> {
         let (config_file, _mock) = if let Some(subcommand) = self.command.as_ref() {
             match subcommand {
                 Commands::Mock { config_file } => (config_file, true),

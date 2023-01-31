@@ -3,7 +3,6 @@ name = "mev-relay-rs"
 version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-rust-version = "1.60.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -23,4 +22,5 @@ serde = { version = "1.0", features = ["derive"] }
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
-mev-build-rs = { path = "../mev-build-rs"}
+mev-lib = { path = "../mev-lib" }
+mev-build-rs = { path = "../mev-build-rs" }

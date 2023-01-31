@@ -1,6 +1,5 @@
 use crate::{
     blinded_block_provider::Error,
-    builder::Error as BuilderError,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -49,7 +48,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(BuilderError::NoHeaderPrepared(Box::new(bid_request.clone())).into())
+            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())))
         }
 
         let result: ApiResult<Value<SignedBuilderBid>> =

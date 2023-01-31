@@ -1408,6 +1408,7 @@ dependencies = [
  "futures",
  "httpmock",
  "mev-build-rs",
+ "mev-lib",
  "mev-relay-rs",
  "parking_lot",
  "pin-project",
@@ -1423,6 +1424,25 @@ dependencies = [
 
 [[package]]
 name = "mev-build-rs"
+version = "0.2.1"
+dependencies = [
+ "async-trait",
+ "axum",
+ "beacon-api-client",
+ "ethereum-consensus",
+ "hyper",
+ "mev-lib",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "ssz-rs",
+ "thiserror",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "mev-lib"
 version = "0.2.1"
 dependencies = [
  "async-trait",
@@ -1449,6 +1469,7 @@ dependencies = [
  "futures",
  "http",
  "mev-build-rs",
+ "mev-lib",
  "parking_lot",
  "pin-project",
  "serde",
@@ -1466,6 +1487,7 @@ dependencies = [
  "clap",
  "mev-boost-rs",
  "mev-build-rs",
+ "mev-lib",
  "mev-relay-rs",
  "serde",
  "tokio",

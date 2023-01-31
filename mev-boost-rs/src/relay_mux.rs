@@ -5,7 +5,7 @@ use ethereum_consensus::{
     state_transition::{Context, Error as ConsensusError},
 };
 use futures::{stream, StreamExt};
-use mev_build_rs::{
+use mev_lib::{
     verify_signed_builder_message, BidRequest, BlindedBlockProvider,
     BlindedBlockProviderClient as Relay, BlindedBlockProviderError, ExecutionPayload, Network,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,

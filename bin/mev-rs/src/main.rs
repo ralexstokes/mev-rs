@@ -1,6 +1,4 @@
-mod boost;
-mod config;
-mod relay;
+mod cmd;
 
 use anyhow::Result;
 use clap::{Parser, Subcommand};
@@ -9,7 +7,7 @@ use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Default, Debug, Clone, clap::ValueEnum)]
-pub(crate) enum NetworkArg {
+pub enum NetworkArg {
     #[default]
     Mainnet,
     Sepolia,
@@ -18,7 +16,7 @@ pub(crate) enum NetworkArg {
 
 // NOTE: define this mapping so only this crate needs the `clap` dependency while still being able
 // to use the `clap::ValueEnum` machinery
-impl From<NetworkArg> for mev_build_rs::Network {
+impl From<NetworkArg> for mev_lib::Network {
     fn from(arg: NetworkArg) -> Self {
         match arg {
             NetworkArg::Mainnet => Self::Mainnet,
@@ -39,9 +37,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
-    Boost(boost::Command),
-    Relay(relay::Command),
-    Config(config::Command),
+    Boost(cmd::boost::Command),
+    Relay(cmd::relay::Command),
+    Config(cmd::config::Command),
 }
 
 fn setup_logging() {

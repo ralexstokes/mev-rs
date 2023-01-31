@@ -2,7 +2,8 @@ use crate::relay::Relay;
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 
-use mev_build_rs::{BlindedBlockProviderServer, EngineBuilder, Network};
+use mev_build_rs::EngineBuilder;
+use mev_lib::{BlindedBlockProviderServer, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};

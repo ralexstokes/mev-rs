@@ -12,11 +12,12 @@ use ethereum_consensus::{
     state_transition::{Context, Error as ConsensusError},
 };
 use futures::StreamExt;
-use mev_build_rs::{
+use mev_build_rs::EngineBuilder;
+use mev_lib::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
-    BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, BuilderError,
-    EngineBuilder, ExecutionPayload, ExecutionPayloadHeader, ExecutionPayloadWithValue,
-    SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
+    BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, ExecutionPayload,
+    ExecutionPayloadHeader, ExecutionPayloadWithValue, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration,
 };
 use parking_lot::Mutex;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc};
@@ -51,8 +52,6 @@ pub enum Error {
     InactiveValidator(BlsPublicKey, ValidatorStatus),
     #[error("{0}")]
     Consensus(#[from] ConsensusError),
-    #[error("{0}")]
-    Builder(#[from] BuilderError),
     #[error("{0}")]
     Validators(#[from] ValidatorSummaryProviderError),
 }
