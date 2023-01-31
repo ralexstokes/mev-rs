@@ -314,7 +314,7 @@ dependencies = [
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes//beacon-api-client?rev=7d5d8dad1648f771573f42585ad8080a45b05689#7d5d8dad1648f771573f42585ad8080a45b05689"
+source = "git+https://github.com/ralexstokes//beacon-api-client?rev=5184d83ba6d6408c6ef6a1ec1884efcb89e63ad3#5184d83ba6d6408c6ef6a1ec1884efcb89e63ad3"
 dependencies = [
  "ethereum-consensus",
  "http",
@@ -763,7 +763,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=a8110af76d97bf2bf27fb987a671808fcbdf1834#a8110af76d97bf2bf27fb987a671808fcbdf1834"
+source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=5531c285fc4030e265b8499612946d8a704e2c57#5531c285fc4030e265b8499612946d8a704e2c57"
 dependencies = [
  "async-stream",
  "blst",
@@ -772,6 +772,7 @@ dependencies = [
  "hex",
  "integer-sqrt",
  "multiaddr",
+ "multihash",
  "rand",
  "serde",
  "serde_json",
@@ -1539,7 +1540,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c346cf9999c631f002d8f977c4eaeaa0e6386f16007202308d0b3757522c2cc"
 dependencies = [
  "core2",
+ "digest 0.10.3",
  "multihash-derive",
+ "sha2 0.10.5",
  "unsigned-varint",
 ]
 
@@ -2287,11 +2290,10 @@ dependencies = [
 [[package]]
 name = "ssz-rs"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=cb08f18ca919cc1b685b861d0fa9e2daabe89737#cb08f18ca919cc1b685b861d0fa9e2daabe89737"
+source = "git+https://github.com/ralexstokes//ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
 dependencies = [
  "bitvec",
  "hex",
- "lazy_static",
  "num-bigint",
  "serde",
  "sha2 0.9.9",
@@ -2302,7 +2304,7 @@ dependencies = [
 [[package]]
 name = "ssz-rs-derive"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=cb08f18ca919cc1b685b861d0fa9e2daabe89737#cb08f18ca919cc1b685b861d0fa9e2daabe89737"
+source = "git+https://github.com/ralexstokes//ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
 dependencies = [
  "proc-macro2",
  "quote",
