@@ -7,8 +7,7 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use mev_lib::{
-    blinded_block_provider::Error as BlindedBlockProviderError,
-    types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue},
+    blinded_block_provider::Error as BlindedBlockProviderError, types::BidRequest as PayloadRequest,
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -61,7 +60,7 @@ impl EngineBuilder {
     pub fn get_payload_with_value(
         &self,
         request: &PayloadRequest,
-    ) -> Result<ExecutionPayloadWithValue, BlindedBlockProviderError> {
+    ) -> Result<(ExecutionPayload, U256), BlindedBlockProviderError> {
         let (fee_recipient, gas_limit) = self
             .state
             .lock()
@@ -82,8 +81,7 @@ impl EngineBuilder {
             ..Default::default()
         };
 
-        let bid = ExecutionPayloadWithValue { payload, value: U256::from_bytes_le([1u8; 32]) };
-        Ok(bid)
+        Ok((payload, U256::from_bytes_le([1u8; 32])))
     }
 
     pub fn register_validators(

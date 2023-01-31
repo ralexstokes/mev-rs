@@ -29,10 +29,3 @@ pub struct SignedBuilderBid {
     pub message: BuilderBid,
     pub signature: BlsSignature,
 }
-
-#[derive(Debug, Default, SimpleSerialize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExecutionPayloadWithValue {
-    pub payload: ExecutionPayload,
-    pub value: U256,
-}

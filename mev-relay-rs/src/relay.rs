@@ -16,7 +16,7 @@ use mev_build_rs::EngineBuilder;
 use mev_lib::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
     BidRequest, BlindedBlockProvider, BlindedBlockProviderError, BuilderBid, ExecutionPayload,
-    ExecutionPayloadHeader, ExecutionPayloadWithValue, SignedBlindedBeaconBlock, SignedBuilderBid,
+    ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
     SignedValidatorRegistration,
 };
 use parking_lot::Mutex;
@@ -311,8 +311,7 @@ impl BlindedBlockProvider for Relay {
     ) -> Result<SignedBuilderBid, BlindedBlockProviderError> {
         validate_bid_request(bid_request)?;
 
-        let ExecutionPayloadWithValue { mut payload, value } =
-            self.builder.get_payload_with_value(bid_request)?;
+        let (mut payload, value) = self.builder.get_payload_with_value(bid_request)?;
 
         let header = {
             let mut state = self.state.lock();
