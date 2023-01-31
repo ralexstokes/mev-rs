@@ -1,11 +1,12 @@
 [workspace]
-
 members = [
+    "bin/mev-rs",
     "mev-boost-rs",
     "mev-relay-rs",
     "mev-build-rs",
-    "mev-rs",
+    "mev-lib",
 ]
+default-members = ["bin/mev-rs"]
 
 [patch."https://github.com/ralexstokes/ethereum-consensus"]
 ethereum-consensus = { git = "https://github.com/ralexstokes//ethereum-consensus", rev = "a8110af76d97bf2bf27fb987a671808fcbdf1834" }

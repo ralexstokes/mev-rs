@@ -1,8 +1,3 @@
-use crate::{
-    blinded_block_provider::Error as BlindedBlockProviderError,
-    builder::Error,
-    types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue},
-};
 use ethereum_consensus::{
     bellatrix::mainnet::ExecutionPayload,
     builder::SignedValidatorRegistration,
@@ -10,6 +5,10 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, U256},
     ssz::ByteList,
     state_transition::Context,
+};
+use mev_lib::{
+    blinded_block_provider::Error as BlindedBlockProviderError,
+    types::{BidRequest as PayloadRequest, ExecutionPayloadWithValue},
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -62,7 +61,7 @@ impl EngineBuilder {
     pub fn get_payload_with_value(
         &self,
         request: &PayloadRequest,
-    ) -> Result<ExecutionPayloadWithValue, Error> {
+    ) -> Result<ExecutionPayloadWithValue, BlindedBlockProviderError> {
         let (fee_recipient, gas_limit) = self
             .state
             .lock()
@@ -71,7 +70,9 @@ impl EngineBuilder {
             .map(|preferences| {
                 (preferences.message.fee_recipient.clone(), preferences.message.gas_limit)
             })
-            .ok_or_else(|| Error::MissingPreferences(request.public_key.clone()))?;
+            .ok_or_else(|| {
+                BlindedBlockProviderError::MissingPreferences(request.public_key.clone())
+            })?;
 
         let payload = ExecutionPayload {
             parent_hash: request.parent_hash.clone(),

@@ -1,15 +1,15 @@
 use anyhow::{Context, Result};
 use clap::Args;
 use mev_boost_rs::Config as BoostConfig;
-use mev_build_rs::Network;
+use mev_lib::Network;
 use mev_relay_rs::Config as RelayConfig;
 use serde::Deserialize;
 use std::{fmt, path::Path};
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct Config {
-    pub(crate) boost: Option<BoostConfig>,
-    pub(crate) relay: Option<RelayConfig>,
+pub struct Config {
+    pub boost: Option<BoostConfig>,
+    pub relay: Option<RelayConfig>,
 }
 
 impl Config {
@@ -25,13 +25,13 @@ impl Config {
 
 #[derive(Debug, Args)]
 #[clap(about = "🛠 (debug) utility to verify configuration")]
-pub(crate) struct Command {
+pub struct Command {
     #[clap(env)]
     config_file: String,
 }
 
 impl Command {
-    pub(crate) async fn execute(&self, network: Network) -> Result<()> {
+    pub async fn execute(&self, network: Network) -> Result<()> {
         let config_file = &self.config_file;
 
         let config = Config::from_toml_file(config_file)?;

@@ -1,5 +1,5 @@
 [package]
-name = "mev-build-rs"
+name = "mev-lib"
 version = "0.2.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
@@ -24,5 +24,3 @@ parking_lot = "0.12.1"
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
 ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
-
-mev-lib = { path = "../mev-lib" }
