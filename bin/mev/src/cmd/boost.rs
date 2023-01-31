@@ -2,7 +2,7 @@ use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
 use clap::Args;
 use mev_boost_rs::Service;
-use mev_lib::Network;
+use mev_rs::Network;
 
 #[derive(Debug, Args)]
 #[clap(about = "🚀 connecting proposers to the external builder network")]

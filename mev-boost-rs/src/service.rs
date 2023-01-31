@@ -5,7 +5,7 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use futures::StreamExt;
-use mev_lib::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
+use mev_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};

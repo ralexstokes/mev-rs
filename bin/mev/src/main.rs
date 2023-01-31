@@ -16,7 +16,7 @@ pub enum NetworkArg {
 
 // NOTE: define this mapping so only this crate needs the `clap` dependency while still being able
 // to use the `clap::ValueEnum` machinery
-impl From<NetworkArg> for mev_lib::Network {
+impl From<NetworkArg> for mev_rs::Network {
     fn from(arg: NetworkArg) -> Self {
         match arg {
             NetworkArg::Mainnet => Self::Mainnet,
@@ -27,7 +27,7 @@ impl From<NetworkArg> for mev_lib::Network {
 }
 
 #[derive(Debug, Parser)]
-#[clap(author, version, name = "mev", about = "utilities for block space", long_about = None)]
+#[clap(author, version, about = "utilities for block space", long_about = None)]
 struct Cli {
     #[clap(long, default_value_t, value_enum)]
     network: NetworkArg,

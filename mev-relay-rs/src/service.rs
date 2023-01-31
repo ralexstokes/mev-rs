@@ -6,7 +6,7 @@ use ethereum_consensus::{
 };
 use futures::StreamExt;
 use mev_build_rs::EngineBuilder;
-use mev_lib::{BlindedBlockProviderServer, Network};
+use mev_rs::{BlindedBlockProviderServer, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};

@@ -11,7 +11,7 @@ use ethereum_consensus::{
     state_transition::{Context, Error as ConsensusError},
 };
 use mev_build_rs::EngineBuilder;
-use mev_lib::{
+use mev_rs::{
     sign_builder_message, types::bellatrix as spec, verify_signed_builder_message, BidRequest,
     BlindedBlockProvider, BlindedBlockProviderError, ExecutionPayload, ExecutionPayloadHeader,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
