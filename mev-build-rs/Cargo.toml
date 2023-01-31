@@ -11,4 +11,4 @@ parking_lot = "0.12.1"
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 
-mev-lib = { path = "../mev-lib" }
+mev-rs = { path = "../mev-rs" }

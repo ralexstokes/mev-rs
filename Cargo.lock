@@ -1400,6 +1400,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
+name = "mev"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "clap",
+ "mev-boost-rs",
+ "mev-build-rs",
+ "mev-relay-rs",
+ "mev-rs",
+ "serde",
+ "tokio",
+ "toml",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "mev-boost-rs"
 version = "0.2.1"
 dependencies = [
@@ -1409,8 +1426,8 @@ dependencies = [
  "futures",
  "httpmock",
  "mev-build-rs",
- "mev-lib",
  "mev-relay-rs",
+ "mev-rs",
  "parking_lot",
  "pin-project",
  "rand",
@@ -1428,24 +1445,8 @@ name = "mev-build-rs"
 version = "0.2.1"
 dependencies = [
  "ethereum-consensus",
- "mev-lib",
+ "mev-rs",
  "parking_lot",
-]
-
-[[package]]
-name = "mev-lib"
-version = "0.2.1"
-dependencies = [
- "async-trait",
- "axum",
- "beacon-api-client",
- "ethereum-consensus",
- "hyper",
- "serde",
- "ssz-rs",
- "thiserror",
- "tokio",
- "tracing",
 ]
 
 [[package]]
@@ -1458,7 +1459,7 @@ dependencies = [
  "futures",
  "http",
  "mev-build-rs",
- "mev-lib",
+ "mev-rs",
  "parking_lot",
  "pin-project",
  "serde",
@@ -1472,17 +1473,16 @@ dependencies = [
 name = "mev-rs"
 version = "0.2.1"
 dependencies = [
- "anyhow",
- "clap",
- "mev-boost-rs",
- "mev-build-rs",
- "mev-lib",
- "mev-relay-rs",
+ "async-trait",
+ "axum",
+ "beacon-api-client",
+ "ethereum-consensus",
+ "hyper",
  "serde",
+ "ssz-rs",
+ "thiserror",
  "tokio",
- "toml",
  "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

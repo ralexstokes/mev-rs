@@ -21,7 +21,7 @@ parking_lot = "0.12.1"
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
-mev-lib = { path = "../mev-lib" }
+mev-rs = { path = "../mev-rs" }
 
 [dev-dependencies]
 rand = "0.8.5"

@@ -6,7 +6,7 @@ use ethereum_consensus::{
     ssz::ByteList,
     state_transition::Context,
 };
-use mev_lib::{
+use mev_rs::{
     blinded_block_provider::Error as BlindedBlockProviderError,
     types::{BidRequest as PayloadRequest, ExecutionPayload},
 };

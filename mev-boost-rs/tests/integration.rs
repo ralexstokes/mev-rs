@@ -10,11 +10,11 @@ use ethereum_consensus::{
 };
 use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
-use mev_lib::{
+use mev_relay_rs::{Config as RelayConfig, Service as Relay};
+use mev_rs::{
     sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient, ExecutionPayload,
     SignedBlindedBeaconBlock, SignedBuilderBid,
 };
-use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 
 use rand::seq::SliceRandom;
 use std::{
