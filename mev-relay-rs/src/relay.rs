@@ -204,18 +204,6 @@ pub struct RelayInner {
     state: Mutex<State>,
 }
 
-impl RelayInner {
-    pub fn new(
-        secret_key: SecretKey,
-        builder: EngineBuilder,
-        validators: ValidatorSummaryProvider,
-        context: Arc<Context>,
-    ) -> Self {
-        let public_key = secret_key.public_key();
-        Self { secret_key, public_key, context, builder, validators, state: Default::default() }
-    }
-}
-
 #[derive(Debug, Default)]
 struct State {
     validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
@@ -226,8 +214,16 @@ impl Relay {
     pub fn new(builder: EngineBuilder, beacon_node: Client, context: Arc<Context>) -> Self {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+        let public_key = secret_key.public_key();
         let validators = ValidatorSummaryProvider::new(beacon_node);
-        let inner = RelayInner::new(secret_key, builder, validators, context);
+        let inner = RelayInner {
+            secret_key,
+            public_key,
+            builder,
+            validators,
+            context,
+            state: Default::default(),
+        };
         Self(Arc::new(inner))
     }
 

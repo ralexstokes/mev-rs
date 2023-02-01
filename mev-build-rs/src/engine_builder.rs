@@ -31,20 +31,6 @@ pub struct EngineBuilderInner {
     state: Mutex<State>,
 }
 
-impl EngineBuilderInner {
-    pub fn new(context: Arc<Context>) -> Self {
-        let key_bytes = [2u8; 32];
-        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
-        let public_key = secret_key.public_key();
-        Self {
-            _secret_key: secret_key,
-            _public_key: public_key,
-            _context: context,
-            state: Default::default(),
-        }
-    }
-}
-
 #[derive(Debug, Default)]
 struct State {
     validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
@@ -52,7 +38,15 @@ struct State {
 
 impl EngineBuilder {
     pub fn new(context: Arc<Context>) -> Self {
-        let inner = EngineBuilderInner::new(context);
+        let key_bytes = [2u8; 32];
+        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+        let public_key = secret_key.public_key();
+        let inner = EngineBuilderInner {
+            _secret_key: secret_key,
+            _public_key: public_key,
+            _context: context,
+            state: Default::default(),
+        };
         Self(Arc::new(inner))
     }
 
