@@ -1,45 +1,23 @@
 use async_trait::async_trait;
 use ethereum_consensus::{
-    primitives::{BlsPublicKey, Hash32, Slot, U256},
-    state_transition::{Context, Error as ConsensusError},
+    primitives::{BlsPublicKey, Slot, U256},
+    state_transition::Context,
 };
 use futures::{stream, StreamExt};
 use mev_rs::{
-    BidRequest, BlindedBlockProvider, BlindedBlockProviderClient as Relay,
-    BlindedBlockProviderError, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+    blinded_block_provider::Client as Relay,
+    types::{
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
+    },
+    BlindedBlockProvider, Error,
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
-use thiserror::Error;
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
-
-#[derive(Debug, Error)]
-pub enum Error {
-    #[error("no valid bids returned for proposal")]
-    NoBids,
-    #[error("could not find relay with outstanding bid to accept")]
-    MissingOpenBid,
-    #[error("could not register with any relay")]
-    CouldNotRegister,
-    #[error("no payload returned for opened bid with block hash {0}")]
-    MissingPayload(Hash32),
-    #[error("{0}")]
-    Consensus(#[from] ConsensusError),
-}
-
-impl From<Error> for BlindedBlockProviderError {
-    fn from(err: Error) -> Self {
-        match err {
-            Error::Consensus(err) => err.into(),
-            // TODO conform to API errors
-            err => Self::Custom(err.to_string()),
-        }
-    }
-}
 
 fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
     Ok(bid.verify_signature(context)?)
@@ -103,7 +81,7 @@ impl BlindedBlockProvider for RelayMux {
     async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
-    ) -> Result<(), BlindedBlockProviderError> {
+    ) -> Result<(), Error> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move { relay.register_validators(registrations).await })
@@ -114,16 +92,13 @@ impl BlindedBlockProvider for RelayMux {
         let failures = responses.iter().filter(|r| r.is_err());
 
         if failures.count() == self.relays.len() {
-            Err(Error::CouldNotRegister.into())
+            Err(Error::CouldNotRegister)
         } else {
             Ok(())
         }
     }
 
-    async fn fetch_best_bid(
-        &self,
-        bid_request: &BidRequest,
-    ) -> Result<SignedBuilderBid, BlindedBlockProviderError> {
+    async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
             .buffer_unordered(self.relays.len())
@@ -154,7 +129,7 @@ impl BlindedBlockProvider for RelayMux {
         let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
-            return Err(Error::NoBids.into())
+            return Err(Error::NoBids)
         }
 
         // for now, break any ties by picking the first bid,
@@ -177,13 +152,14 @@ impl BlindedBlockProvider for RelayMux {
             state.outstanding_bids.insert(bid_request.clone(), relay_indices);
         }
 
-        Ok(bids[*best_index].0.clone())
+        let best_bid = bids[*best_index].0.clone();
+        Ok(best_bid)
     }
 
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, BlindedBlockProviderError> {
+    ) -> Result<ExecutionPayload, Error> {
         let relay_indices = {
             let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
@@ -202,10 +178,11 @@ impl BlindedBlockProvider for RelayMux {
         for (i, response) in responses.into_iter().enumerate() {
             match response {
                 Ok(payload) => {
-                    if payload.block_hash() == expected_block_hash {
+                    let block_hash = payload.block_hash();
+                    if block_hash == expected_block_hash {
                         return Ok(payload)
                     } else {
-                        tracing::warn!("error opening bid from relay {i}: the returned payload did not match the expected block hash: {expected_block_hash}");
+                        tracing::warn!("error opening bid from relay {i}: the returned payload with block hash {block_hash} did not match the expected block hash: {expected_block_hash}");
                     }
                 }
                 Err(err) => {
@@ -214,7 +191,7 @@ impl BlindedBlockProvider for RelayMux {
             }
         }
 
-        Err(Error::MissingPayload(expected_block_hash.clone()).into())
+        Err(Error::MissingPayload(expected_block_hash.clone()))
     }
 }
 

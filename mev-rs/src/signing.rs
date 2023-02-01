@@ -3,7 +3,7 @@ use ethereum_consensus::{
     crypto::SecretKey,
     domains::DomainType,
     phase0::mainnet::compute_domain,
-    primitives::{BlsPublicKey, BlsSignature, Slot},
+    primitives::{BlsPublicKey, BlsSignature, Root, Slot},
     signing::{sign_with_domain, verify_signed_data},
     state_transition::{Context, Error, Forks},
 };
@@ -15,14 +15,15 @@ pub fn verify_signed_consensus_message<T: SimpleSerialize>(
     public_key: &BlsPublicKey,
     context: &Context,
     slot_hint: Option<Slot>,
+    root_hint: Option<Root>,
 ) -> Result<(), Error> {
-    let fork_version = slot_hint.map(|slot| match context.fork(slot) {
+    let fork_version = slot_hint.map(|slot| match context.fork_for(slot) {
         Forks::Bellatrix => context.bellatrix_fork_version,
         Forks::Capella => context.capella_fork_version,
         _ => unimplemented!(),
     });
-    // TODO use real values...
-    let domain = compute_domain(DomainType::BeaconProposer, fork_version, None, context).unwrap();
+    let domain =
+        compute_domain(DomainType::BeaconProposer, fork_version, root_hint, context).unwrap();
     verify_signed_data(message, signature, public_key, domain)?;
     Ok(())
 }

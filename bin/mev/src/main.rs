@@ -1,7 +1,8 @@
 mod cmd;
 
 use anyhow::Result;
-use clap::{Parser, Subcommand};
+use clap::{ArgGroup, Parser, Subcommand};
+use mev_rs::Network;
 use std::future::Future;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -16,7 +17,7 @@ pub enum NetworkArg {
 
 // NOTE: define this mapping so only this crate needs the `clap` dependency while still being able
 // to use the `clap::ValueEnum` machinery
-impl From<NetworkArg> for mev_rs::Network {
+impl From<NetworkArg> for Network {
     fn from(arg: NetworkArg) -> Self {
         match arg {
             NetworkArg::Mainnet => Self::Mainnet,
@@ -28,9 +29,12 @@ impl From<NetworkArg> for mev_rs::Network {
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about = "utilities for block space", long_about = None)]
+#[clap(group(ArgGroup::new("network-config").args(&["network", "network_config"])))]
 struct Cli {
-    #[clap(long, default_value_t, value_enum)]
-    network: NetworkArg,
+    #[clap(long, value_enum, value_name = "NETWORK")]
+    network: Option<NetworkArg>,
+    #[clap(long, value_name = "FILE")]
+    network_config: Option<String>,
     #[clap(subcommand)]
     command: Commands,
 }
@@ -38,6 +42,7 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Commands {
     Boost(cmd::boost::Command),
+    Build(cmd::build::Command),
     Relay(cmd::relay::Command),
     Config(cmd::config::Command),
 }
@@ -62,11 +67,24 @@ async fn run_task_until_signal(task: impl Future<Output = Result<()>>) -> Result
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
+    let network = if let Some(network) = cli.network {
+        network.into()
+    } else if let Some(network_config) = cli.network_config {
+        // use custom config if provided
+        Network::Custom(network_config)
+    } else {
+        // default to `mainnet` if no network configuration is provided
+        let network = NetworkArg::Mainnet;
+        network.into()
+    };
+
     setup_logging();
 
-    let network = cli.network.into();
+    tracing::info!("configured for {network}");
+
     match cli.command {
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute(network)).await,
+        Commands::Build(cmd) => run_task_until_signal(cmd.execute(network)).await,
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute(network)).await,
         Commands::Config(cmd) => run_task_until_signal(cmd.execute(network)).await,
     }

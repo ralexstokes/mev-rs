@@ -1,11 +1,11 @@
 use crate::relay_mux::RelayMux;
 use beacon_api_client::Client;
-use ethereum_consensus::{
-    clock::{Clock, SystemTimeProvider},
-    state_transition::Context,
-};
+use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
-use mev_rs::{BlindedBlockProviderClient as Relay, BlindedBlockProviderServer, Network};
+use mev_rs::{
+    blinded_block_provider::{Client as Relay, Server as BlindedBlockProviderServer},
+    Error, Network,
+};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -16,7 +16,7 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub relays: Vec<String>,
-    #[serde(skip)]
+    #[serde(default)]
     pub network: Network,
 }
 
@@ -64,15 +64,16 @@ impl Service {
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub fn spawn(self, context: Option<Context>) -> ServiceHandle {
+    pub fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network } = self;
-        let context = context.unwrap_or_else(|| From::from(&network));
+        let context =
+            if let Some(context) = context { context } else { Context::try_from(&network)? };
         let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
+        let clock = context.clock(None);
         let relay_mux = RelayMux::new(relays, context);
 
         let relay_mux_clone = relay_mux.clone();
         let relay_task = tokio::spawn(async move {
-            let clock: Clock<SystemTimeProvider> = (&network).into();
             let slots = clock.stream_slots();
 
             tokio::pin!(slots);
@@ -84,7 +85,7 @@ impl Service {
 
         let server = BlindedBlockProviderServer::new(host, port, relay_mux).spawn();
 
-        ServiceHandle { relay_mux: relay_task, server }
+        Ok(ServiceHandle { relay_mux: relay_task, server })
     }
 }
 
