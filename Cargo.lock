@@ -1478,6 +1478,7 @@ dependencies = [
  "beacon-api-client",
  "ethereum-consensus",
  "hyper",
+ "parking_lot",
  "serde",
  "ssz-rs",
  "thiserror",

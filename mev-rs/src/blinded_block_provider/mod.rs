@@ -1,17 +1,20 @@
 #[cfg(feature = "api")]
 mod api;
 
-#[cfg(feature = "api")]
-pub use {api::client::Client, api::server::Server, beacon_api_client::Error as ClientError};
-
-use crate::types::{
-    BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
-    SignedValidatorRegistration,
+use crate::{
+    types::{
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
+    },
+    validator_registration::validator_registrar::Error as ValidatorRegistrationError,
 };
+
 use async_trait::async_trait;
 use beacon_api_client::ApiError;
 use ethereum_consensus::{primitives::BlsPublicKey, state_transition::Error as ConsensusError};
 use thiserror::Error;
+#[cfg(feature = "api")]
+pub use {api::client::Client, api::server::Server, beacon_api_client::Error as ClientError};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -27,6 +30,8 @@ pub enum Error {
     Consensus(#[from] ConsensusError),
     #[error("{0}")]
     Api(#[from] ApiError),
+    #[error("{0}")]
+    ValidatorRegistration(#[from] ValidatorRegistrationError),
     #[error("internal server error")]
     Internal(String),
     #[error("{0}")]
