@@ -1,6 +1,6 @@
 use ethereum_consensus::{
-    bellatrix::mainnet as spec,
     builder::SignedValidatorRegistration,
+    capella::mainnet as spec,
     crypto::SecretKey,
     primitives::{BlsPublicKey, U256},
     ssz::ByteList,
@@ -68,7 +68,7 @@ impl EngineBuilder {
                 BlindedBlockProviderError::MissingPreferences(request.public_key.clone())
             })?;
 
-        let payload = ExecutionPayload::Bellatrix(spec::ExecutionPayload {
+        let payload = ExecutionPayload::Capella(spec::ExecutionPayload {
             parent_hash: request.parent_hash.clone(),
             fee_recipient,
             gas_limit,

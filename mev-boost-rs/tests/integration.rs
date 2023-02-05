@@ -1,7 +1,7 @@
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::{
-    bellatrix::mainnet::{self as spec, BlindedBeaconBlock, BlindedBeaconBlockBody},
     builder::{SignedValidatorRegistration, ValidatorRegistration},
+    capella::mainnet::{self as spec, BlindedBeaconBlock, BlindedBeaconBlockBody},
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
     primitives::{DomainType, ExecutionAddress, Hash32, Slot},
@@ -161,7 +161,7 @@ async fn propose_block(
     assert_eq!(bid_parent_hash, &parent_hash);
 
     let beacon_block_body = match signed_bid {
-        SignedBuilderBid::Bellatrix(bid) => BlindedBeaconBlockBody {
+        SignedBuilderBid::Capella(bid) => BlindedBeaconBlockBody {
             execution_payload_header: bid.message.header,
             ..Default::default()
         },
@@ -180,7 +180,7 @@ async fn propose_block(
 
     beacon_node.check_status().await.unwrap();
 
-    let signed_block = SignedBlindedBeaconBlock::Bellatrix(signed_block);
+    let signed_block = SignedBlindedBeaconBlock::Capella(signed_block);
     let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
     match payload {
@@ -188,7 +188,10 @@ async fn propose_block(
             assert_eq!(payload.parent_hash, parent_hash);
             assert_eq!(payload.fee_recipient, proposer.fee_recipient);
         }
-        _ => unimplemented!(),
+        ExecutionPayload::Capella(payload) => {
+            assert_eq!(payload.parent_hash, parent_hash);
+            assert_eq!(payload.fee_recipient, proposer.fee_recipient);
+        }
     }
 
     beacon_node.check_status().await.unwrap();

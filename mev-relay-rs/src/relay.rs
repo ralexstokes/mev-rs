@@ -12,7 +12,7 @@ use ethereum_consensus::{
 };
 use mev_build_rs::EngineBuilder;
 use mev_rs::{
-    sign_builder_message, types::bellatrix as spec, verify_signed_builder_message, BidRequest,
+    sign_builder_message, types::capella as spec, verify_signed_builder_message, BidRequest,
     BlindedBlockProvider, BlindedBlockProviderError, ExecutionPayload, ExecutionPayloadHeader,
     SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
 };
@@ -311,7 +311,7 @@ impl BlindedBlockProvider for Relay {
         };
 
         let mut bid = match header {
-            ExecutionPayloadHeader::Bellatrix(header) => {
+            ExecutionPayloadHeader::Capella(header) => {
                 spec::BuilderBid { header, value, public_key: self.public_key.clone() }
             }
             _ => unimplemented!("consider how to best handle polymorphism here..."),
@@ -320,7 +320,7 @@ impl BlindedBlockProvider for Relay {
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
         let signed_bid = spec::SignedBuilderBid { message: bid, signature };
-        Ok(SignedBuilderBid::Bellatrix(signed_bid))
+        Ok(SignedBuilderBid::Capella(signed_bid))
     }
 
     async fn open_bid(
