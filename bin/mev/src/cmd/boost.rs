@@ -19,7 +19,7 @@ impl Command {
 
         if let Some(mut config) = config.boost {
             config.network = network;
-            Ok(Service::from(config).spawn().await?)
+            Ok(Service::from(config).spawn(None).await?)
         } else {
             Err(anyhow!("missing boost config from file provided"))
         }
