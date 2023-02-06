@@ -123,18 +123,26 @@ impl SignedBlindedBeaconBlock {
         context: &Context,
     ) -> Result<(), Error> {
         match self {
-            Self::Bellatrix(bid) => verify_signed_consensus_message(
-                &mut bid.message,
-                &bid.signature,
-                public_key,
-                context,
-            ),
-            Self::Capella(bid) => verify_signed_consensus_message(
-                &mut bid.message,
-                &bid.signature,
-                public_key,
-                context,
-            ),
+            Self::Bellatrix(block) => {
+                let slot = block.message.slot;
+                verify_signed_consensus_message(
+                    &mut block.message,
+                    &block.signature,
+                    public_key,
+                    context,
+                    Some(slot),
+                )
+            }
+            Self::Capella(block) => {
+                let slot = block.message.slot;
+                verify_signed_consensus_message(
+                    &mut block.message,
+                    &block.signature,
+                    public_key,
+                    context,
+                    Some(slot),
+                )
+            }
         }
     }
 }

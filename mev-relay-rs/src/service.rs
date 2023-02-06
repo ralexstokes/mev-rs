@@ -5,7 +5,7 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use futures::StreamExt;
-use mev_build_rs::EngineBuilder;
+use mev_build_rs::NullBuilder;
 use mev_rs::{BlindedBlockProviderServer, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
@@ -48,10 +48,11 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(&self) -> ServiceHandle {
-        let context: Context = (&self.network).into();
+    pub async fn spawn(&self, context: Option<Context>) -> ServiceHandle {
+        let network = &self.network;
+        let context = context.unwrap_or_else(|| network.into());
         let context = Arc::new(context);
-        let builder = EngineBuilder::new(context.clone());
+        let builder = NullBuilder::new(context.clone());
         let relay = Relay::new(builder, self.beacon_node.clone(), context);
         relay.initialize().await;
 
