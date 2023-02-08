@@ -1,12 +1,13 @@
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::{
-    bellatrix::mainnet::{self as spec, BlindedBeaconBlock, BlindedBeaconBlockBody},
+    bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
+    capella::mainnet as capella,
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
-    primitives::{DomainType, ExecutionAddress, Hash32, Slot},
+    primitives::{DomainType, ExecutionAddress, Hash32},
     signing::sign_with_domain,
-    state_transition::Context,
+    state_transition::{Context, Forks},
 };
 use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
@@ -93,13 +94,18 @@ async fn test_end_to_end() {
         then.status(200).body(response);
     });
 
+    let mut context = Context::for_mainnet();
+    // mock epoch values to transition across forks
+    context.bellatrix_fork_epoch = 12;
+    context.capella_fork_epoch = 22;
+
     // start upstream relay
     let validator_mock_server_url = validator_mock_server.url("");
     let relay_config =
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config);
-    relay.spawn().await;
+    relay.spawn(Some(context.clone())).await;
 
     // start mux server
     let mut config = Config::default();
@@ -107,7 +113,7 @@ async fn test_end_to_end() {
 
     let mux_port = config.port;
     let service = Service::from(config);
-    service.spawn();
+    service.spawn(Some(context.clone()));
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
@@ -115,7 +121,6 @@ async fn test_end_to_end() {
 
     beacon_node.check_status().await.unwrap();
 
-    let context = Context::for_mainnet();
     let registrations = proposers
         .iter()
         .map(|proposer| {
@@ -148,7 +153,12 @@ async fn propose_block(
     shuffling_index: usize,
     context: &Context,
 ) {
-    let current_slot = 32 + shuffling_index as Slot;
+    let fork = if shuffling_index == 0 { Forks::Bellatrix } else { Forks::Capella };
+    let current_slot = match fork {
+        Forks::Bellatrix => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
+        Forks::Capella => 32 + context.capella_fork_epoch * context.slots_per_epoch,
+        _ => unimplemented!(),
+    };
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
 
     let request = BidRequest {
@@ -160,27 +170,62 @@ async fn propose_block(
     let bid_parent_hash = signed_bid.parent_hash();
     assert_eq!(bid_parent_hash, &parent_hash);
 
-    let beacon_block_body = match signed_bid {
-        SignedBuilderBid::Bellatrix(bid) => BlindedBeaconBlockBody {
-            execution_payload_header: bid.message.header,
-            ..Default::default()
-        },
+    let signed_block = match fork {
+        Forks::Bellatrix => {
+            let bid = match signed_bid {
+                SignedBuilderBid::Bellatrix(bid) => bid,
+                _ => unimplemented!(),
+            };
+            let beacon_block_body = bellatrix::BlindedBeaconBlockBody {
+                execution_payload_header: bid.message.header,
+                ..Default::default()
+            };
+            let mut beacon_block = bellatrix::BlindedBeaconBlock {
+                slot: current_slot,
+                proposer_index: proposer.index,
+                body: beacon_block_body,
+                ..Default::default()
+            };
+            let fork_version = context.bellatrix_fork_version;
+            let domain =
+                compute_domain(DomainType::BeaconProposer, Some(fork_version), None, context)
+                    .unwrap();
+            let signature =
+                sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
+            let signed_block =
+                bellatrix::SignedBlindedBeaconBlock { message: beacon_block, signature };
+            SignedBlindedBeaconBlock::Bellatrix(signed_block)
+        }
+        Forks::Capella => {
+            let bid = match signed_bid {
+                SignedBuilderBid::Capella(bid) => bid,
+                _ => unimplemented!(),
+            };
+            let beacon_block_body = capella::BlindedBeaconBlockBody {
+                execution_payload_header: bid.message.header,
+                ..Default::default()
+            };
+            let mut beacon_block = capella::BlindedBeaconBlock {
+                slot: current_slot,
+                proposer_index: proposer.index,
+                body: beacon_block_body,
+                ..Default::default()
+            };
+            let fork_version = context.capella_fork_version;
+            let domain =
+                compute_domain(DomainType::BeaconProposer, Some(fork_version), None, context)
+                    .unwrap();
+            let signature =
+                sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
+            let signed_block =
+                capella::SignedBlindedBeaconBlock { message: beacon_block, signature };
+            SignedBlindedBeaconBlock::Capella(signed_block)
+        }
         _ => unimplemented!(),
     };
-    let mut beacon_block = BlindedBeaconBlock {
-        slot: current_slot,
-        proposer_index: proposer.index,
-        body: beacon_block_body,
-        ..Default::default()
-    };
-    // TODO provide realistic values
-    let domain = compute_domain(DomainType::BeaconProposer, None, None, context).unwrap();
-    let signature = sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
-    let signed_block = spec::SignedBlindedBeaconBlock { message: beacon_block, signature };
 
     beacon_node.check_status().await.unwrap();
 
-    let signed_block = SignedBlindedBeaconBlock::Bellatrix(signed_block);
     let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
     match payload {
@@ -188,7 +233,10 @@ async fn propose_block(
             assert_eq!(payload.parent_hash, parent_hash);
             assert_eq!(payload.fee_recipient, proposer.fee_recipient);
         }
-        _ => unimplemented!(),
+        ExecutionPayload::Capella(payload) => {
+            assert_eq!(payload.parent_hash, parent_hash);
+            assert_eq!(payload.fee_recipient, proposer.fee_recipient);
+        }
     }
 
     beacon_node.check_status().await.unwrap();

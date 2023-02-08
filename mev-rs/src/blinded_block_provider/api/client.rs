@@ -6,9 +6,7 @@ use crate::{
     },
 };
 use axum::http::StatusCode;
-use beacon_api_client::{
-    api_error_or_ok, ApiResult, Client as BeaconApiClient, Error as BeaconApiError, Value,
-};
+use beacon_api_client::{api_error_or_ok, ApiResult, Client as BeaconApiClient, VersionedValue};
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -51,10 +49,10 @@ impl Client {
             return Err(Error::NoBidPrepared(Box::new(bid_request.clone())))
         }
 
-        let result: ApiResult<Value<SignedBuilderBid>> =
+        let result: ApiResult<VersionedValue<SignedBuilderBid>> =
             response.json().await.map_err(beacon_api_client::Error::Http)?;
         match result {
-            ApiResult::Ok(result) => Ok(result.data),
+            ApiResult::Ok(result) => Ok(result.payload),
             ApiResult::Err(err) => Err(err.into()),
         }
     }
@@ -65,8 +63,11 @@ impl Client {
     ) -> Result<ExecutionPayload, Error> {
         let response = self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?;
 
-        let response: Value<ExecutionPayload> =
-            response.json().await.map_err(|err| -> Error { BeaconApiError::Http(err).into() })?;
-        Ok(response.data)
+        let result: ApiResult<VersionedValue<ExecutionPayload>> =
+            response.json().await.map_err(beacon_api_client::Error::Http)?;
+        match result {
+            ApiResult::Ok(result) => Ok(result.payload),
+            ApiResult::Err(err) => Err(err.into()),
+        }
     }
 }

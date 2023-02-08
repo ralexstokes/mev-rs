@@ -763,7 +763,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=5531c285fc4030e265b8499612946d8a704e2c57#5531c285fc4030e265b8499612946d8a704e2c57"
+source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=9b0ee0a8a45b968c8df5e7e64ea1c094e16f053d#9b0ee0a8a45b968c8df5e7e64ea1c094e16f053d"
 dependencies = [
  "async-stream",
  "blst",
@@ -2279,7 +2279,7 @@ dependencies = [
 [[package]]
 name = "ssz-rs"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
+source = "git+https://github.com/ralexstokes//ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1#adf1a0b14cef90b9536f28ef89da1fab316465e1"
 dependencies = [
  "bitvec",
  "hex",
@@ -2293,7 +2293,7 @@ dependencies = [
 [[package]]
 name = "ssz-rs-derive"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
+source = "git+https://github.com/ralexstokes//ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1#adf1a0b14cef90b9536f28ef89da1fab316465e1"
 dependencies = [
  "proc-macro2",
  "quote",

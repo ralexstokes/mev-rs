@@ -64,9 +64,9 @@ impl Service {
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub fn spawn(self) -> ServiceHandle {
+    pub fn spawn(self, context: Option<Context>) -> ServiceHandle {
         let Self { host, port, relays, network } = self;
-        let context: Context = (&network).into();
+        let context = context.unwrap_or_else(|| From::from(&network));
         let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
         let relay_mux = RelayMux::new(relays, context);
 

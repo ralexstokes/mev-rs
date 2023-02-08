@@ -34,7 +34,7 @@ impl Command {
         if let Some(mut config) = config.relay {
             config.network = network;
             // TODO separate mock and "real" modes
-            let service = Service::from(config).spawn().await;
+            let service = Service::from(config).spawn(None).await;
             Ok(service.await?)
         } else {
             Err(anyhow!("missing relay config from file provided"))

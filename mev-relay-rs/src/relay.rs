@@ -7,11 +7,13 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
     state_transition::{Context, Error as ConsensusError},
 };
-use mev_build_rs::EngineBuilder;
+use mev_build_rs::NullBuilder;
 use mev_rs::{
-    sign_builder_message, types::bellatrix as spec, BidRequest, BlindedBlockProvider,
-    BlindedBlockProviderError, ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
-    SignedBuilderBid, SignedValidatorRegistration, ValidatorRegistrar, ValidatorRegistrationStatus,
+    sign_builder_message,
+    types::{bellatrix, capella},
+    verify_signed_builder_message, BidRequest, BlindedBlockProvider, BlindedBlockProviderError,
+    ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
+    SignedValidatorRegistration, ValidatorRegistrar, ValidatorRegistrationStatus,
     ValidatorSummaryProvider, ValidatorSummaryProviderError,
 };
 use parking_lot::Mutex;
@@ -123,7 +125,7 @@ impl Deref for Relay {
 pub struct RelayInner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
-    builder: EngineBuilder,
+    builder: NullBuilder,
     validators: ValidatorSummaryProvider,
     context: Arc<Context>,
     state: Mutex<State>,
@@ -136,7 +138,7 @@ struct State {
 }
 
 impl Relay {
-    pub fn new(builder: EngineBuilder, beacon_node: Client, context: Arc<Context>) -> Self {
+    pub fn new(builder: NullBuilder, beacon_node: Client, context: Arc<Context>) -> Self {
         let key_bytes = [1u8; 32];
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
         let public_key = secret_key.public_key();
@@ -234,17 +236,24 @@ impl BlindedBlockProvider for Relay {
             header
         };
 
-        let mut bid = match header {
+        match header {
             ExecutionPayloadHeader::Bellatrix(header) => {
-                spec::BuilderBid { header, value, public_key: self.public_key.clone() }
+                let mut bid =
+                    bellatrix::BuilderBid { header, value, public_key: self.public_key.clone() };
+                let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
+
+                let signed_bid = bellatrix::SignedBuilderBid { message: bid, signature };
+                Ok(SignedBuilderBid::Bellatrix(signed_bid))
             }
-            _ => unimplemented!("consider how to best handle polymorphism here..."),
-        };
+            ExecutionPayloadHeader::Capella(header) => {
+                let mut bid =
+                    capella::BuilderBid { header, value, public_key: self.public_key.clone() };
+                let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 
-        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
-
-        let signed_bid = spec::SignedBuilderBid { message: bid, signature };
-        Ok(SignedBuilderBid::Bellatrix(signed_bid))
+                let signed_bid = capella::SignedBuilderBid { message: bid, signature };
+                Ok(SignedBuilderBid::Capella(signed_bid))
+            }
+        }
     }
 
     async fn open_bid(
