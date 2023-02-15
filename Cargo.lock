@@ -1479,7 +1479,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "mev"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -1496,7 +1496,7 @@ dependencies = [
 
 [[package]]
 name = "mev-boost-rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
@@ -1520,7 +1520,7 @@ dependencies = [
 
 [[package]]
 name = "mev-build-rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
@@ -1538,7 +1538,7 @@ dependencies = [
 
 [[package]]
 name = "mev-relay-rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
@@ -1558,7 +1558,7 @@ dependencies = [
 
 [[package]]
 name = "mev-rs"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anvil-rpc",
  "async-trait",
