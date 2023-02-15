@@ -1,43 +1,35 @@
-use ethereum_consensus::{
-    clock::{self, SystemTimeProvider},
-    state_transition::Context,
-};
+use ethereum_consensus::state_transition::{Context, Error};
 
 #[derive(Default, Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum Network {
     #[default]
     Mainnet,
     Sepolia,
     Goerli,
+    Custom(String),
 }
 
 impl std::fmt::Display for Network {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let repr = match self {
-            Self::Mainnet => "mainnet",
-            Self::Sepolia => "sepolia",
-            Self::Goerli => "goerli",
-        };
-        write!(f, "{repr}")
-    }
-}
-
-impl From<&Network> for Context {
-    fn from(network: &Network) -> Self {
-        match network {
-            Network::Mainnet => Context::for_mainnet(),
-            Network::Sepolia => Context::for_sepolia(),
-            Network::Goerli => Context::for_goerli(),
+        match self {
+            Self::Mainnet => write!(f, "mainnet"),
+            Self::Sepolia => write!(f, "sepolia"),
+            Self::Goerli => write!(f, "goerli"),
+            Self::Custom(config) => write!(f, "custom network with config at `{config}`"),
         }
     }
 }
 
-impl From<&Network> for clock::Clock<SystemTimeProvider> {
-    fn from(network: &Network) -> Self {
+impl TryFrom<&Network> for Context {
+    type Error = Error;
+
+    fn try_from(network: &Network) -> Result<Self, Self::Error> {
         match network {
-            Network::Mainnet => clock::for_mainnet(),
-            Network::Sepolia => clock::for_sepolia(),
-            Network::Goerli => clock::for_goerli(),
+            Network::Mainnet => Ok(Context::for_mainnet()),
+            Network::Sepolia => Ok(Context::for_sepolia()),
+            Network::Goerli => Ok(Context::for_goerli()),
+            Network::Custom(config) => Context::try_from_file(config),
         }
     }
 }

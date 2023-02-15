@@ -1,12 +1,8 @@
 use crate::relay::Relay;
 use beacon_api_client::Client;
-use ethereum_consensus::{
-    clock::{Clock, SystemTimeProvider},
-    state_transition::Context,
-};
+use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
-use mev_build_rs::NullBuilder;
-use mev_rs::{BlindedBlockProviderServer, Network};
+use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -17,14 +13,14 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub beacon_node_url: String,
-    #[serde(skip)]
+    #[serde(default)]
     pub network: Network,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            host: Ipv4Addr::UNSPECIFIED,
+            host: Ipv4Addr::LOCALHOST,
             port: 28545,
             beacon_node_url: "http://127.0.0.1:5052".into(),
             network: Default::default(),
@@ -48,18 +44,18 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(&self, context: Option<Context>) -> ServiceHandle {
+    pub async fn spawn(&self, context: Option<Context>) -> Result<ServiceHandle, Error> {
         let network = &self.network;
-        let context = context.unwrap_or_else(|| network.into());
+        let context =
+            if let Some(context) = context { context } else { Context::try_from(network)? };
+        let clock = context.clock(None);
         let context = Arc::new(context);
-        let builder = NullBuilder::new(context.clone());
-        let relay = Relay::new(builder, self.beacon_node.clone(), context);
+        let relay = Relay::new(self.beacon_node.clone(), context);
         relay.initialize().await;
 
         let block_provider = relay.clone();
         let server = BlindedBlockProviderServer::new(self.host, self.port, block_provider).spawn();
 
-        let clock: Clock<SystemTimeProvider> = (&self.network).into();
         let relay = tokio::spawn(async move {
             let slots = clock.stream_slots();
 
@@ -77,7 +73,7 @@ impl Service {
             }
         });
 
-        ServiceHandle { relay, server }
+        Ok(ServiceHandle { relay, server })
     }
 }
 

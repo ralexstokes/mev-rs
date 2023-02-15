@@ -13,8 +13,9 @@ use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use mev_rs::{
-    sign_builder_message, BidRequest, BlindedBlockProviderClient as RelayClient, ExecutionPayload,
-    SignedBlindedBeaconBlock, SignedBuilderBid,
+    blinded_block_provider::Client as RelayClient,
+    signing::sign_builder_message,
+    types::{BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid},
 };
 
 use rand::seq::SliceRandom;
@@ -79,7 +80,7 @@ async fn test_end_to_end() {
         .map(|proposer| ValidatorSummary {
             index: proposer.index,
             balance,
-            status: ValidatorStatus::Active,
+            status: ValidatorStatus::ActiveOngoing,
             validator: Validator {
                 public_key: proposer.signing_key.public_key(),
                 effective_balance: balance,
@@ -105,7 +106,7 @@ async fn test_end_to_end() {
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config);
-    relay.spawn(Some(context.clone())).await;
+    relay.spawn(Some(context.clone())).await.unwrap();
 
     // start mux server
     let mut config = Config::default();
@@ -113,7 +114,7 @@ async fn test_end_to_end() {
 
     let mux_port = config.port;
     let service = Service::from(config);
-    service.spawn(Some(context.clone()));
+    service.spawn(Some(context.clone())).unwrap();
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),

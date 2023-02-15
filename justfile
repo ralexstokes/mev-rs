@@ -18,4 +18,4 @@ lint: fmt validate-example-config
     cargo +nightly clippy --all-targets --all-features --all
 build:
     cargo build --all-targets --all-features --all
-run-ci: lint build test
+run-ci: lint build test run-integration-tests

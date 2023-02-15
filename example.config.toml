@@ -9,3 +9,13 @@ relays = [
 host = "0.0.0.0"
 port = 28545
 beacon_node_url = "http://127.0.0.1:5052"
+
+[builder]
+host = "0.0.0.0"
+port = 28546
+beacon_api_endpoint = "http://127.0.0.1:5052"
+
+[builder.engine_api_proxy]
+host = "0.0.0.0"
+port = 8551
+engine_api_endpoint = "http://127.0.0.1:8552"

@@ -7,8 +7,18 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tracing = "0.1"
+futures = "0.3.21"
+async-trait = "0.1.53"
 parking_lot = "0.12.1"
+pin-project = "1.0.12"
+
+thiserror = "1.0.30"
+url = { version = "2.2.2", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
 mev-rs = { path = "../mev-rs" }
