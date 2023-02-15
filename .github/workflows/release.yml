@@ -30,13 +30,19 @@ jobs:
     needs: extract-version
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v2
-      - name: Build toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions/checkout@v3
+
+      - name: Read toolchain file
+        id: rust-toolchain
+        run: |
+          RUST_TOOLCHAIN=$(grep 'channel' rust-toolchain.toml | awk '{split($0,a," = "); print a[2]}' | tr -d '"')
+          echo "RUST_TOOLCHAIN=$RUST_TOOLCHAIN" >> $GITHUB_OUTPUT
+        shell: bash
+
+      - name: Install toolchain
+        uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: stable
-          profile:  minimal
-          override: true
+          toolchain: ${{ steps.rust-toolchain.outputs.RUST_TOOLCHAIN }}
 
       # ==============================
       #       Build
@@ -44,7 +50,7 @@ jobs:
 
       - name: Build mev-rs
         run:  |
-          cargo install --path bin/mev-rs --locked
+          cargo install --path bin/mev --locked
           mkdir artifacts
           mv ~/.cargo/bin/mev ./artifacts
           cd artifacts
@@ -71,7 +77,7 @@ jobs:
     steps:
       # This is necessary for generating the changelog. It has to come before "Download Artifacts" or else it deletes the artifacts.
       - name: Checkout sources
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
