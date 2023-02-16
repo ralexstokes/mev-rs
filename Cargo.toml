@@ -9,7 +9,8 @@ members = [
 default-members = ["bin/mev"]
 
 [patch."https://github.com/ralexstokes/ethereum-consensus"]
-ethereum-consensus = { git = "https://github.com/ralexstokes//ethereum-consensus", rev = "ef89b4a" }
+# FIXME https://github.com/ralexstokes/ethereum-consensus/pull/170
+ethereum-consensus = { git = "https://github.com/jimmygchen/ethereum-consensus", rev = "4c82111" }
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
 ssz-rs = { git = "https://github.com/ralexstokes//ssz-rs", rev = "45ff6f1" }

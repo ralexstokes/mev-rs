@@ -48,7 +48,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())))
+            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())));
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =
@@ -68,6 +68,9 @@ impl Client {
                 self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
             }
             SignedBlindedBeaconBlock::Capella(signed_block) => {
+                self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
+            }
+            SignedBlindedBeaconBlock::Deneb(signed_block) => {
                 self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
             }
         };

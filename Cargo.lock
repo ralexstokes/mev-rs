@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=ef89b4a#ef89b4a4ef97cdd53a66ddb52e554667aca0beb2"
+source = "git+https://github.com/jimmygchen/ethereum-consensus?rev=4c82111#4c82111efe84a11ac0d4939d4ae166e1f1e3fac0"
 dependencies = [
  "async-stream",
  "blst",
