@@ -9,10 +9,10 @@ members = [
 default-members = ["bin/mev"]
 
 [patch."https://github.com/ralexstokes/ethereum-consensus"]
-ethereum-consensus = { git = "https://github.com/ralexstokes//ethereum-consensus", rev = "ef89b4a" }
+ethereum-consensus = { git = "https://github.com:443/ralexstokes/ethereum-consensus.git?rev=ef89b4a", rev = "ef89b4a" }
 
 [patch."https://github.com/ralexstokes/ssz-rs"]
-ssz-rs = { git = "https://github.com/ralexstokes//ssz-rs", rev = "45ff6f1" }
+ssz-rs = { git = "https://github.com:443/ralexstokes/ssz-rs.git?rev=45ff6f1", rev = "45ff6f1" }
 
 [patch."https://github.com/ralexstokes/beacon-api-client"]
-beacon-api-client = { git = "https://github.com/ralexstokes//beacon-api-client", rev = "53690a711e33614d59d4d44fb09762b4699e2a4e" }
+beacon-api-client = { git = "https://github.com:443/ralexstokes/beacon-api-client.git?rev=53690a711e33614d59d4d44fb09762b4699e2a4e", rev = "53690a711e33614d59d4d44fb09762b4699e2a4e" }

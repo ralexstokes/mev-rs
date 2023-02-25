@@ -332,7 +332,7 @@ dependencies = [
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes//beacon-api-client?rev=53690a711e33614d59d4d44fb09762b4699e2a4e#53690a711e33614d59d4d44fb09762b4699e2a4e"
+source = "git+https://github.com/ralexstokes/beacon-api-client.git?rev=53690a711e33614d59d4d44fb09762b4699e2a4e?rev=53690a711e33614d59d4d44fb09762b4699e2a4e#53690a711e33614d59d4d44fb09762b4699e2a4e"
 dependencies = [
  "ethereum-consensus",
  "http",
@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=ef89b4a#ef89b4a4ef97cdd53a66ddb52e554667aca0beb2"
+source = "git+https://github.com/ralexstokes/ethereum-consensus.git?rev=ef89b4a?rev=ef89b4a#ef89b4a4ef97cdd53a66ddb52e554667aca0beb2"
 dependencies = [
  "async-stream",
  "blst",
@@ -2404,7 +2404,7 @@ dependencies = [
 [[package]]
 name = "ssz-rs"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
+source = "git+https://github.com/ralexstokes/ssz-rs.git?rev=45ff6f1?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
 dependencies = [
  "bitvec",
  "hex",
@@ -2418,7 +2418,7 @@ dependencies = [
 [[package]]
 name = "ssz-rs-derive"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
+source = "git+https://github.com/ralexstokes/ssz-rs.git?rev=45ff6f1?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
 dependencies = [
  "proc-macro2",
  "quote",
