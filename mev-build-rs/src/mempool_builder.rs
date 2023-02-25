@@ -56,13 +56,13 @@ struct State {
 
 impl Builder {
     pub fn new(
+        secret_key: SecretKey,
         genesis_validators_root: Root,
         client: Client,
         context: Arc<Context>,
         engine_api_client: EngineApiClient,
         proxy: Arc<Proxy>,
     ) -> Self {
-        let secret_key = SecretKey::key_gen(&[23u8; 32]).unwrap();
         let public_key = secret_key.public_key();
         let validator_registry = ValidatorRegistry::new(client.clone());
         let proposer_scheduler = ProposerScheduler::new(client);
@@ -124,7 +124,10 @@ impl Builder {
     }
 
     pub async fn initialize(&self, current_epoch: Epoch) {
-        self.on_epoch(current_epoch).await
+        self.on_epoch(current_epoch).await;
+
+        let public_key = &self.public_key;
+        tracing::info!("builder initialized with public key {public_key}");
     }
 
     pub async fn on_slot(&self, slot: Slot) {
