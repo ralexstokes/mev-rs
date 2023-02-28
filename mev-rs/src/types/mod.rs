@@ -107,6 +107,13 @@ impl SignedBuilderBid {
         }
     }
 
+    pub fn public_key(&self) -> &BlsPublicKey {
+        match self {
+            Self::Bellatrix(bid) => &bid.message.public_key,
+            Self::Capella(bid) => &bid.message.public_key,
+        }
+    }
+
     pub fn block_hash(&self) -> &Hash32 {
         match self {
             Self::Bellatrix(bid) => &bid.message.header.block_hash,

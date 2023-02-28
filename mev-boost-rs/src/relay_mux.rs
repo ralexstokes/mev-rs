@@ -112,11 +112,16 @@ impl BlindedBlockProvider for RelayMux {
             .enumerate()
             .filter_map(|(relay_index, response)| match response {
                 Ok(mut bid) => {
-                    if let Err(err) = validate_bid(&mut bid, &self.context) {
-                        tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
+                    if &self.relays[relay_index].public_key != bid.public_key() {
+                        tracing::warn!("invalid public key for bid: {bid:?}");
                         None
                     } else {
-                        Some((bid, relay_index))
+                        if let Err(err) = validate_bid(&mut bid, &self.context) {
+                            tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
+                            None
+                        } else {
+                            Some((bid, relay_index))
+                        }
                     }
                 }
                 Err(err) => {
@@ -129,7 +134,7 @@ impl BlindedBlockProvider for RelayMux {
         let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
-            return Err(Error::NoBids)
+            return Err(Error::NoBids);
         }
 
         // for now, break any ties by picking the first bid,
@@ -180,7 +185,7 @@ impl BlindedBlockProvider for RelayMux {
                 Ok(payload) => {
                     let block_hash = payload.block_hash();
                     if block_hash == expected_block_hash {
-                        return Ok(payload)
+                        return Ok(payload);
                     } else {
                         tracing::warn!("error opening bid from relay {i}: the returned payload with block hash {block_hash} did not match the expected block hash: {expected_block_hash}");
                     }
@@ -205,6 +210,9 @@ fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicK
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_bid_verification() {}
 
     #[test]
     fn test_bid_selection_by_value() {
