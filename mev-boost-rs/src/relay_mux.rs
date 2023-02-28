@@ -185,7 +185,7 @@ impl BlindedBlockProvider for RelayMux {
                 Ok(payload) => {
                     let block_hash = payload.block_hash();
                     if block_hash == expected_block_hash {
-                        return Ok(payload);
+                        return Ok(payload)
                     } else {
                         tracing::warn!("error opening bid from relay {i}: the returned payload with block hash {block_hash} did not match the expected block hash: {expected_block_hash}");
                     }
