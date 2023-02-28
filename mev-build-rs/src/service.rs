@@ -10,6 +10,7 @@ use mev_rs::{
             Client as HttpClient, Config as EngineApiProxyConfig, Proxy, Server as EngineApiProxy,
         },
     },
+    transaction_injector::{Config as TransactionInjectorConfig, Injector as TransactionInjector},
     Error, Network,
 };
 use serde::Deserialize;
@@ -31,6 +32,8 @@ pub struct Config {
     pub network: Network,
     pub engine_api_proxy: EngineApiProxyConfig,
     pub secret_key: SecretKey,
+    #[serde(default)]
+    pub transaction_injector: Option<TransactionInjectorConfig>,
 }
 
 impl fmt::Debug for Config {
@@ -42,6 +45,7 @@ impl fmt::Debug for Config {
             .field("network", &self.network)
             .field("engine_api_proxy", &self.engine_api_proxy)
             .field("secret_key", &"...")
+            .field("transaction_injector", &self.transaction_injector)
             .finish()
     }
 }
@@ -55,6 +59,7 @@ impl Default for Config {
             network: Default::default(),
             engine_api_proxy: Default::default(),
             secret_key: SecretKey::default(),
+            transaction_injector: None,
         }
     }
 }
@@ -69,8 +74,15 @@ impl Service {
     }
 
     pub async fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
-        let Config { host, port, beacon_api_endpoint, network, engine_api_proxy, secret_key } =
-            self.config;
+        let Config {
+            host,
+            port,
+            beacon_api_endpoint,
+            network,
+            engine_api_proxy,
+            secret_key,
+            transaction_injector,
+        } = self.config;
 
         let beacon_api_endpoint: Url = beacon_api_endpoint.parse().unwrap();
         let client = Client::new(beacon_api_endpoint);
@@ -101,6 +113,14 @@ impl Service {
         let current_epoch = clock.current_epoch();
         builder.initialize(current_epoch).await;
 
+        let mut transaction_injector =
+            transaction_injector.and_then(|config| match TransactionInjector::new(config) {
+                Ok(injector) => Some(injector),
+                Err(err) => {
+                    tracing::warn!("could not create transaction injector: {err}");
+                    None
+                }
+            });
         let clock = tokio::spawn(async move {
             let slots = clock.stream_slots();
 
@@ -108,6 +128,12 @@ impl Service {
 
             while let Some(slot) = slots.next().await {
                 builder.on_slot(slot).await;
+                if let Some(transaction_injector) = &mut transaction_injector {
+                    match transaction_injector.submit_transaction().await {
+                        Ok(txn_hash) => tracing::info!("injected transaction with hash {txn_hash}"),
+                        Err(err) => tracing::warn!("error injecting transaction: {err}"),
+                    }
+                }
             }
         });
 
