@@ -77,16 +77,15 @@ impl Service {
 
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let clock = context.clock(Option::from(genesis_details.genesis_time));
-        let context = Arc::new(context);
         let (tx, rx) = mpsc::channel(BUILD_JOB_BUFFER_SIZE);
         let engine_api_client = EngineApiClient::new(&engine_api_proxy.engine_api_endpoint);
         let http_client = HttpClient::new();
         let proxy = Arc::new(Proxy::new(http_client, &engine_api_proxy.engine_api_endpoint, tx));
         let engine_api_proxy = EngineApiProxy::new(engine_api_proxy);
 
-        let genesis_validators_root =
-            client.get_genesis_details().await.map(|details| details.genesis_validators_root)?;
+        let genesis_details = client.get_genesis_details().await?;
+        let genesis_validators_root = genesis_details.genesis_validators_root;
+        let clock = context.clock(Some(genesis_details.genesis_time));
         let builder = Builder::new(
             secret_key,
             genesis_validators_root,

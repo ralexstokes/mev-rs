@@ -37,7 +37,7 @@ pub struct Inner {
     proposer_scheduler: ProposerScheduler,
     engine_api_client: EngineApiClient,
     proxy: Arc<Proxy>,
-    context: Arc<Context>,
+    context: Context,
     state: Mutex<State>,
 }
 
@@ -59,7 +59,7 @@ impl Builder {
         secret_key: SecretKey,
         genesis_validators_root: Root,
         client: Client,
-        context: Arc<Context>,
+        context: Context,
         engine_api_client: EngineApiClient,
         proxy: Arc<Proxy>,
     ) -> Self {
