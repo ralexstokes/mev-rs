@@ -43,4 +43,7 @@ pub enum Error {
     #[cfg(feature = "engine-proxy")]
     #[error("{0}")]
     EngineApi(#[from] crate::engine_api_proxy::Error),
+    #[cfg(feature = "transaction-injector")]
+    #[error("{0}")]
+    TransactionInjector(#[from] crate::transaction_injector::Error),
 }

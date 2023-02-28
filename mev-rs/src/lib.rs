@@ -7,6 +7,8 @@ mod proposer_scheduler;
 #[cfg(feature = "serde")]
 pub mod serde;
 pub mod signing;
+#[cfg(feature = "transaction-injector")]
+pub mod transaction_injector;
 pub mod types;
 mod validator_registry;
 

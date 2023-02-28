@@ -7,9 +7,10 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["serde", "api", "engine-proxy"]
+default = ["serde", "api", "engine-proxy", "transaction-injector"]
 api = ["tokio", "axum", "hyper", "beacon-api-client", "tracing", "serde_json"]
 engine-proxy = ["serde", "api", "anvil-rpc", "reqwest", "serde_json"]
+transaction-injector = ["ethers", "url", "tokio"]
 
 [dependencies]
 tokio = { version = "1.0", optional = true }
@@ -29,3 +30,6 @@ serde_json = {version =  "1.0.92", optional = true }
 ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
+
+ethers = { version = "1.0.2", optional = true }
+url = {version = "2.3.1", optional = true }
