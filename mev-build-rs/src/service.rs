@@ -77,7 +77,7 @@ impl Service {
 
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let clock = context.clock(None);
+        let clock = context.clock(Option::from(genesis_details.genesis_time));
         let context = Arc::new(context);
         let (tx, rx) = mpsc::channel(BUILD_JOB_BUFFER_SIZE);
         let engine_api_client = EngineApiClient::new(&engine_api_proxy.engine_api_endpoint);
