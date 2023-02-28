@@ -26,6 +26,6 @@ anvil-rpc = { git = "https://github.com/foundry-rs/foundry", rev = "b45456717ffa
 reqwest = { version = "0.11.14", optional = true }
 serde_json = {version =  "1.0.92", optional = true }
 
+ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
-ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
