@@ -19,8 +19,8 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
-fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
-    Ok(bid.verify_signature(context)?)
+fn validate_bid(bid: &mut SignedBuilderBid, relay_pub_key: String, context: &Context) -> Result<(), Error> {
+    Ok(bid.verify_signature(relay_pub_key, context)?)
 }
 
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
@@ -111,8 +111,8 @@ impl BlindedBlockProvider for RelayMux {
             .into_iter()
             .enumerate()
             .filter_map(|(relay_index, response)| match response {
-                Ok(mut bid) => {
-                    if let Err(err) = validate_bid(&mut bid, &self.context) {
+                Ok(mut bid) => {                
+                    if let Err(err) = validate_bid(&mut bid, self.relays[relay_index].public_key.clone(), &self.context) {
                         tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                         None
                     } else {

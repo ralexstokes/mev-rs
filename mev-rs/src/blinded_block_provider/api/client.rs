@@ -9,6 +9,8 @@ use axum::http::StatusCode;
 use beacon_api_client::{
     api_error_or_ok, ApiResult, Client as BeaconApiClient, Error as ApiError, VersionedValue,
 };
+use ethereum_consensus::crypto::PublicKey;
+
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -17,11 +19,12 @@ use beacon_api_client::{
 #[derive(Clone)]
 pub struct Client {
     api: BeaconApiClient,
+    pub public_key: PublicKey
 }
 
 impl Client {
-    pub fn new(api_client: BeaconApiClient) -> Self {
-        Self { api: api_client }
+    pub fn new(api_client: BeaconApiClient, ) -> Self {
+        Self { api: api_client, public_key: "0x0".to_string()}
     }
 
     pub async fn check_status(&self) -> Result<(), beacon_api_client::Error> {
