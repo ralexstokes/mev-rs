@@ -5,7 +5,7 @@ use ethereum_consensus::{
     capella::mainnet as capella,
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
-    primitives::{DomainType, ExecutionAddress, Hash32},
+    primitives::{BlsPublicKey, DomainType, ExecutionAddress, Hash32},
     signing::sign_with_domain,
     state_transition::{Context, Forks},
 };
@@ -116,10 +116,11 @@ async fn test_end_to_end() {
     let service = Service::from(config);
     service.spawn(Some(context.clone())).unwrap();
 
-    let beacon_node = RelayClient::new(ApiClient::new(
-        Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
-    ));
-
+    let beacon_node = RelayClient::new(
+        ApiClient::new(Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap()),
+        BlsPublicKey::default(),
+    );
+    
     beacon_node.check_status().await.unwrap();
 
     let registrations = proposers

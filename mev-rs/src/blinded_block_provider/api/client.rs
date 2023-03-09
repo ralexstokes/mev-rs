@@ -9,8 +9,7 @@ use axum::http::StatusCode;
 use beacon_api_client::{
     api_error_or_ok, ApiResult, Client as BeaconApiClient, Error as ApiError, VersionedValue,
 };
-use ethereum_consensus::crypto::PublicKey;
-
+use ethereum_consensus::primitives::BlsPublicKey;
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `Builder` trait so that
@@ -19,12 +18,12 @@ use ethereum_consensus::crypto::PublicKey;
 #[derive(Clone)]
 pub struct Client {
     api: BeaconApiClient,
-    pub public_key: PublicKey
+    pub pub_key: BlsPublicKey,
 }
 
 impl Client {
-    pub fn new(api_client: BeaconApiClient, ) -> Self {
-        Self { api: api_client, public_key: "0x0".to_string()}
+    pub fn new(api_client: BeaconApiClient, public_key: BlsPublicKey) -> Self {
+        Self { api: api_client, pub_key: public_key }
     }
 
     pub async fn check_status(&self) -> Result<(), beacon_api_client::Error> {
@@ -51,7 +50,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())))
+            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())));
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =

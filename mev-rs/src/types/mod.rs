@@ -121,19 +121,18 @@ impl SignedBuilderBid {
         }
     }
 
-    pub fn verify_signature(&mut self, relay_pub_key: String, context: &Context) -> Result<(), Error> {
+    pub fn verify_signature(
+        &mut self,
+        relay_pub_key: &BlsPublicKey,
+        context: &Context,
+    ) -> Result<(), Error> {
         match self {
             Self::Bellatrix(bid) => {
                 let public_key = bid.message.public_key.clone();
 
-                // if relayPubKey.clone() != public_key {
-                //     tracing::warn!("invalid signed builder bid:");
-                // }
-
-                if relay_pub_key != "0x01" {
-                    tracing::warn!("invalid signed builder bid:");
+                if relay_pub_key != &public_key {
+                    tracing::warn!("invalid public key for bid: {bid:?}");
                 }
-
 
                 verify_signed_builder_message(
                     &mut bid.message,
@@ -144,6 +143,11 @@ impl SignedBuilderBid {
             }
             Self::Capella(bid) => {
                 let public_key = bid.message.public_key.clone();
+
+                if relay_pub_key != &public_key {
+                    tracing::warn!("invalid signed builder bid:");
+                }
+
                 verify_signed_builder_message(
                     &mut bid.message,
                     &bid.signature,

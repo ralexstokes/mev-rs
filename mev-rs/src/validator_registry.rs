@@ -152,7 +152,7 @@ impl ValidatorRegistry {
             let status =
                 determine_validator_registration_status(message.timestamp, latest_timestamp);
             if matches!(status, ValidatorRegistrationStatus::Outdated) {
-                return Err(Error::InvalidTimestamp)
+                return Err(Error::InvalidTimestamp);
             }
             status
         } else {

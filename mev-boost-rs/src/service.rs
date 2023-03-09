@@ -1,6 +1,6 @@
-use crate::relay_mux::RelayMux;
+use crate::{relay_mux::RelayMux, relay_struct::RelayStruct};
 use beacon_api_client::Client;
-use ethereum_consensus::state_transition::Context;
+use ethereum_consensus::{primitives::BlsPublicKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::{Client as Relay, Server as BlindedBlockProviderServer},
@@ -48,17 +48,30 @@ fn parse_url(input: &str) -> Option<Url> {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<Url>,
+    relays: Vec<RelayStruct>,
     network: Network,
 }
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
+        let relays_url: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
 
-        if relays.is_empty() {
-            tracing::error!("no valid relays provided; please restart with correct configuration");
+        if relays_url.is_empty() {
+            tracing::error!(
+                "no valid relays URL provided; please restart with correct configuration"
+            );
         }
+
+        let relays: Vec<RelayStruct> = relays_url
+            .iter()
+            .filter_map(|endpoint| {
+                Some(RelayStruct::new(
+                    Relay::new(Client::new(endpoint.clone()), BlsPublicKey::default()),
+                    BlsPublicKey::default(),
+                    url::Url::from(endpoint.clone()),
+                ))
+            })
+            .collect();
 
         Self { host: config.host, port: config.port, relays, network: config.network }
     }
@@ -68,7 +81,9 @@ impl Service {
         let Self { host, port, relays, network } = self;
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
+        let relays = relays
+            .into_iter()
+            .map(|relay| Relay::new(Client::new(relay.endpoint), BlsPublicKey::default()));
         let clock = context.clock(None);
         let relay_mux = RelayMux::new(relays, context);
 
@@ -107,7 +122,7 @@ impl Future for ServiceHandle {
         let this = self.project();
         let relay_mux = this.relay_mux.poll(cx);
         if relay_mux.is_ready() {
-            return relay_mux
+            return relay_mux;
         }
         this.server.poll(cx)
     }

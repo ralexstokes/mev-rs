@@ -142,15 +142,15 @@ impl Future for ServiceHandle {
         let this = self.project();
         let clock = this.clock.poll(cx);
         if clock.is_ready() {
-            return clock
+            return clock;
         }
         let api_server = this.api_server.poll(cx);
         if api_server.is_ready() {
-            return api_server
+            return api_server;
         }
         let engine_api_proxy = this.engine_api_proxy.poll(cx);
         if engine_api_proxy.is_ready() {
-            return engine_api_proxy
+            return engine_api_proxy;
         }
         this.builder.poll(cx)
     }
