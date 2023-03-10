@@ -5,7 +5,6 @@ use ethereum_consensus::{
 };
 use futures::{stream, StreamExt};
 use mev_rs::{
-    blinded_block_provider::Client as Relay,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -15,12 +14,21 @@ use mev_rs::{
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
+use crate::relay_entry::RelayEntry;
+
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
-fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
-    Ok(bid.verify_signature(context)?)
+fn validate_bid(
+    bid: &mut SignedBuilderBid,
+    context: &Context,
+    relay: &RelayEntry,
+) -> Result<(), Error> {
+    match bid.public_key() == &relay.public_key {
+        true => Ok(bid.verify_signature(context)?),
+        false => Err(Error::InvalidBidPublicKey),
+    }
 }
 
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
@@ -38,6 +46,9 @@ fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<us
     })
 }
 
+//Add test for matching public keys from other relays
+//Add method to return/print out all relays
+
 #[derive(Clone)]
 pub struct RelayMux(Arc<RelayMuxInner>);
 
@@ -50,7 +61,7 @@ impl Deref for RelayMux {
 }
 
 pub struct RelayMuxInner {
-    relays: Vec<Relay>,
+    relays: Vec<RelayEntry>,
     context: Context,
     state: Mutex<State>,
 }
@@ -63,7 +74,7 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(relays: impl Iterator<Item = Relay>, context: Context) -> Self {
+    pub fn new(relays: impl Iterator<Item = RelayEntry>, context: Context) -> Self {
         let inner = RelayMuxInner { relays: relays.collect(), context, state: Default::default() };
         Self(Arc::new(inner))
     }
@@ -84,7 +95,7 @@ impl BlindedBlockProvider for RelayMux {
     ) -> Result<(), Error> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.register_validators(registrations).await })
+            .map(|relay| async move { relay.api.register_validators(registrations).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
@@ -100,7 +111,7 @@ impl BlindedBlockProvider for RelayMux {
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
+            .map(|relay| async move { relay.api.fetch_best_bid(bid_request).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
@@ -112,16 +123,13 @@ impl BlindedBlockProvider for RelayMux {
             .enumerate()
             .filter_map(|(relay_index, response)| match response {
                 Ok(mut bid) => {
-                    if &self.relays[relay_index].public_key != bid.public_key() {
-                        tracing::warn!("invalid public key for bid: {bid:?}");
+                    if let Err(err) =
+                        validate_bid(&mut bid, &self.context, &self.relays[relay_index])
+                    {
+                        tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                         None
                     } else {
-                        if let Err(err) = validate_bid(&mut bid, &self.context) {
-                            tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
-                            None
-                        } else {
-                            Some((bid, relay_index))
-                        }
+                        Some((bid, relay_index))
                     }
                 }
                 Err(err) => {
@@ -134,7 +142,7 @@ impl BlindedBlockProvider for RelayMux {
         let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
-            return Err(Error::NoBids);
+            return Err(Error::NoBids)
         }
 
         // for now, break any ties by picking the first bid,
@@ -174,7 +182,7 @@ impl BlindedBlockProvider for RelayMux {
         let signed_block = &signed_block;
         let relays = relay_indices.into_iter().map(|i| self.relays[i].clone());
         let responses = stream::iter(relays)
-            .map(|relay| async move { relay.open_bid(signed_block).await })
+            .map(|relay| async move { relay.api.open_bid(signed_block).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
@@ -210,9 +218,6 @@ fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicK
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_bid_verification() {}
 
     #[test]
     fn test_bid_selection_by_value() {
