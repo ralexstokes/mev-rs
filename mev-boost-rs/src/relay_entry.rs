@@ -22,11 +22,11 @@ impl TryFrom<Url> for RelayEntry {
     type Error = RelayError;
 
     fn try_from(url: Url) -> Result<Self, Self::Error> {
-        if url.username().is_empty() || url.username().len() < 48 {
-            return Err(RelayError::RelayUrlPublicKeyError(url, "public key field of relay URL is incorrectly formed: public key is 48 characters in length".to_string()));
+        if url.username().is_empty() || url.username().len() != 98 {
+            return Err(RelayError::RelayUrlPublicKeyError(url, "public key field of relay URL is incorrectly formed: public key must be 48 characters in length".to_string()));
         }
 
-        match hex::decode(url.username()) {
+        match hex::decode(url.username().replace("0x", "")) {
             Ok(hex) => match BlsPublicKey::try_from(hex.as_ref()) {
                 Ok(public_key) => Ok(Self::new(url, public_key)),
                 Err(e) => Err(RelayError::RelayUrlPublicKeyError(
@@ -70,10 +70,7 @@ mod tests {
 
     #[test]
     fn test_parse_relay_from_str_url() {
-        let test_url = format!(
-            "http://{0}@127.0.0.1:5555",
-            BlsPublicKey::default().to_string().replace("0x", "")
-        );
+        let test_url = format!("http://{0}@127.0.0.1:5555", BlsPublicKey::default().to_string());
         let result = RelayEntry::from_str(&test_url).unwrap();
         let expected = RelayEntry {
             api: RelayClient::new(
@@ -88,10 +85,7 @@ mod tests {
 
     #[test]
     fn test_parse_relay_try_from_string_url() {
-        let test_url = format!(
-            "http://{0}@127.0.0.1:5555",
-            BlsPublicKey::default().to_string().replace("0x", "")
-        );
+        let test_url = format!("http://{0}@127.0.0.1:5555", BlsPublicKey::default().to_string(),);
         let result = RelayEntry::try_from(&test_url).unwrap();
         let expected = RelayEntry {
             api: RelayClient::new(
@@ -105,20 +99,22 @@ mod tests {
     }
 
     #[test]
-    fn test_url_parse_errors_url() {
-        let public_key = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
-        let long_public_key = "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011";
-        let short_public_key = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+    fn test_url_parse_errors() {
+        let public_key = "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
+        let long_public_key = "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000011";
+        let short_public_key = "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001";
         let http = "http://";
-        let url = "@127.0.0.1:5555";
-        let bad_url = "@127.0.0.1:555a";
+        let host_name = "@127.0.0.1:5555";
+        let bad_host_name = "@127.0.0.1:555a";
 
         let test_cases = [
             format!(""),
-            format!("{http}{url}"),
-            format!("{http}{long_public_key}{url}"),
-            format!("{http}{short_public_key}{url}"),
-            format!("{http}{public_key}{bad_url}"),
+            format!("{http}{host_name}"),
+            format!("{http}{public_key}"),
+            format!("{public_key}{host_name}"),
+            format!("{http}{long_public_key}{host_name}"),
+            format!("{http}{short_public_key}{host_name}"),
+            format!("{http}{public_key}{bad_host_name}"),
         ];
 
         for input in test_cases.into_iter() {

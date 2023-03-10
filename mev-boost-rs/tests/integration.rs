@@ -111,7 +111,7 @@ async fn test_end_to_end() {
     // add relay to config
     let mut mux_config = MuxConfig::default();
     //TODO: eliminate this hard coded value by exposing the public key of Relay
-    let relay_public_key = "aa1a1c26055a329817a5759d877a2795f9499b97d6056edde0eea39512f24e8bc874b4471f0501127abb1ea0d9f68ac1";
+    let relay_public_key = "0xaa1a1c26055a329817a5759d877a2795f9499b97d6056edde0eea39512f24e8bc874b4471f0501127abb1ea0d9f68ac1";
     mux_config.relays.push(format!("http://{relay_public_key}@127.0.0.1:{port}"));
 
     //start mux server
