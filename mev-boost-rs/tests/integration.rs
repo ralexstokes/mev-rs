@@ -1,4 +1,4 @@
-use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
+use beacon_api_client::{Client as BeaconApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
@@ -10,7 +10,7 @@ use ethereum_consensus::{
     state_transition::{Context, Forks},
 };
 use httpmock::prelude::*;
-use mev_boost_rs::{Config, Service};
+use mev_boost_rs::{Config as MuxConfig, Service};
 use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use mev_rs::{
     blinded_block_provider::Client as RelayClient,
@@ -108,16 +108,19 @@ async fn test_end_to_end() {
     let relay = Relay::from(relay_config);
     relay.spawn(Some(context.clone())).await.unwrap();
 
-    // start mux server
-    let mut config = Config::default();
-    config.relays.push(format!("http://127.0.0.1:{port}"));
+    // add relay to config
+    let mut mux_config = MuxConfig::default();
+    //TODO: eliminate this hard coded value by exposing the public key of Relay
+    let relay_public_key = "aa1a1c26055a329817a5759d877a2795f9499b97d6056edde0eea39512f24e8bc874b4471f0501127abb1ea0d9f68ac1";
+    mux_config.relays.push(format!("http://{relay_public_key}@127.0.0.1:{port}"));
 
-    let mux_port = config.port;
-    let service = Service::from(config);
+    //start mux server
+    let mux_port = mux_config.port;
+    let service = Service::from(mux_config);
     service.spawn(Some(context.clone())).unwrap();
 
     let beacon_node = RelayClient::new(
-        ApiClient::new(Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap()),
+        BeaconApiClient::new(Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap()),
         BlsPublicKey::default(),
     );
 
@@ -168,6 +171,7 @@ async fn propose_block(
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.public_key.clone(),
     };
+
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
     let bid_parent_hash = signed_bid.parent_hash();
     assert_eq!(bid_parent_hash, &parent_hash);
