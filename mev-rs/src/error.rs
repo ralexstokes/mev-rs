@@ -5,6 +5,7 @@ use ethereum_consensus::{
     state_transition::Error as ConsensusError,
 };
 use thiserror::Error;
+use url::{ParseError, Url};
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -28,6 +29,8 @@ pub enum Error {
     UnknownBlock,
     #[error("payload request does not match any outstanding bid")]
     UnknownBid,
+    #[error("bid public key is incorrect")]
+    InvalidBidPublicKey,
     #[error("validator {0} does not have {1} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
     #[error("validator with public key {0} is not currently registered")]
@@ -43,4 +46,8 @@ pub enum Error {
     #[cfg(feature = "engine-proxy")]
     #[error("{0}")]
     EngineApi(#[from] crate::engine_api_proxy::Error),
+    #[error("unable to parse relay URL {0} as {1}")]
+    RelayUrlParseError(String, ParseError),
+    #[error("unable to parse relay public key from URL {0} due to error: {1}")]
+    RelayUrlPublicKeyError(Url, String),
 }
