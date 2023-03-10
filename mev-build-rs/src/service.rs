@@ -1,6 +1,6 @@
 use crate::mempool_builder::Builder;
 use beacon_api_client::Client;
-use ethereum_consensus::state_transition::Context;
+use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
@@ -13,7 +13,7 @@ use mev_rs::{
     Error, Network,
 };
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use std::{fmt, future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::{
     sync::mpsc,
     task::{JoinError, JoinHandle},
@@ -22,7 +22,7 @@ use url::Url;
 
 const BUILD_JOB_BUFFER_SIZE: usize = 1;
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
@@ -30,6 +30,20 @@ pub struct Config {
     #[serde(default)]
     pub network: Network,
     pub engine_api_proxy: EngineApiProxyConfig,
+    pub secret_key: SecretKey,
+}
+
+impl fmt::Debug for Config {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Config")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .field("beacon_api_endpoint", &self.beacon_api_endpoint)
+            .field("network", &self.network)
+            .field("engine_api_proxy", &self.engine_api_proxy)
+            .field("secret_key", &"...")
+            .finish()
+    }
 }
 
 impl Default for Config {
@@ -40,6 +54,7 @@ impl Default for Config {
             beacon_api_endpoint: String::new(),
             network: Default::default(),
             engine_api_proxy: Default::default(),
+            secret_key: SecretKey::default(),
         }
     }
 }
@@ -54,24 +69,26 @@ impl Service {
     }
 
     pub async fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
-        let Config { host, port, beacon_api_endpoint, network, engine_api_proxy } = self.config;
+        let Config { host, port, beacon_api_endpoint, network, engine_api_proxy, secret_key } =
+            self.config;
 
         let beacon_api_endpoint: Url = beacon_api_endpoint.parse().unwrap();
         let client = Client::new(beacon_api_endpoint);
 
-        let genesis_details = client.get_genesis_details().await?;
-
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let clock = context.clock(None);
-        let context = Arc::new(context);
         let (tx, rx) = mpsc::channel(BUILD_JOB_BUFFER_SIZE);
         let engine_api_client = EngineApiClient::new(&engine_api_proxy.engine_api_endpoint);
         let http_client = HttpClient::new();
         let proxy = Arc::new(Proxy::new(http_client, &engine_api_proxy.engine_api_endpoint, tx));
         let engine_api_proxy = EngineApiProxy::new(engine_api_proxy);
+
+        let genesis_details = client.get_genesis_details().await?;
+        let genesis_validators_root = genesis_details.genesis_validators_root;
+        let clock = context.clock(Some(genesis_details.genesis_time));
         let builder = Builder::new(
-            genesis_details.genesis_validators_root,
+            secret_key,
+            genesis_validators_root,
             client,
             context,
             engine_api_client,
