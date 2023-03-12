@@ -26,10 +26,13 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
-fn validate_bid_request(is_registered_public_key: Option<ValidatorIndex>, _bid_request: &BidRequest) -> Result<(), Error> {
+fn validate_bid_request(is_registered_public_key: Option<ValidatorIndex>, current_slot: Slot, bid_request: &BidRequest) -> Result<(), Error> {
     // TODO validations
 
     // verify slot is timely
+    if bid_request.slot  < current_slot || bid_request.slot > current_slot + PROPOSAL_TOLERANCE_DELAY {
+        return Err(Error::UnknownBid);
+    }
 
     // verify parent_hash is on a chain tip
 
@@ -71,11 +74,14 @@ fn validate_signed_block(
     signed_block: &mut SignedBlindedBeaconBlock,
     public_key: &BlsPublicKey,
     local_payload: &mut ExecutionPayload,
+    current_slot: Slot,
     genesis_validators_root: Root,
+
     context: &Context,
 ) -> Result<(), Error> {
     let local_block_hash = local_payload.block_hash();
     let block_hash = signed_block.block_hash();
+    let slot = signed_block.slot();
     if block_hash != local_block_hash {
         return Err(Error::UnknownBlock)
     }
@@ -83,8 +89,12 @@ fn validate_signed_block(
     // OPTIONAL:
     // -- verify w/ consensus?
     // verify slot is timely
+    if slot < current_slot || slot > current_slot + PROPOSAL_TOLERANCE_DELAY {
+        return Err(Error::UnknownBlock);
+    }
 
-    // verify proposer_index is correct
+    // verify proposer_index is correct 
+    // -> Isn't this checked by successfully returning the publickey?
 
     // verify parent_root matches
     Ok(signed_block.verify_signature(public_key, genesis_validators_root, context)?)
@@ -114,6 +124,7 @@ pub struct Inner {
 #[derive(Debug, Default)]
 struct State {
     execution_payloads: HashMap<BidRequest, ExecutionPayload>,
+    current_slot: Slot,
 }
 
 impl Relay {
@@ -122,6 +133,7 @@ impl Relay {
         let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
         let public_key = secret_key.public_key();
         let validator_registry = ValidatorRegistry::new(beacon_node);
+
         let inner = Inner {
             secret_key,
             public_key,
@@ -129,6 +141,7 @@ impl Relay {
             builder: NullBuilder,
             validator_registry,
             context,
+            //TODO: Can we rely on the future to poll and update this upon initialization instead of initializing it?
             state: Default::default(),
         };
         Self(Arc::new(inner))
@@ -144,6 +157,10 @@ impl Relay {
         self.load_full_validator_set().await;
     }
 
+    pub fn get_current_slot(&self) -> u64 {
+        return self.state.lock().current_slot;
+    }
+
     pub async fn on_slot(&self, slot: Slot, next_epoch: bool) {
         if next_epoch {
             // TODO grab validators more efficiently
@@ -153,6 +170,7 @@ impl Relay {
         state
             .execution_payloads
             .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+        state.current_slot = slot;
     }
 }
 
@@ -173,7 +191,7 @@ impl BlindedBlockProvider for Relay {
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         let is_registered_public_key = self.validator_registry.get_validator_index(&bid_request.public_key);
-        validate_bid_request(is_registered_public_key, bid_request)?;
+        validate_bid_request(is_registered_public_key, self.get_current_slot(), bid_request)?;
 
         let public_key = &bid_request.public_key;
         let preferences = self
@@ -239,6 +257,7 @@ impl BlindedBlockProvider for Relay {
             signed_block,
             &bid_request.public_key,
             &mut payload,
+            self.get_current_slot(),
             self.genesis_validators_root,
             &self.context,
         )?;
