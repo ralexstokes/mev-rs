@@ -134,10 +134,13 @@ impl BlindedBlockProvider for RelayMux {
 
         // for now, break any ties by picking the first bid,
         // which currently corresponds to the fastest relay
-        let (best_index, rest) = best_indices.split_first().unwrap();
+        let best_index = best_indices
+            .iter()
+            .max_by(|&x, &y| bids[*x].0.block_hash().cmp(bids[*y].0.block_hash()))
+            .unwrap();
         let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
-        for index in rest.iter() {
+        for index in best_indices.iter() {
             let block_hash = &bids[*index].0.block_hash();
             if block_hash == best_block_hash {
                 relay_indices.push(*index);
