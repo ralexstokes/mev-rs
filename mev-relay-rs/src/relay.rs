@@ -4,7 +4,7 @@ use ethereum_consensus::{
     builder::ValidatorRegistration,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Root, Slot, U256},
+    primitives::{BlsPublicKey, Root, Slot, U256, ExecutionAddress, ValidatorIndex},
     state_transition::Context,
 };
 use mev_build_rs::NullBuilder;
@@ -26,7 +26,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
-fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
+fn validate_bid_request(is_registered_public_key: Option<ValidatorIndex>, _bid_request: &BidRequest) -> Result<(), Error> {
     // TODO validations
 
     // verify slot is timely
@@ -34,6 +34,9 @@ fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
     // verify parent_hash is on a chain tip
 
     // verify public_key is one of the possible proposers
+    if is_registered_public_key == None {
+        return Err(Error::UnknownBid);
+    }
 
     Ok(())
 }
@@ -54,6 +57,12 @@ fn validate_execution_payload(
     // verify payload is valid
 
     // verify payload sends `value` to proposer
+    if execution_payload.fee_recipient() != &preferences.fee_recipient {
+        return Err(
+            Error::UnknownFeeRecipient(preferences.public_key.to_owned(), 
+            ExecutionAddress::try_from(execution_payload.fee_recipient().to_owned()).unwrap())
+        )
+    }
 
     Ok(())
 }
@@ -74,9 +83,10 @@ fn validate_signed_block(
     // OPTIONAL:
     // -- verify w/ consensus?
     // verify slot is timely
-    // verify proposer_index is correct
-    // verify parent_root matches
 
+    // verify proposer_index is correct
+
+    // verify parent_root matches
     Ok(signed_block.verify_signature(public_key, genesis_validators_root, context)?)
 }
 
@@ -162,7 +172,8 @@ impl BlindedBlockProvider for Relay {
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        validate_bid_request(bid_request)?;
+        let is_registered_public_key = self.validator_registry.get_validator_index(&bid_request.public_key);
+        validate_bid_request(is_registered_public_key, bid_request)?;
 
         let public_key = &bid_request.public_key;
         let preferences = self

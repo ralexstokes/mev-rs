@@ -12,6 +12,7 @@ use ethereum_consensus::{
         BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Root, Slot, ValidatorIndex,
     },
     state_transition::{Context, Error},
+    ssz::ByteVector,
 };
 use ssz_rs::prelude::*;
 
@@ -303,6 +304,13 @@ impl ExecutionPayload {
             Self::Bellatrix(payload) => payload.gas_limit,
             Self::Capella(payload) => payload.gas_limit,
             Self::Deneb(payload_and_blobs) => payload_and_blobs.execution_payload.gas_limit,
+        }
+    }
+
+    pub fn fee_recipient(&self) -> &ByteVector<20> {
+        match self {
+            Self::Bellatrix(payload) => &payload.fee_recipient,
+            Self::Capella(payload) => &payload.fee_recipient,
         }
     }
 }
