@@ -132,8 +132,7 @@ impl BlindedBlockProvider for RelayMux {
             return Err(Error::NoBids)
         }
 
-        // for now, break any ties by picking the first bid,
-        // which currently corresponds to the fastest relay
+        // If multiple indices with same bid value break tie by selecting largest Execution Block Hash
         let best_index = best_indices
             .iter()
             .max_by(|&x, &y| bids[*x].0.block_hash().cmp(bids[*y].0.block_hash()))
