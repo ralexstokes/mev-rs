@@ -101,7 +101,7 @@ impl BlindedBlockProvider for RelayMux {
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        let try_responses = stream::iter(self.relays.iter().cloned())
+        let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move {
                 tokio::time::timeout(
                     Duration::from_secs(FETCH_BEST_BID_TIME_OUT),
@@ -115,7 +115,7 @@ impl BlindedBlockProvider for RelayMux {
 
         // ideally can fuse the filtering into the prior async fetch but
         // several attempts lead to opaque compiler errors...
-        let bids = try_responses
+        let bids = responses
         .into_iter()
         .enumerate()
         .filter_map(|(relay_index, response)| match response {
