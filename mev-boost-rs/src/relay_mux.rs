@@ -13,11 +13,13 @@ use mev_rs::{
     BlindedBlockProvider, Error,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+// Give relays this amount of time in seconds to return bids.
+const FETCH_BEST_BID_TIME_OUT: u64 = 1;
 
 fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
     Ok(bid.verify_signature(context)?)
@@ -99,32 +101,44 @@ impl BlindedBlockProvider for RelayMux {
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.fetch_best_bid(bid_request).await })
+        let try_responses = stream::iter(self.relays.iter().cloned())
+            .map(|relay| async move {
+                tokio::time::timeout(
+                    Duration::from_secs(FETCH_BEST_BID_TIME_OUT),
+                    relay.fetch_best_bid(bid_request),
+                )
+                .await
+            })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
         // ideally can fuse the filtering into the prior async fetch but
         // several attempts lead to opaque compiler errors...
-        let bids = responses
-            .into_iter()
-            .enumerate()
-            .filter_map(|(relay_index, response)| match response {
-                Ok(mut bid) => {
-                    if let Err(err) = validate_bid(&mut bid, &self.context) {
-                        tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
-                        None
-                    } else {
-                        Some((bid, relay_index))
-                    }
-                }
-                Err(err) => {
-                    tracing::warn!("failed to get a bid from relay {relay_index}: {err}");
+        let bids = try_responses
+        .into_iter()
+        .enumerate()
+        .filter_map(|(relay_index, response)| match response {
+            Ok(Ok(mut bid)) => {
+                if let Err(err) = validate_bid(&mut bid, &self.context) {
+                    tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                     None
+                } else {
+                    Some((bid, relay_index))
                 }
-            })
-            .collect::<Vec<_>>();
+            }
+            Ok(Err(err)) => {
+                tracing::warn!("failed to get a bid from relay {relay_index}: {err}");
+                None
+            }
+            Err(_) => {
+                tracing::warn!(
+                    "relay {relay_index} didn't provide bid before time out {FETCH_BEST_BID_TIME_OUT}s."
+                );
+                None
+            }
+        })
+        .collect::<Vec<_>>();
 
         let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
