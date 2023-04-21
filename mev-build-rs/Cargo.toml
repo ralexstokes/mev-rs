@@ -18,7 +18,7 @@ thiserror = "1.0.30"
 url = { version = "2.2.2", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "46ca1716f2b1651e59b8a565b5bbcadf6b052fa5" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "53690a711e33614d59d4d44fb09762b4699e2a4e" }
 
 mev-rs = { path = "../mev-rs" }

@@ -332,9 +332,9 @@ dependencies = [
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes//beacon-api-client?rev=53690a711e33614d59d4d44fb09762b4699e2a4e#53690a711e33614d59d4d44fb09762b4699e2a4e"
+source = "git+https://github.com/ralexstokes/beacon-api-client?rev=53690a711e33614d59d4d44fb09762b4699e2a4e#53690a711e33614d59d4d44fb09762b4699e2a4e"
 dependencies = [
- "ethereum-consensus",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=5531c285fc4030e265b8499612946d8a704e2c57)",
  "http",
  "itertools",
  "reqwest",
@@ -800,7 +800,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes//ethereum-consensus?rev=ef89b4a#ef89b4a4ef97cdd53a66ddb52e554667aca0beb2"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=46ca1716f2b1651e59b8a565b5bbcadf6b052fa5#46ca1716f2b1651e59b8a565b5bbcadf6b052fa5"
 dependencies = [
  "async-stream",
  "blst",
@@ -815,7 +815,30 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2 0.9.9",
- "ssz-rs",
+ "ssz-rs 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1)",
+ "thiserror",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
+name = "ethereum-consensus"
+version = "0.1.1"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=5531c285fc4030e265b8499612946d8a704e2c57#5531c285fc4030e265b8499612946d8a704e2c57"
+dependencies = [
+ "async-stream",
+ "blst",
+ "bs58",
+ "enr",
+ "hex",
+ "integer-sqrt",
+ "multiaddr",
+ "multihash",
+ "rand",
+ "serde",
+ "serde_json",
+ "sha2 0.9.9",
+ "ssz-rs 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2)",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -1500,7 +1523,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=46ca1716f2b1651e59b8a565b5bbcadf6b052fa5)",
  "futures",
  "httpmock",
  "mev-build-rs",
@@ -1524,7 +1547,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=46ca1716f2b1651e59b8a565b5bbcadf6b052fa5)",
  "futures",
  "mev-rs",
  "parking_lot",
@@ -1542,7 +1565,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=46ca1716f2b1651e59b8a565b5bbcadf6b052fa5)",
  "futures",
  "http",
  "mev-build-rs",
@@ -1564,13 +1587,13 @@ dependencies = [
  "async-trait",
  "axum",
  "beacon-api-client",
- "ethereum-consensus",
+ "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=46ca1716f2b1651e59b8a565b5bbcadf6b052fa5)",
  "hyper",
  "parking_lot",
  "reqwest",
  "serde",
  "serde_json",
- "ssz-rs",
+ "ssz-rs 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=45ff6f19ad155657de6bbd32257257154adfcd9f)",
  "thiserror",
  "tokio",
  "tracing",
@@ -2404,21 +2427,69 @@ dependencies = [
 [[package]]
 name = "ssz-rs"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=45ff6f19ad155657de6bbd32257257154adfcd9f#45ff6f19ad155657de6bbd32257257154adfcd9f"
 dependencies = [
  "bitvec",
  "hex",
  "num-bigint",
  "serde",
  "sha2 0.9.9",
- "ssz-rs-derive",
+ "ssz-rs-derive 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=45ff6f19ad155657de6bbd32257257154adfcd9f)",
+ "thiserror",
+]
+
+[[package]]
+name = "ssz-rs"
+version = "0.8.0"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
+dependencies = [
+ "bitvec",
+ "hex",
+ "num-bigint",
+ "serde",
+ "sha2 0.9.9",
+ "ssz-rs-derive 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2)",
+ "thiserror",
+]
+
+[[package]]
+name = "ssz-rs"
+version = "0.8.0"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1#adf1a0b14cef90b9536f28ef89da1fab316465e1"
+dependencies = [
+ "bitvec",
+ "hex",
+ "num-bigint",
+ "serde",
+ "sha2 0.9.9",
+ "ssz-rs-derive 0.8.0 (git+https://github.com/ralexstokes/ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1)",
  "thiserror",
 ]
 
 [[package]]
 name = "ssz-rs-derive"
 version = "0.8.0"
-source = "git+https://github.com/ralexstokes//ssz-rs?rev=45ff6f1#45ff6f19ad155657de6bbd32257257154adfcd9f"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=45ff6f19ad155657de6bbd32257257154adfcd9f#45ff6f19ad155657de6bbd32257257154adfcd9f"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "ssz-rs-derive"
+version = "0.8.0"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=5946af4a65a1e8547a8fc7cfb62e12637421b8f2#5946af4a65a1e8547a8fc7cfb62e12637421b8f2"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "ssz-rs-derive"
+version = "0.8.0"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=adf1a0b14cef90b9536f28ef89da1fab316465e1#adf1a0b14cef90b9536f28ef89da1fab316465e1"
 dependencies = [
  "proc-macro2",
  "quote",
