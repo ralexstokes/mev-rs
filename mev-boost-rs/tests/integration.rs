@@ -107,7 +107,7 @@ async fn test_end_to_end() {
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config);
-    let relay_secret_key = SecretKey::random(&mut rand::thread_rng()).unwrap();
+    let relay_secret_key = SecretKey::random(&mut rng).unwrap();
     let relay_public_key = relay_secret_key.public_key().clone();
     relay.spawn(relay_secret_key, Some(context.clone())).await.unwrap();
 
