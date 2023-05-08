@@ -1483,6 +1483,7 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
+ "ethereum-consensus",
  "mev-boost-rs",
  "mev-build-rs",
  "mev-relay-rs",
@@ -1502,6 +1503,7 @@ dependencies = [
  "beacon-api-client",
  "ethereum-consensus",
  "futures",
+ "hex",
  "httpmock",
  "mev-build-rs",
  "mev-relay-rs",

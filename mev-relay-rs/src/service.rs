@@ -1,6 +1,6 @@
 use crate::relay::Relay;
 use beacon_api_client::Client;
-use ethereum_consensus::state_transition::Context;
+use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
@@ -44,13 +44,13 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(&self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+    pub async fn spawn(&self, secret_key: SecretKey, context: Option<Context>) -> Result<ServiceHandle, Error> {
         let network = &self.network;
         let context =
             if let Some(context) = context { context } else { Context::try_from(network)? };
         let clock = context.clock(None);
         let context = Arc::new(context);
-        let relay = Relay::new(self.beacon_node.clone(), context);
+        let relay = Relay::new(self.beacon_node.clone(), secret_key, context);
         relay.initialize().await;
 
         let block_provider = relay.clone();

@@ -1,5 +1,6 @@
 use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
+use ethereum_consensus::crypto::SecretKey;
 use clap::{Args, Subcommand};
 use mev_relay_rs::Service;
 use mev_rs::Network;
@@ -32,8 +33,12 @@ impl Command {
         let config = Config::from_toml_file(config_file)?;
 
         if let Some(mut config) = config.relay {
+            let key_bytes = [1u8; 32];
+            let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+
             config.network = network;
-            let service = Service::from(config).spawn(None).await?;
+            let service = Service::from(config).spawn(secret_key, None).await?;
+
             Ok(service.await?)
         } else {
             Err(anyhow!("missing relay config from file provided"))

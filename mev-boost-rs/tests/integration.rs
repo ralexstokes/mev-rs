@@ -21,6 +21,7 @@ use mev_rs::{
 use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
+    ops::Deref,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -106,11 +107,13 @@ async fn test_end_to_end() {
         RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
     let port = relay_config.port;
     let relay = Relay::from(relay_config);
-    relay.spawn(Some(context.clone())).await.unwrap();
+    let relay_secret_key = SecretKey::random(&mut rand::thread_rng()).unwrap();
+    let relay_public_key = relay_secret_key.public_key().clone();
+    relay.spawn(relay_secret_key, Some(context.clone())).await.unwrap();
 
     // start mux server
     let mut config = Config::default();
-    config.relays.push(format!("http://127.0.0.1:{port}"));
+    config.relays.push(format!("http://{:#x}@127.0.0.1:{port}", relay_public_key.deref()));
 
     let mux_port = config.port;
     let service = Service::from(config);

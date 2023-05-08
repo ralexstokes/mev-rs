@@ -1,9 +1,9 @@
+use crate::relay;
 use crate::relay_mux::RelayMux;
-use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
 use mev_rs::{
-    blinded_block_provider::{Client as Relay, Server as BlindedBlockProviderServer},
+    blinded_block_provider::Server as BlindedBlockProviderServer,
     Error, Network,
 };
 use serde::Deserialize;
@@ -48,13 +48,13 @@ fn parse_url(input: &str) -> Option<Url> {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<Url>,
+    relays: Vec<relay::RelayEndpoint>,
     network: Network,
 }
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
+        let relays: Vec<relay::RelayEndpoint> = config.relays.iter().filter_map(|s| parse_url(s)).filter_map(|url| relay::RelayEndpoint::try_from(url).ok()).collect();
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
@@ -68,7 +68,7 @@ impl Service {
         let Self { host, port, relays, network } = self;
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
+        let relays = relays.into_iter().map(relay::Relay::from);
         let clock = context.clock(None);
         let relay_mux = RelayMux::new(relays, context);
 

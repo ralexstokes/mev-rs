@@ -1,3 +1,4 @@
+mod relay;
 mod relay_mux;
 mod service;
 
