@@ -11,16 +11,6 @@ pub struct RelayEndpoint {
     public_key: BlsPublicKey,
 }
 
-impl RelayEndpoint {
-    pub fn url(&self) -> &Url {
-        &self.url
-    }
-
-    pub fn public_key(&self) -> &BlsPublicKey {
-        &self.public_key
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum RelayUrlError {
     #[error("{0}")]
@@ -69,10 +59,8 @@ impl Relay {
 
 impl From<RelayEndpoint> for Relay {
     fn from(value: RelayEndpoint) -> Self {
-        Self {
-            api: Client::new(BeaconClient::new(value.url().clone())),
-            public_key: value.public_key().clone(),
-        }
+        let RelayEndpoint { url, public_key } = value;
+        Self { api: Client::new(BeaconClient::new(url)), public_key }
     }
 }
 
