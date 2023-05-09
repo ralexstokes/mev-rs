@@ -1,4 +1,4 @@
-use crate::relay;
+use crate::relay::{Relay, RelayEndpoint};
 use crate::relay_mux::RelayMux;
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
@@ -48,13 +48,13 @@ fn parse_url(input: &str) -> Option<Url> {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<relay::RelayEndpoint>,
+    relays: Vec<RelayEndpoint>,
     network: Network,
 }
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<relay::RelayEndpoint> = config.relays.iter().filter_map(|s| parse_url(s)).filter_map(|url| relay::RelayEndpoint::try_from(url).ok()).collect();
+        let relays: Vec<RelayEndpoint> = config.relays.iter().filter_map(|s| parse_url(s)).filter_map(|url| RelayEndpoint::try_from(url).ok()).collect();
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
@@ -68,7 +68,7 @@ impl Service {
         let Self { host, port, relays, network } = self;
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let relays = relays.into_iter().map(relay::Relay::from);
+        let relays = relays.into_iter().map(Relay::from);
         let clock = context.clock(None);
         let relay_mux = RelayMux::new(relays, context);
 
