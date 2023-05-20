@@ -13,6 +13,7 @@ use mev_rs::{
     BlindedBlockProvider, Error,
 };
 use parking_lot::Mutex;
+use rand::prelude::*;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 // See note in the `mev-relay-rs::Relay` about this constant.
@@ -146,12 +147,13 @@ impl BlindedBlockProvider for RelayMux {
             return Err(Error::NoBids)
         }
 
-        // for now, break any ties by picking the first bid,
-        // which currently corresponds to the fastest relay
-        let (best_index, rest) = best_indices.split_first().unwrap();
+        // if multiple indices with same bid value, break tie by randomly picking one
+        let mut rng = rand::thread_rng();
+        let best_index = &best_indices[rng.gen_range(0..best_indices.len())];
+        let rest = best_indices.iter().filter(|i| **i != *best_index);
         let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
-        for index in rest.iter() {
+        for index in rest {
             let block_hash = &bids[*index].0.block_hash();
             if block_hash == best_block_hash {
                 relay_indices.push(*index);
