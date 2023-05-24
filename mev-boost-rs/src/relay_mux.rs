@@ -22,9 +22,16 @@ const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT: u64 = 1;
 
-fn validate_bid(bid: &mut SignedBuilderBid, public_key: &BlsPublicKey, context: &Context) -> Result<(), Error> {
+fn validate_bid(
+    bid: &mut SignedBuilderBid,
+    public_key: &BlsPublicKey,
+    context: &Context,
+) -> Result<(), Error> {
     if *bid.public_key() != *public_key {
-        return Err(Error::BidPublicKeyMismatch { bid: bid.public_key().clone(), relay: public_key.clone() });
+        return Err(Error::BidPublicKeyMismatch {
+            bid: bid.public_key().clone(),
+            relay: public_key.clone(),
+        })
     }
     Ok(bid.verify_signature(context)?)
 }

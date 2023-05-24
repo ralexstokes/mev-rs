@@ -1,11 +1,10 @@
-use crate::relay::{Relay, RelayEndpoint};
-use crate::relay_mux::RelayMux;
+use crate::{
+    relay::{Relay, RelayEndpoint},
+    relay_mux::RelayMux,
+};
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
-use mev_rs::{
-    blinded_block_provider::Server as BlindedBlockProviderServer,
-    Error, Network,
-};
+use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -54,7 +53,12 @@ pub struct Service {
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<RelayEndpoint> = config.relays.iter().filter_map(|s| parse_url(s)).filter_map(|url| RelayEndpoint::try_from(url).ok()).collect();
+        let relays: Vec<RelayEndpoint> = config
+            .relays
+            .iter()
+            .filter_map(|s| parse_url(s))
+            .filter_map(|url| RelayEndpoint::try_from(url).ok())
+            .collect();
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");

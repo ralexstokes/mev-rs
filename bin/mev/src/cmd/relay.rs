@@ -1,7 +1,7 @@
 use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
-use ethereum_consensus::crypto::SecretKey;
 use clap::{Args, Subcommand};
+use ethereum_consensus::crypto::SecretKey;
 use mev_relay_rs::Service;
 use mev_rs::Network;
 

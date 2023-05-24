@@ -72,7 +72,7 @@ mod tests {
 
     use std::ops::Deref;
 
-    const URL: &'static str = "https://relay.com";
+    const URL: &str = "https://relay.com";
 
     fn random_bls_public_key() -> BlsPublicKey {
         let mut rng = rand::thread_rng();
@@ -97,7 +97,7 @@ mod tests {
     fn parse_relay_endpoint_missing_public_key() {
         let url = Url::parse(URL).unwrap();
 
-        let endpoint = RelayEndpoint::try_from(url.clone());
+        let endpoint = RelayEndpoint::try_from(url);
         assert!(std::matches!(endpoint, Err(RelayUrlError::MissingPublicKey(..))));
     }
 
@@ -121,7 +121,7 @@ mod tests {
         let invalid_hex = "0xethereum";
 
         let mut url = Url::parse(URL).unwrap();
-        url.set_username(&invalid_hex).unwrap();
+        url.set_username(invalid_hex).unwrap();
 
         let endpoint = RelayEndpoint::try_from(url.clone());
         assert!(std::matches!(endpoint, Err(RelayUrlError::Hex(..))));

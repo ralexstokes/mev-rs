@@ -44,7 +44,11 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(&self, secret_key: SecretKey, context: Option<Context>) -> Result<ServiceHandle, Error> {
+    pub async fn spawn(
+        &self,
+        secret_key: SecretKey,
+        context: Option<Context>,
+    ) -> Result<ServiceHandle, Error> {
         let network = &self.network;
         let context =
             if let Some(context) = context { context } else { Context::try_from(network)? };
