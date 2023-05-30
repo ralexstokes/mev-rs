@@ -141,7 +141,7 @@ impl BlindedBlockProvider for RelayMux {
         })
         .collect::<Vec<_>>();
 
-        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
+        let mut best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
             return Err(Error::NoBids)
@@ -149,8 +149,8 @@ impl BlindedBlockProvider for RelayMux {
 
         // if multiple indices with same bid value, break tie by randomly picking one
         let mut rng = rand::thread_rng();
-        let best_index = &best_indices[rng.gen_range(0..best_indices.len())];
-        let rest = best_indices.iter().filter(|i| **i != *best_index);
+        best_indices.shuffle(&mut rng);
+        let (best_index, rest) = best_indices.split_first().unwrap();
         let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
         for index in rest {
