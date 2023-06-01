@@ -12,6 +12,7 @@ use mev_rs::{
     BlindedBlockProvider, Error,
 };
 use parking_lot::Mutex;
+use rand::prelude::*;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 use crate::relay::Relay;
@@ -151,18 +152,19 @@ impl BlindedBlockProvider for RelayMux {
         })
         .collect::<Vec<_>>();
 
-        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
+        let mut best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
             return Err(Error::NoBids)
         }
 
-        // for now, break any ties by picking the first bid,
-        // which currently corresponds to the fastest relay
+        // if multiple indices with same bid value, break tie by randomly picking one
+        let mut rng = rand::thread_rng();
+        best_indices.shuffle(&mut rng);
         let (best_index, rest) = best_indices.split_first().unwrap();
         let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
-        for index in rest.iter() {
+        for index in rest {
             let block_hash = &bids[*index].0.block_hash();
             if block_hash == best_block_hash {
                 relay_indices.push(*index);

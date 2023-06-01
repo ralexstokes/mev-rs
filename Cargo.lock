@@ -1503,7 +1503,6 @@ dependencies = [
  "beacon-api-client",
  "ethereum-consensus",
  "futures",
- "hex",
  "httpmock",
  "mev-build-rs",
  "mev-relay-rs",
