@@ -97,7 +97,7 @@ impl BlindedBlockProvider for RelayMux {
     ) -> Result<(), Error> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.api().register_validators(registrations).await })
+            .map(|relay| async move { relay.register_validators(registrations).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
@@ -116,7 +116,7 @@ impl BlindedBlockProvider for RelayMux {
             .map(|relay| async move {
                 tokio::time::timeout(
                     Duration::from_secs(FETCH_BEST_BID_TIME_OUT),
-                    relay.api().fetch_best_bid(bid_request),
+                    relay.fetch_best_bid(bid_request),
                 )
                 .await
             })
@@ -131,7 +131,7 @@ impl BlindedBlockProvider for RelayMux {
         .enumerate()
         .filter_map(|(relay_index, response)| match response {
             Ok(Ok(mut bid)) => {
-                if let Err(err) = validate_bid(&mut bid, self.relays[relay_index].public_key(), &self.context) {
+                if let Err(err) = validate_bid(&mut bid, &self.relays[relay_index].public_key, &self.context) {
                     tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                     None
                 } else {
@@ -194,7 +194,7 @@ impl BlindedBlockProvider for RelayMux {
         let signed_block = &signed_block;
         let relays = relay_indices.into_iter().map(|i| self.relays[i].clone());
         let responses = stream::iter(relays)
-            .map(|relay| async move { relay.api().open_bid(signed_block).await })
+            .map(|relay| async move { relay.open_bid(signed_block).await })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
