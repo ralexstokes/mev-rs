@@ -1,5 +1,6 @@
 reorder_imports = true
 imports_granularity = "Crate"
+group_imports = "One"
 use_small_heuristics = "Max"
 comment_width = 100
 wrap_comments = true
