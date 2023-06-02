@@ -1,9 +1,8 @@
-use std::ops::Deref;
-
 use beacon_api_client::Client as BeaconClient;
 use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
+use std::ops::Deref;
 use url::Url;
 
 use mev_rs::blinded_block_provider::Client;
@@ -59,10 +58,9 @@ mod tests {
         let mut rng = rand::thread_rng();
         let sk = SecretKey::random(&mut rng).unwrap();
         let public_key = sk.public_key();
-        let public_key_hex = format!("{:#x}", *public_key);
 
         let mut url = Url::parse(URL).unwrap();
-        url.set_username(&public_key_hex).unwrap();
+        url.set_username(&public_key.to_string()).unwrap();
 
         let endpoint = RelayEndpoint::try_from(url.clone()).unwrap();
         assert_eq!(endpoint.url, url);

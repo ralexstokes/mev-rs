@@ -1,3 +1,4 @@
+use crate::relay::Relay;
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -15,8 +16,6 @@ use parking_lot::Mutex;
 use rand::prelude::*;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
-use crate::relay::Relay;
-
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
@@ -28,7 +27,7 @@ fn validate_bid(
     public_key: &BlsPublicKey,
     context: &Context,
 ) -> Result<(), Error> {
-    if *bid.public_key() != *public_key {
+    if bid.public_key() != public_key {
         return Err(Error::BidPublicKeyMismatch {
             bid: bid.public_key().clone(),
             relay: public_key.clone(),
@@ -132,7 +131,8 @@ impl BlindedBlockProvider for RelayMux {
         .enumerate()
         .filter_map(|(relay_index, response)| match response {
             Ok(Ok(mut bid)) => {
-                if let Err(err) = validate_bid(&mut bid, &self.relays[relay_index].public_key, &self.context) {
+                let public_key = &self.relays[relay_index].public_key;
+                if let Err(err) = validate_bid(&mut bid, public_key, &self.context) {
                     tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                     None
                 } else {
