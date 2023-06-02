@@ -102,15 +102,26 @@ async fn test_end_to_end() {
 
     // start upstream relay
     let validator_mock_server_url = validator_mock_server.url("");
-    let relay_config =
-        RelayConfig { beacon_node_url: validator_mock_server_url, ..Default::default() };
+
+    // NOTE: non-default secret key required. otherwise public key is point at infinity and
+    // signature verification will fail.
+    let key_bytes: &[u8] = &[1u8; 32];
+    let secret_key = SecretKey::try_from(key_bytes).unwrap();
+
+    let relay_config = RelayConfig {
+        beacon_node_url: validator_mock_server_url,
+        secret_key,
+        ..Default::default()
+    };
+
     let port = relay_config.port;
+    let relay_public_key = relay_config.secret_key.public_key();
     let relay = Relay::from(relay_config);
     relay.spawn(Some(context.clone())).await.unwrap();
 
     // start mux server
     let mut config = Config::default();
-    config.relays.push(format!("http://127.0.0.1:{port}"));
+    config.relays.push(format!("http://{relay_public_key}@127.0.0.1:{port}"));
 
     let mux_port = config.port;
     let service = Service::from(config);
