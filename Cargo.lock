@@ -1483,7 +1483,6 @@ version = "0.3.0"
 dependencies = [
  "anyhow",
  "clap",
- "ethereum-consensus",
  "mev-boost-rs",
  "mev-build-rs",
  "mev-relay-rs",
