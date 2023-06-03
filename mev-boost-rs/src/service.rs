@@ -53,12 +53,17 @@ pub struct Service {
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<RelayEndpoint> = config
-            .relays
-            .iter()
-            .filter_map(|s| parse_url(s))
-            .filter_map(|url| RelayEndpoint::try_from(url).ok())
-            .collect();
+        let mut relays: Vec<RelayEndpoint> = Vec::new();
+
+        for s in &config.relays {
+            match parse_url(s) {
+                Some(url) => match RelayEndpoint::try_from(url) {
+                    Ok(relay) => relays.push(relay),
+                    Err(_) => tracing::warn!("Failed to parse relay endpoint: {}", s),
+                },
+                None => tracing::warn!("Failed to parse URL: {}", s),
+            }
+        }
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
