@@ -65,17 +65,18 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(&self, context: Option<Context>) -> Result<ServiceHandle, Error> {
-        let network = &self.network;
+    pub async fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+        let Self { host, port, beacon_node, network, secret_key } = self;
+
         let context =
-            if let Some(context) = context { context } else { Context::try_from(network)? };
+            if let Some(context) = context { context } else { Context::try_from(&network)? };
         let clock = context.clock(None);
         let context = Arc::new(context);
-        let relay = Relay::new(self.beacon_node.clone(), self.secret_key.clone(), context);
+        let relay = Relay::new(beacon_node, secret_key, context);
         relay.initialize().await;
 
         let block_provider = relay.clone();
-        let server = BlindedBlockProviderServer::new(self.host, self.port, block_provider).spawn();
+        let server = BlindedBlockProviderServer::new(host, port, block_provider).spawn();
 
         let relay = tokio::spawn(async move {
             let slots = clock.stream_slots();
