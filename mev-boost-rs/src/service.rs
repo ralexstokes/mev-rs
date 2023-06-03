@@ -30,18 +30,19 @@ impl Default for Config {
     }
 }
 
-fn parse_url(input: &str) -> Option<Url> {
-    if input.is_empty() {
-        None
-    } else {
-        input
-            .parse()
-            .map_err(|err| {
-                tracing::warn!("error parsing relay from URL: `{err}`");
-                err
-            })
-            .ok()
+fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
+    let mut relays = Vec::new();
+
+    for relay_url in relay_urls {
+        match relay_url.parse::<Url>() {
+            Ok(url) => match RelayEndpoint::try_from(url.clone()) {
+                Ok(relay) => relays.push(relay),
+                Err(err) => tracing::warn!("error parsing relay endpoint `{url}`: {err}"),
+            },
+            Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
+        }
     }
+    relays
 }
 
 pub struct Service {
@@ -53,17 +54,7 @@ pub struct Service {
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let mut relays: Vec<RelayEndpoint> = Vec::new();
-
-        for s in &config.relays {
-            match parse_url(s) {
-                Some(url) => match RelayEndpoint::try_from(url) {
-                    Ok(relay) => relays.push(relay),
-                    Err(_) => tracing::warn!("Failed to parse relay endpoint: {}", s),
-                },
-                None => tracing::warn!("Failed to parse URL: {}", s),
-            }
-        }
+        let relays = parse_relay_endpoints(&config.relays);
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
