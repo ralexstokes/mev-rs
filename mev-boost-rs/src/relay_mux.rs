@@ -7,7 +7,6 @@ use ethereum_consensus::{
 };
 use futures::{stream, StreamExt};
 use mev_rs::{
-    blinded_block_provider::Client as Relay,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -17,13 +16,25 @@ use mev_rs::{
 use parking_lot::Mutex;
 use rand::prelude::*;
 
+use crate::relay::Relay;
+
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT: u64 = 1;
 
-fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
+fn validate_bid(
+    bid: &mut SignedBuilderBid,
+    public_key: &BlsPublicKey,
+    context: &Context,
+) -> Result<(), Error> {
+    if bid.public_key() != public_key {
+        return Err(Error::BidPublicKeyMismatch {
+            bid: bid.public_key().clone(),
+            relay: public_key.clone(),
+        })
+    }
     Ok(bid.verify_signature(context)?)
 }
 
@@ -122,7 +133,8 @@ impl BlindedBlockProvider for RelayMux {
         .enumerate()
         .filter_map(|(relay_index, response)| match response {
             Ok(Ok(mut bid)) => {
-                if let Err(err) = validate_bid(&mut bid, &self.context) {
+                let public_key = &self.relays[relay_index].public_key;
+                if let Err(err) = validate_bid(&mut bid, public_key, &self.context) {
                     tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
                     None
                 } else {

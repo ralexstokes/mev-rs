@@ -107,9 +107,7 @@ struct State {
 }
 
 impl Relay {
-    pub fn new(beacon_node: Client, context: Arc<Context>) -> Self {
-        let key_bytes = [1u8; 32];
-        let secret_key = SecretKey::try_from(key_bytes.as_slice()).unwrap();
+    pub fn new(beacon_node: Client, secret_key: SecretKey, context: Arc<Context>) -> Self {
         let public_key = secret_key.public_key();
         let validator_registry = ValidatorRegistry::new(beacon_node);
         let inner = Inner {
