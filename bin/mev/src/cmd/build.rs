@@ -1,8 +1,9 @@
-use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
 use mev_build_rs::Service;
 use mev_rs::Network;
+
+use crate::cmd::config::Config;
 
 #[derive(Debug, Args)]
 #[clap(about = "🛠️ building blocks since 2023", subcommand_negates_reqs = true)]

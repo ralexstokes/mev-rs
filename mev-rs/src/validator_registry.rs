@@ -1,4 +1,5 @@
-use crate::{signing::verify_signed_builder_message, types::SignedValidatorRegistration};
+use std::{cmp::Ordering, collections::HashMap};
+
 use beacon_api_client::{Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
@@ -6,8 +7,9 @@ use ethereum_consensus::{
     state_transition::{Context, Error as ConsensusError},
 };
 use parking_lot::Mutex;
-use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
+
+use crate::{signing::verify_signed_builder_message, types::SignedValidatorRegistration};
 
 #[derive(Debug, Error)]
 pub enum Error {

@@ -1,9 +1,6 @@
 pub mod bellatrix;
 pub mod capella;
 
-use crate::signing::{
-    sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
-};
 pub use ethereum_consensus::builder::SignedValidatorRegistration;
 use ethereum_consensus::{
     crypto::SecretKey,
@@ -11,6 +8,10 @@ use ethereum_consensus::{
     state_transition::{Context, Error},
 };
 use ssz_rs::prelude::*;
+
+use crate::signing::{
+    sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
+};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

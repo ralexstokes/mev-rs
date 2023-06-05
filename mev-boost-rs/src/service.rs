@@ -1,4 +1,5 @@
-use crate::relay_mux::RelayMux;
+use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
+
 use beacon_api_client::Client;
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
@@ -7,9 +8,10 @@ use mev_rs::{
     Error, Network,
 };
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use url::Url;
+
+use crate::relay_mux::RelayMux;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {

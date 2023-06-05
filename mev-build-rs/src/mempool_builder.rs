@@ -1,3 +1,5 @@
+use std::{collections::HashMap, ops::Deref, sync::Arc};
+
 use async_trait::async_trait;
 use beacon_api_client::{BeaconProposerRegistration, Client, ProposerDuty};
 use ethereum_consensus::{
@@ -15,7 +17,6 @@ use mev_rs::{
     BlindedBlockProvider, Error, ProposerScheduler, ValidatorRegistry,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
 
 #[derive(Clone)]

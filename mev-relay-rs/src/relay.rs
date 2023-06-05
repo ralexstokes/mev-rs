@@ -1,3 +1,5 @@
+use std::{collections::HashMap, ops::Deref, sync::Arc};
+
 use async_trait::async_trait;
 use beacon_api_client::Client;
 use ethereum_consensus::{
@@ -17,7 +19,6 @@ use mev_rs::{
     BlindedBlockProvider, Error, ValidatorRegistry,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
 // once they have been fetched from builders -- currently in response to an incoming request from a

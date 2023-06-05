@@ -1,7 +1,8 @@
-use crate::engine_api_proxy::types::{
-    BuildJob, BuildVersion, ForkchoiceUpdatedV1Params, ForkchoiceUpdatedV1Response,
-    ForkchoiceUpdatedV2Params, PayloadAttributes,
+use std::{
+    net::{Ipv4Addr, SocketAddr},
+    sync::Arc,
 };
+
 use axum::{
     extract::State,
     http::{uri::Uri, Request, Response},
@@ -11,11 +12,12 @@ use axum::{
 use hyper::{body, client::HttpConnector, server::conn::AddrIncoming, Body};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::Arc,
-};
 use tokio::{sync::mpsc, task::JoinHandle};
+
+use crate::engine_api_proxy::types::{
+    BuildJob, BuildVersion, ForkchoiceUpdatedV1Params, ForkchoiceUpdatedV1Response,
+    ForkchoiceUpdatedV2Params, PayloadAttributes,
+};
 
 pub type EngineApiProxyServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
 pub type Client = hyper::client::Client<HttpConnector, Body>;

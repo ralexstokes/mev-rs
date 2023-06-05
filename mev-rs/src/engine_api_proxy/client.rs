@@ -1,3 +1,11 @@
+use std::sync::Arc;
+
+use anvil_rpc::request::{Id, RequestParams, RpcMethodCall, Version};
+use ethereum_consensus::{capella::Withdrawal, primitives::ValidatorIndex};
+use parking_lot::Mutex;
+use serde::Deserialize;
+use ssz_rs::prelude::U256;
+
 use crate::{
     engine_api_proxy::{
         types::{self, BuildVersion, ExecutionPayloadWithValue, PayloadId},
@@ -5,12 +13,6 @@ use crate::{
     },
     types::{bellatrix, capella, ExecutionPayload},
 };
-use anvil_rpc::request::{Id, RequestParams, RpcMethodCall, Version};
-use ethereum_consensus::{capella::Withdrawal, primitives::ValidatorIndex};
-use parking_lot::Mutex;
-use serde::Deserialize;
-use ssz_rs::prelude::U256;
-use std::sync::Arc;
 
 const ENGINE_GET_PAYLOADV1_METHOD: &str = "engine_getPayloadV1";
 const ENGINE_GET_PAYLOADV2_METHOD: &str = "engine_getPayloadV2";

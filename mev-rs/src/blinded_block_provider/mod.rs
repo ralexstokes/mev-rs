@@ -1,6 +1,10 @@
 #[cfg(feature = "api")]
 mod api;
 
+use async_trait::async_trait;
+#[cfg(feature = "api")]
+pub use {api::client::Client, api::server::Server};
+
 use crate::{
     error::Error,
     types::{
@@ -8,9 +12,6 @@ use crate::{
         SignedValidatorRegistration,
     },
 };
-use async_trait::async_trait;
-#[cfg(feature = "api")]
-pub use {api::client::Client, api::server::Server};
 
 #[async_trait]
 pub trait BlindedBlockProvider {

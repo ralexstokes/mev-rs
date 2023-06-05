@@ -1,8 +1,9 @@
-use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
 use mev_relay_rs::Service;
 use mev_rs::Network;
+
+use crate::cmd::config::Config;
 
 #[derive(Debug, Args)]
 #[clap(about = "🏗 connecting builders to proposers", subcommand_negates_reqs = true)]

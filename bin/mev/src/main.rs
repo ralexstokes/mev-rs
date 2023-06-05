@@ -1,9 +1,10 @@
 mod cmd;
 
+use std::future::Future;
+
 use anyhow::Result;
 use clap::{ArgGroup, Parser, Subcommand};
 use mev_rs::Network;
-use std::future::Future;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
