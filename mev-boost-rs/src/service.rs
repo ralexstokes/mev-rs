@@ -31,7 +31,7 @@ impl Default for Config {
 }
 
 fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
-    let mut relays = Vec::new();
+    let mut relays = vec![];
 
     for relay_url in relay_urls {
         match relay_url.parse::<Url>() {
