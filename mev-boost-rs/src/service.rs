@@ -35,9 +35,9 @@ fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
 
     for relay_url in relay_urls {
         match relay_url.parse::<Url>() {
-            Ok(url) => match RelayEndpoint::try_from(url.clone()) {
+            Ok(url) => match RelayEndpoint::try_from(url) {
                 Ok(relay) => relays.push(relay),
-                Err(err) => tracing::warn!("error parsing relay endpoint `{url}`: {err}"),
+                Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
             },
             Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
         }
