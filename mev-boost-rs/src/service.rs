@@ -39,7 +39,7 @@ fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
                 Ok(relay) => relays.push(relay),
                 Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
             },
-            Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
+            Err(err) => tracing::warn!("error parsing relay URL `{relay_url}` from config: {err}"),
         }
     }
     relays
