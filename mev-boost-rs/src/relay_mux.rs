@@ -1,4 +1,10 @@
-use crate::{metrics, relay::Relay};
+use crate::{
+    metrics::{
+        self, API_REQUESTS_COUNTER, API_REQUEST_DURATION_SECONDS, API_TIMEOUT_COUNTER,
+        AUCTION_INVALID_BIDS_COUNTER,
+    },
+    relay::Relay,
+};
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -111,12 +117,19 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        const METHOD: &str = metrics::ApiMethod::Register.as_str();
         let mut num_failures = 0;
         for (relay, duration, response) in responses {
-            metrics::API_REQUEST_DURATION_SECONDS
-                .with_label_values(&[&relay.to_string(), METHOD])
-                .observe(duration.as_secs_f64());
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::Register,
+                &relay,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::Register,
+                &relay,
+                duration.as_secs_f64(),
+            );
 
             if let Err(err) = response {
                 num_failures += 1;
@@ -147,20 +160,31 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        const METHOD: &str = metrics::ApiMethod::GetHeader.as_str();
         let mut bids = Vec::with_capacity(responses.len());
         for (relay_index, duration, response) in responses {
             let relay_public_key = &self.relays[relay_index].public_key;
 
-            metrics::API_REQUEST_DURATION_SECONDS
-                .with_label_values(&[&relay_public_key.to_string(), METHOD])
-                .observe(duration.as_secs_f64());
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::GetHeader,
+                relay_public_key,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::GetHeader,
+                relay_public_key,
+                duration.as_secs_f64(),
+            );
 
             match response {
                 Ok(Ok(mut bid)) => {
                     if let Err(err) = validate_bid(&mut bid, relay_public_key, &self.context) {
                         tracing::warn!(
                             "invalid signed builder bid from relay {relay_public_key}: {err}"
+                        );
+                        metrics::inc_auction_int_counter_vec(
+                            &AUCTION_INVALID_BIDS_COUNTER,
+                            relay_public_key,
                         );
                     } else {
                         bids.push((bid, relay_index));
@@ -171,9 +195,11 @@ impl BlindedBlockProvider for RelayMux {
                 }
                 Err(..) => {
                     tracing::warn!("failed to get bid from relay {relay_public_key} within {FETCH_BEST_BID_TIME_OUT_SECS}s timeout");
-                    metrics::API_TIMEOUT_COUNTER
-                        .with_label_values(&[&relay_public_key.to_string(), METHOD])
-                        .inc();
+                    metrics::inc_api_int_counter_vec(
+                        &API_TIMEOUT_COUNTER,
+                        metrics::ApiMethod::GetHeader,
+                        relay_public_key,
+                    );
                 }
             }
         }
@@ -231,12 +257,19 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        const METHOD: &str = metrics::ApiMethod::GetPayload.as_str();
         let expected_block_hash = signed_block.block_hash();
         for (relay, duration, response) in responses.into_iter() {
-            metrics::API_REQUEST_DURATION_SECONDS
-                .with_label_values(&[&relay.to_string(), METHOD])
-                .observe(duration.as_secs_f64());
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::GetPayload,
+                &relay,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::GetPayload,
+                &relay,
+                duration.as_secs_f64(),
+            );
 
             match response {
                 Ok(payload) => {

@@ -1,3 +1,6 @@
+use std::ops::Deref;
+
+use ethereum_consensus::primitives::BlsPublicKey;
 use lazy_static::lazy_static;
 use prometheus::{
     register_histogram_vec, register_int_counter_vec, HistogramOpts, HistogramVec, IntCounterVec,
@@ -45,6 +48,30 @@ lazy_static! {
         &[RELAY_LABEL]
     )
     .unwrap();
+}
+
+pub fn inc_api_int_counter_vec<C: Deref<Target = IntCounterVec>>(
+    counter_vec: &C,
+    meth: ApiMethod,
+    relay: &BlsPublicKey,
+) {
+    counter_vec.with_label_values(&[meth.as_str(), &relay.to_string()]).inc();
+}
+
+pub fn observe_api_histogram_vec<H: Deref<Target = HistogramVec>>(
+    hist_vec: &H,
+    meth: ApiMethod,
+    relay: &BlsPublicKey,
+    obs: f64,
+) {
+    hist_vec.with_label_values(&[meth.as_str(), &relay.to_string()]).observe(obs);
+}
+
+pub fn inc_auction_int_counter_vec<C: Deref<Target = IntCounterVec>>(
+    counter_vec: &C,
+    relay: &BlsPublicKey,
+) {
+    counter_vec.with_label_values(&[&relay.to_string()]).inc();
 }
 
 #[derive(Copy, Clone, Debug)]
