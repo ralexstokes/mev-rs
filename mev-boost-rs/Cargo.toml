@@ -23,6 +23,8 @@ ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus"
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client" }
 
 mev-rs = { path = "../mev-rs" }
+lazy_static = "1.4.0"
+prometheus = "0.13.3"
 
 [dev-dependencies]
 rand = "0.8.5"
