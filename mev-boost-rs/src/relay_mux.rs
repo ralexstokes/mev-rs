@@ -1,4 +1,10 @@
-use crate::relay::Relay;
+use crate::{
+    metrics::{
+        self, API_REQUESTS_COUNTER, API_REQUEST_DURATION_SECONDS, API_TIMEOUT_COUNTER,
+        AUCTION_INVALID_BIDS_COUNTER,
+    },
+    relay::Relay,
+};
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -14,7 +20,12 @@ use mev_rs::{
 };
 use parking_lot::Mutex;
 use rand::prelude::*;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
@@ -98,15 +109,28 @@ impl BlindedBlockProvider for RelayMux {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async move {
+                let start = Instant::now();
                 let response = relay.register_validators(registrations).await;
-                (relay.public_key, response)
+                (relay.public_key, start.elapsed(), response)
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
         let mut num_failures = 0;
-        for (relay, response) in responses {
+        for (relay, duration, response) in responses {
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::Register,
+                &relay,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::Register,
+                &relay,
+                duration.as_secs_f64(),
+            );
+
             if let Err(err) = response {
                 num_failures += 1;
                 tracing::warn!("failed to register with relay {relay}: {err}");
@@ -124,31 +148,59 @@ impl BlindedBlockProvider for RelayMux {
         let responses = stream::iter(self.relays.iter().cloned())
             .enumerate()
             .map(|(index, relay)| async move {
+                let start = Instant::now();
                 let response = tokio::time::timeout(
                     Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
                     relay.fetch_best_bid(bid_request),
                 )
                 .await;
-                (index, response)
+                (index, start.elapsed(), response)
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
         let mut bids = Vec::with_capacity(responses.len());
-        for (relay_index, response) in responses {
+        for (relay_index, duration, response) in responses {
             let relay_public_key = &self.relays[relay_index].public_key;
+
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::GetHeader,
+                relay_public_key,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::GetHeader,
+                relay_public_key,
+                duration.as_secs_f64(),
+            );
 
             match response {
                 Ok(Ok(mut bid)) => {
                     if let Err(err) = validate_bid(&mut bid, relay_public_key, &self.context) {
-                        tracing::warn!("invalid signed builder bid from relay {relay_public_key}: {err}");
+                        tracing::warn!(
+                            "invalid signed builder bid from relay {relay_public_key}: {err}"
+                        );
+                        metrics::inc_auction_int_counter_vec(
+                            &AUCTION_INVALID_BIDS_COUNTER,
+                            relay_public_key,
+                        );
                     } else {
                         bids.push((bid, relay_index));
                     }
                 }
-                Ok(Err(err)) => tracing::warn!("failed to get a bid from relay {relay_public_key}: {err}"),
-                Err(..) => tracing::warn!("failed to get bid from relay {relay_public_key} within {FETCH_BEST_BID_TIME_OUT_SECS}s timeout"),
+                Ok(Err(err)) => {
+                    tracing::warn!("failed to get a bid from relay {relay_public_key}: {err}")
+                }
+                Err(..) => {
+                    tracing::warn!("failed to get bid from relay {relay_public_key} within {FETCH_BEST_BID_TIME_OUT_SECS}s timeout");
+                    metrics::inc_api_int_counter_vec(
+                        &API_TIMEOUT_COUNTER,
+                        metrics::ApiMethod::GetHeader,
+                        relay_public_key,
+                    );
+                }
             }
         }
 
@@ -197,15 +249,28 @@ impl BlindedBlockProvider for RelayMux {
         let relays = relay_indices.into_iter().map(|i| self.relays[i].clone());
         let responses = stream::iter(relays)
             .map(|relay| async move {
+                let start = Instant::now();
                 let response = relay.open_bid(signed_block).await;
-                (relay.public_key, response)
+                (relay.public_key, start.elapsed(), response)
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
         let expected_block_hash = signed_block.block_hash();
-        for (relay, response) in responses.into_iter() {
+        for (relay, duration, response) in responses.into_iter() {
+            metrics::inc_api_int_counter_vec(
+                &API_REQUESTS_COUNTER,
+                metrics::ApiMethod::GetPayload,
+                &relay,
+            );
+            metrics::observe_api_histogram_vec(
+                &API_REQUEST_DURATION_SECONDS,
+                metrics::ApiMethod::GetPayload,
+                &relay,
+                duration.as_secs_f64(),
+            );
+
             match response {
                 Ok(payload) => {
                     let block_hash = payload.block_hash();

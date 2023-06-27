@@ -1,4 +1,5 @@
 use crate::{
+    metrics,
     relay::{Relay, RelayEndpoint},
     relay_mux::RelayMux,
 };
@@ -65,6 +66,8 @@ impl Service {
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
     pub fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+        metrics::init();
+
         let Self { host, port, relays, network } = self;
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
