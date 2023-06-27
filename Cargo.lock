@@ -1503,7 +1503,6 @@ dependencies = [
  "ethereum-consensus",
  "futures",
  "httpmock",
- "lazy_static",
  "mev-build-rs",
  "mev-relay-rs",
  "mev-rs",
