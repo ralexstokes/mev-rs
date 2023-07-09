@@ -15,8 +15,7 @@ test:
 fmt:
     cargo +nightly fmt --all
 lint: fmt validate-example-config
-    # TODO restore +nightly after fixing this: https://github.com/clap-rs/clap/issues/4733
-    cargo clippy --all-targets --all-features --all
+    cargo +nightly clippy --all-targets --all-features --all
 build:
     cargo build --all-targets --all-features --all
 run-ci: lint build test run-integration-tests
