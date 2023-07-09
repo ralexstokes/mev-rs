@@ -24,8 +24,8 @@ parking_lot = "0.12.1"
 
 anvil-rpc = { git = "https://github.com/foundry-rs/foundry", rev = "b45456717ffae1af65acdc71099f8cb95e6683a0", optional = true}
 reqwest = { version = "0.11.14", optional = true }
-serde_json = {version =  "1.0.92", optional = true }
+serde_json = { version =  "1.0.92", optional = true }
 
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
-ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
+ssz_rs = { workspace = true }
+ethereum-consensus = { workspace = true }
+beacon-api-client = { workspace = true, optional = true }

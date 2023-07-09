@@ -1,5 +1,5 @@
 use crate::relay::Relay;
-use beacon_api_client::Client;
+use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
@@ -83,7 +83,7 @@ impl Service {
 
             tokio::pin!(slots);
 
-            let mut current_epoch = clock.current_epoch();
+            let mut current_epoch = clock.current_epoch().expect("after genesis");
             let mut next_epoch = false;
             while let Some(slot) = slots.next().await {
                 let epoch = clock.epoch_for(slot);

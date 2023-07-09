@@ -1,5 +1,7 @@
 use crate::{signing::verify_signed_builder_message, types::SignedValidatorRegistration};
-use beacon_api_client::{Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary};
+use beacon_api_client::{
+    mainnet::Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary,
+};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
     primitives::{BlsPublicKey, ExecutionAddress, ValidatorIndex},
