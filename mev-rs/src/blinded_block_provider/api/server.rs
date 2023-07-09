@@ -26,7 +26,7 @@ impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let message = self.to_string();
         let code = StatusCode::BAD_REQUEST;
-        (code, Json(ApiError { code, message })).into_response()
+        (code, Json(ApiError::ErrorMessage { code, message })).into_response()
     }
 }
 
