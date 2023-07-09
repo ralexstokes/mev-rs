@@ -28,4 +28,4 @@ serde_json = {version =  "1.0.92", optional = true }
 
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus" }
 beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", optional = true }
-ssz-rs = { git = "https://github.com/ralexstokes/ssz-rs" }
+ssz_rs = "0.9.0"
