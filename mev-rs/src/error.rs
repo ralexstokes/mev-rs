@@ -1,10 +1,11 @@
-use crate::types::BidRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, ExecutionAddress, Hash32},
     state_transition::Error as ConsensusError,
 };
 use thiserror::Error;
+
+use crate::types::BidRequest;
 
 #[derive(Debug, Error)]
 pub enum Error {

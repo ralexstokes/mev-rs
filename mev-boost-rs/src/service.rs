@@ -1,14 +1,16 @@
-use crate::{
-    relay::{Relay, RelayEndpoint},
-    relay_mux::RelayMux,
-};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
+
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use url::Url;
+
+use crate::{
+    relay::{Relay, RelayEndpoint},
+    relay_mux::RelayMux,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {

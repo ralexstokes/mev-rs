@@ -1,11 +1,5 @@
-use crate::{
-    blinded_block_provider::BlindedBlockProvider,
-    error::Error,
-    types::{
-        bellatrix, capella, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
-        SignedBuilderBid, SignedValidatorRegistration,
-    },
-};
+use std::net::{Ipv4Addr, SocketAddr};
+
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
@@ -16,8 +10,16 @@ use axum::{
 use beacon_api_client::{ApiError, Error as ApiClientError, VersionedValue};
 use hyper::server::conn::AddrIncoming;
 use serde::Deserialize;
-use std::net::{Ipv4Addr, SocketAddr};
 use tokio::task::JoinHandle;
+
+use crate::{
+    blinded_block_provider::BlindedBlockProvider,
+    error::Error,
+    types::{
+        bellatrix, capella, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
+        SignedBuilderBid, SignedValidatorRegistration,
+    },
+};
 
 /// Type alias for the configured axum server
 pub type BlockProviderServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;

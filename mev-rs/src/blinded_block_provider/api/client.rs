@@ -1,14 +1,15 @@
+use axum::http::StatusCode;
+use beacon_api_client::{
+    api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
+    VersionedValue,
+};
+
 use crate::{
     blinded_block_provider::Error,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-};
-use axum::http::StatusCode;
-use beacon_api_client::{
-    api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
-    VersionedValue,
 };
 
 /// A `Client` for a service implementing the Builder APIs.

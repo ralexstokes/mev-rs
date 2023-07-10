@@ -1,3 +1,8 @@
+use std::{
+    collections::HashMap,
+    time::{SystemTime, UNIX_EPOCH},
+};
+
 use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
 use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
@@ -17,13 +22,7 @@ use mev_rs::{
     signing::sign_builder_message,
     types::{BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid},
 };
-
 use rand::seq::SliceRandom;
-use std::{
-    collections::HashMap,
-    time::{SystemTime, UNIX_EPOCH},
-};
-
 use url::Url;
 
 fn setup_logging() {

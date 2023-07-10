@@ -1,4 +1,5 @@
-use crate::relay::Relay;
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -14,7 +15,8 @@ use mev_rs::{
 };
 use parking_lot::Mutex;
 use rand::prelude::*;
-use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
+
+use crate::relay::Relay;
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...

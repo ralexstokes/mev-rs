@@ -1,12 +1,14 @@
-use crate::relay::Relay;
+use std::{fmt, future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+
 use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
-use std::{fmt, future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use url::Url;
+
+use crate::relay::Relay;
 
 #[derive(Deserialize)]
 pub struct Config {

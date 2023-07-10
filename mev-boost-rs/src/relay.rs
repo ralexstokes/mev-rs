@@ -1,11 +1,11 @@
+use std::ops::Deref;
+
 use beacon_api_client::Client as BeaconClient;
 use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
-use std::ops::Deref;
-use url::Url;
-
 use mev_rs::blinded_block_provider::Client;
+use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct RelayEndpoint {
@@ -47,9 +47,9 @@ impl From<RelayEndpoint> for Relay {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     use ethereum_consensus::crypto::SecretKey;
+
+    use super::*;
 
     const URL: &str = "https://relay.com";
 

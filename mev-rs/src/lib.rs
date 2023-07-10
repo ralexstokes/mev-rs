@@ -11,7 +11,6 @@ pub mod types;
 mod validator_registry;
 
 pub use blinded_block_provider::BlindedBlockProvider;
-
 pub use error::Error;
 pub use network::*;
 pub use proposer_scheduler::ProposerScheduler;
