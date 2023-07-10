@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use beacon_api_client::{BeaconProposerRegistration, Client, Error as ApiError, ProposerDuty};
+use beacon_api_client::{
+    mainnet::Client, BeaconProposerRegistration, Error as ApiError, ProposerDuty,
+};
 use ethereum_consensus::primitives::{BlsPublicKey, Epoch, Slot};
 use parking_lot::Mutex;
 use thiserror::Error;

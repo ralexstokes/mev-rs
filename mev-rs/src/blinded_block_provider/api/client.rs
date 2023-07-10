@@ -1,6 +1,7 @@
 use axum::http::StatusCode;
 use beacon_api_client::{
-    api_error_or_ok, ApiResult, Client as BeaconApiClient, Error as ApiError, VersionedValue,
+    api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
+    VersionedValue,
 };
 
 use crate::{

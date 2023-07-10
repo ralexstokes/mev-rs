@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
-use beacon_api_client::{BeaconProposerRegistration, Client, ProposerDuty};
+use beacon_api_client::{mainnet::Client, BeaconProposerRegistration, ProposerDuty};
 use ethereum_consensus::{
     clock::{convert_timestamp_to_slot, get_current_unix_time_in_secs},
     crypto::SecretKey,
@@ -160,7 +160,8 @@ impl Builder {
             // TODO update method on Context
             .unwrap_or(self.context.min_genesis_time + self.context.genesis_delay);
         let slot =
-            convert_timestamp_to_slot(*timestamp, genesis_time, self.context.seconds_per_slot);
+            convert_timestamp_to_slot(*timestamp, genesis_time, self.context.seconds_per_slot)
+                .expect("after genesis");
         let coordinate = Coordinate { slot, parent_hash };
         let mut state = self.state.lock();
         tracing::trace!("at {coordinate:?}, inserting build job from engine API: {job:?}");

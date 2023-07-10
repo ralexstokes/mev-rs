@@ -1,7 +1,7 @@
 use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use async_trait::async_trait;
-use beacon_api_client::Client;
+use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{
     builder::ValidatorRegistration,
     clock::get_current_unix_time_in_secs,

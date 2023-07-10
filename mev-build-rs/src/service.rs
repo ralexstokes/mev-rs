@@ -100,7 +100,7 @@ impl Service {
         let block_provider = builder.clone();
         let engine_builder = builder.clone();
 
-        let current_epoch = clock.current_epoch();
+        let current_epoch = clock.current_epoch().expect("after genesis");
         builder.initialize(current_epoch).await;
 
         let clock = tokio::spawn(async move {

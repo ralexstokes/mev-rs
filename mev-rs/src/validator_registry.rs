@@ -1,6 +1,8 @@
 use std::{cmp::Ordering, collections::HashMap};
 
-use beacon_api_client::{Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary};
+use beacon_api_client::{
+    mainnet::Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary,
+};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
     primitives::{BlsPublicKey, ExecutionAddress, ValidatorIndex},
