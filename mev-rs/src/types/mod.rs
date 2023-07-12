@@ -53,7 +53,7 @@ impl From<(ExecutionPayloadHeader, U256, &BlsPublicKey)> for BuilderBid {
                 value,
                 public_key: public_key.clone(),
             }),
-            ExecutionPayloadHeader::Deneb(header) => unimplemented!(),
+            ExecutionPayloadHeader::Deneb(_header) => unimplemented!(),
         }
     }
 }

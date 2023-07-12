@@ -11,7 +11,7 @@ use mev_build_rs::NullBuilder;
 use mev_rs::{
     signing::sign_builder_message,
     types::{
-        bellatrix, capella, deneb, BidRequest, ExecutionPayload, ExecutionPayloadHeader,
+        bellatrix, capella, BidRequest, ExecutionPayload, ExecutionPayloadHeader,
         SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
     },
     BlindedBlockProvider, Error, ValidatorRegistry,
@@ -48,7 +48,7 @@ fn validate_execution_payload(
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
     if execution_payload.gas_limit() != preferences.gas_limit {
-        return Err(Error::InvalidGasLimit);
+        return Err(Error::InvalidGasLimit)
     }
 
     // verify payload is valid
@@ -67,7 +67,7 @@ fn validate_signed_block(
     let local_block_hash = local_payload.block_hash();
     let block_hash = signed_block.block_hash();
     if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock);
+        return Err(Error::UnknownBlock)
     }
 
     // OPTIONAL:
@@ -200,7 +200,7 @@ impl BlindedBlockProvider for Relay {
                 let signed_bid = capella::SignedBuilderBid { message: bid, signature };
                 Ok(SignedBuilderBid::Capella(signed_bid))
             }
-            ExecutionPayloadHeader::Deneb(header) => unimplemented!(),
+            ExecutionPayloadHeader::Deneb(_header) => unimplemented!(),
         }
     }
 
