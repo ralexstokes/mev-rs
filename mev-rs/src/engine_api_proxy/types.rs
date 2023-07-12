@@ -2,6 +2,8 @@ use ethereum_consensus::{
     bellatrix::mainnet::{
         Transaction, BYTES_PER_LOGS_BLOOM, MAX_EXTRA_DATA_BYTES, MAX_TRANSACTIONS_PER_PAYLOAD,
     },
+    deneb::mainnet::{Blob, MAX_BLOBS_PER_BLOCK},
+    kzg::{KzgCommitment, KzgProof},
     primitives::{Bytes32, ExecutionAddress, Hash32},
     ssz::{ByteList, ByteVector},
 };
@@ -145,10 +147,21 @@ pub enum ExecutionPayload {
 
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
+// TODO: maybe rename this to `GetPayloadV2Response` for consistency with the V3 response type?
 pub struct ExecutionPayloadWithValue {
     pub execution_payload: ExecutionPayload,
     #[serde(deserialize_with = "u256_from_be_hex")]
     pub block_value: U256,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct GetPayloadV3Response {
+    pub execution_payload: ExecutionPayloadV3,
+    #[serde(deserialize_with = "u256_from_be_hex")]
+    pub block_value: U256,
+    pub blobs_bundle: BlobsBundleV1,
+    pub should_override_builder: bool,
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -200,6 +213,43 @@ pub struct ExecutionPayloadV2 {
     pub transactions: List<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
     // TODO: add bound on vec here?
     pub withdrawals: Vec<WithdrawalV1>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionPayloadV3 {
+    pub parent_hash: Hash32,
+    pub fee_recipient: ExecutionAddress,
+    pub state_root: Bytes32,
+    pub receipts_root: Bytes32,
+    pub logs_bloom: ByteVector<BYTES_PER_LOGS_BLOOM>,
+    pub prev_randao: Bytes32,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub block_number: u64,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub gas_limit: u64,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub gas_used: u64,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub timestamp: u64,
+    pub extra_data: ByteList<MAX_EXTRA_DATA_BYTES>,
+    #[serde(deserialize_with = "u256_from_be_hex")]
+    pub base_fee_per_gas: U256,
+    pub block_hash: Hash32,
+    pub transactions: List<Transaction, MAX_TRANSACTIONS_PER_PAYLOAD>,
+    pub withdrawals: Vec<WithdrawalV1>,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub data_gas_used: u64,
+    #[serde(deserialize_with = "u64_from_hex")]
+    pub excess_data_gas: u64,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlobsBundleV1 {
+    pub commitments: List<KzgCommitment, MAX_BLOBS_PER_BLOCK>,
+    pub proofs: List<KzgProof, MAX_BLOBS_PER_BLOCK>,
+    pub blobs: List<Blob, MAX_BLOBS_PER_BLOCK>,
 }
 
 #[cfg(test)]

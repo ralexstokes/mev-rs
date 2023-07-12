@@ -8,11 +8,10 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use mev_build_rs::NullBuilder;
-use mev_rs::types::deneb;
 use mev_rs::{
     signing::sign_builder_message,
     types::{
-        bellatrix, capella, BidRequest, ExecutionPayload, ExecutionPayloadHeader,
+        bellatrix, capella, deneb, BidRequest, ExecutionPayload, ExecutionPayloadHeader,
         SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
     },
     BlindedBlockProvider, Error, ValidatorRegistry,
@@ -49,7 +48,7 @@ fn validate_execution_payload(
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
     if execution_payload.gas_limit() != preferences.gas_limit {
-        return Err(Error::InvalidGasLimit);
+        return Err(Error::InvalidGasLimit)
     }
 
     // verify payload is valid
@@ -68,7 +67,7 @@ fn validate_signed_block(
     let local_block_hash = local_payload.block_hash();
     let block_hash = signed_block.block_hash();
     if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock);
+        return Err(Error::UnknownBlock)
     }
 
     // OPTIONAL:
@@ -204,10 +203,10 @@ impl BlindedBlockProvider for Relay {
             ExecutionPayloadHeader::Deneb(header) => {
                 let mut bid = deneb::BuilderBid {
                     header,
+                    // FIXME: this is a placeholder
+                    blinded_blobs_bundle: Default::default(),
                     value,
                     public_key: self.public_key.clone(),
-                    // FIXME: this is a placeholder
-                    blinded_blob_sidecars: Default::default(),
                 };
                 let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
 

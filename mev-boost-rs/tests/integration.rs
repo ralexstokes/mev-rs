@@ -249,6 +249,7 @@ async fn propose_block(
             assert_eq!(payload.parent_hash, parent_hash);
             assert_eq!(payload.fee_recipient, proposer.fee_recipient);
         }
+        _ => unimplemented!(),
     }
 
     beacon_node.check_status().await.unwrap();
