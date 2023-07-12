@@ -1,11 +1,10 @@
-use crate::relay_mux::RelayMux;
-use beacon_api_client::Client;
+use crate::{
+    relay::{Relay, RelayEndpoint},
+    relay_mux::RelayMux,
+};
 use ethereum_consensus::state_transition::Context;
 use futures::StreamExt;
-use mev_rs::{
-    blinded_block_provider::{Client as Relay, Server as BlindedBlockProviderServer},
-    Error, Network,
-};
+use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -31,30 +30,31 @@ impl Default for Config {
     }
 }
 
-fn parse_url(input: &str) -> Option<Url> {
-    if input.is_empty() {
-        None
-    } else {
-        input
-            .parse()
-            .map_err(|err| {
-                tracing::warn!("error parsing relay from URL: `{err}`");
-                err
-            })
-            .ok()
+fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
+    let mut relays = vec![];
+
+    for relay_url in relay_urls {
+        match relay_url.parse::<Url>() {
+            Ok(url) => match RelayEndpoint::try_from(url) {
+                Ok(relay) => relays.push(relay),
+                Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
+            },
+            Err(err) => tracing::warn!("error parsing relay URL `{relay_url}` from config: {err}"),
+        }
     }
+    relays
 }
 
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<Url>,
+    relays: Vec<RelayEndpoint>,
     network: Network,
 }
 
 impl Service {
     pub fn from(config: Config) -> Self {
-        let relays: Vec<Url> = config.relays.iter().filter_map(|s| parse_url(s)).collect();
+        let relays = parse_relay_endpoints(&config.relays);
 
         if relays.is_empty() {
             tracing::error!("no valid relays provided; please restart with correct configuration");
@@ -68,7 +68,7 @@ impl Service {
         let Self { host, port, relays, network } = self;
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let relays = relays.into_iter().map(|endpoint| Relay::new(Client::new(endpoint)));
+        let relays = relays.into_iter().map(Relay::from);
         let clock = context.clock(None);
         let relay_mux = RelayMux::new(relays, context);
 

@@ -124,6 +124,14 @@ impl SignedBuilderBid {
         }
     }
 
+    pub fn public_key(&self) -> &BlsPublicKey {
+        match self {
+            Self::Bellatrix(bid) => &bid.message.public_key,
+            Self::Capella(bid) => &bid.message.public_key,
+            Self::Deneb(bid) => &bid.message.public_key,
+        }
+    }
+
     pub fn block_hash(&self) -> &Hash32 {
         match self {
             Self::Bellatrix(bid) => &bid.message.header.block_hash,
@@ -141,34 +149,26 @@ impl SignedBuilderBid {
     }
 
     pub fn verify_signature(&mut self, context: &Context) -> Result<(), Error> {
+        let public_key = self.public_key().clone();
         match self {
-            Self::Bellatrix(bid) => {
-                let public_key = bid.message.public_key.clone();
-                verify_signed_builder_message(
-                    &mut bid.message,
-                    &bid.signature,
-                    &public_key,
-                    context,
-                )
-            }
-            Self::Capella(bid) => {
-                let public_key = bid.message.public_key.clone();
-                verify_signed_builder_message(
-                    &mut bid.message,
-                    &bid.signature,
-                    &public_key,
-                    context,
-                )
-            }
-            Self::Deneb(bid) => {
-                let public_key = bid.message.public_key.clone();
-                verify_signed_builder_message(
-                    &mut bid.message,
-                    &bid.signature,
-                    &public_key,
-                    context,
-                )
-            }
+            Self::Bellatrix(bid) => verify_signed_builder_message(
+                &mut bid.message,
+                &bid.signature,
+                &public_key,
+                context,
+            ),
+            Self::Capella(bid) => verify_signed_builder_message(
+                &mut bid.message,
+                &bid.signature,
+                &public_key,
+                context,
+            ),
+            Self::Deneb(bid) => verify_signed_builder_message(
+                &mut bid.message,
+                &bid.signature,
+                &public_key,
+                context,
+            ),
         }
     }
 }

@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = [
     "bin/mev",
     "mev-boost-rs",
@@ -8,12 +9,11 @@ members = [
 ]
 default-members = ["bin/mev"]
 
+[workspace.dependencies]
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "e380108" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "93d7e8c" }
+ssz_rs = "0.9.0"
+
 [patch."https://github.com/ralexstokes/ethereum-consensus"]
 # FIXME https://github.com/ralexstokes/ethereum-consensus/pull/170
-ethereum-consensus = { git = "https://github.com/jimmygchen/ethereum-consensus", rev = "4c82111" }
-
-[patch."https://github.com/ralexstokes/ssz-rs"]
-ssz-rs = { git = "https://github.com/ralexstokes//ssz-rs", rev = "45ff6f1" }
-
-[patch."https://github.com/ralexstokes/beacon-api-client"]
-beacon-api-client = { git = "https://github.com/ralexstokes//beacon-api-client", rev = "53690a711e33614d59d4d44fb09762b4699e2a4e" }
+ethereum-consensus = { git = "https://github.com/jimmygchen/ethereum-consensus", rev = "4d40289" }

@@ -9,6 +9,7 @@ relays = [
 host = "0.0.0.0"
 port = 28545
 beacon_node_url = "http://127.0.0.1:5052"
+secret_key = "0x24b6e79cbc6267c6e527b4bf7a71747d42a58b10279366cf0c7bb4e2aa455901"
 
 [builder]
 host = "0.0.0.0"

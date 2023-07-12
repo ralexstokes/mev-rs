@@ -8,6 +8,8 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("bid public key {bid} does not match relay public key {relay}")]
+    BidPublicKeyMismatch { bid: BlsPublicKey, relay: BlsPublicKey },
     #[error("no bid prepared for request {0:?}")]
     NoBidPrepared(Box<BidRequest>),
     #[error("no valid bids returned for proposal")]

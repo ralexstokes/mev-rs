@@ -1,3 +1,4 @@
+use crate::relay::Relay;
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -5,7 +6,6 @@ use ethereum_consensus::{
 };
 use futures::{stream, StreamExt};
 use mev_rs::{
-    blinded_block_provider::Client as Relay,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -13,15 +13,26 @@ use mev_rs::{
     BlindedBlockProvider, Error,
 };
 use parking_lot::Mutex;
+use rand::prelude::*;
 use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
-const FETCH_BEST_BID_TIME_OUT: u64 = 1;
+const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
-fn validate_bid(bid: &mut SignedBuilderBid, context: &Context) -> Result<(), Error> {
+fn validate_bid(
+    bid: &mut SignedBuilderBid,
+    public_key: &BlsPublicKey,
+    context: &Context,
+) -> Result<(), Error> {
+    if bid.public_key() != public_key {
+        return Err(Error::BidPublicKeyMismatch {
+            bid: bid.public_key().clone(),
+            relay: public_key.clone(),
+        })
+    }
     Ok(bid.verify_signature(context)?)
 }
 
@@ -86,14 +97,23 @@ impl BlindedBlockProvider for RelayMux {
     ) -> Result<(), Error> {
         let registrations = &registrations;
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move { relay.register_validators(registrations).await })
+            .map(|relay| async move {
+                let response = relay.register_validators(registrations).await;
+                (relay.public_key, response)
+            })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
-        let failures = responses.iter().filter(|r| r.is_err());
+        let mut num_failures = 0;
+        for (relay, response) in responses {
+            if let Err(err) = response {
+                num_failures += 1;
+                tracing::warn!("failed to register with relay {relay}: {err}");
+            }
+        }
 
-        if failures.count() == self.relays.len() {
+        if num_failures == self.relays.len() {
             Err(Error::CouldNotRegister)
         } else {
             Ok(())
@@ -102,56 +122,49 @@ impl BlindedBlockProvider for RelayMux {
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         let responses = stream::iter(self.relays.iter().cloned())
-            .map(|relay| async move {
-                tokio::time::timeout(
-                    Duration::from_secs(FETCH_BEST_BID_TIME_OUT),
+            .enumerate()
+            .map(|(index, relay)| async move {
+                let response = tokio::time::timeout(
+                    Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
                     relay.fetch_best_bid(bid_request),
                 )
-                .await
+                .await;
+                (index, response)
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
-        // ideally can fuse the filtering into the prior async fetch but
-        // several attempts lead to opaque compiler errors...
-        let bids = responses
-        .into_iter()
-        .enumerate()
-        .filter_map(|(relay_index, response)| match response {
-            Ok(Ok(mut bid)) => {
-                if let Err(err) = validate_bid(&mut bid, &self.context) {
-                    tracing::warn!("invalid signed builder bid: {err} for bid: {bid:?}");
-                    None
-                } else {
-                    Some((bid, relay_index))
-                }
-            }
-            Ok(Err(err)) => {
-                tracing::warn!("failed to get a bid from relay {relay_index}: {err}");
-                None
-            }
-            Err(_) => {
-                tracing::warn!(
-                    "relay {relay_index} didn't provide bid before time out {FETCH_BEST_BID_TIME_OUT}s."
-                );
-                None
-            }
-        })
-        .collect::<Vec<_>>();
+        let mut bids = Vec::with_capacity(responses.len());
+        for (relay_index, response) in responses {
+            let relay_public_key = &self.relays[relay_index].public_key;
 
-        let best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
+            match response {
+                Ok(Ok(mut bid)) => {
+                    if let Err(err) = validate_bid(&mut bid, relay_public_key, &self.context) {
+                        tracing::warn!("invalid signed builder bid from relay {relay_public_key}: {err}");
+                    } else {
+                        bids.push((bid, relay_index));
+                    }
+                }
+                Ok(Err(err)) => tracing::warn!("failed to get a bid from relay {relay_public_key}: {err}"),
+                Err(..) => tracing::warn!("failed to get bid from relay {relay_public_key} within {FETCH_BEST_BID_TIME_OUT_SECS}s timeout"),
+            }
+        }
+
+        let mut best_indices = select_best_bids(bids.iter().map(|(bid, i)| (bid.value(), *i)));
 
         if best_indices.is_empty() {
             return Err(Error::NoBids)
         }
 
-        // for now, break any ties by picking the first bid,
-        // which currently corresponds to the fastest relay
+        // if multiple indices with same bid value, break tie by randomly picking one
+        let mut rng = rand::thread_rng();
+        best_indices.shuffle(&mut rng);
         let (best_index, rest) = best_indices.split_first().unwrap();
         let best_block_hash = &bids[*best_index].0.block_hash();
         let mut relay_indices = vec![*best_index];
-        for index in rest.iter() {
+        for index in rest {
             let block_hash = &bids[*index].0.block_hash();
             if block_hash == best_block_hash {
                 relay_indices.push(*index);
@@ -183,24 +196,27 @@ impl BlindedBlockProvider for RelayMux {
         let signed_block = &signed_block;
         let relays = relay_indices.into_iter().map(|i| self.relays[i].clone());
         let responses = stream::iter(relays)
-            .map(|relay| async move { relay.open_bid(signed_block).await })
+            .map(|relay| async move {
+                let response = relay.open_bid(signed_block).await;
+                (relay.public_key, response)
+            })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
             .await;
 
         let expected_block_hash = signed_block.block_hash();
-        for (i, response) in responses.into_iter().enumerate() {
+        for (relay, response) in responses.into_iter() {
             match response {
                 Ok(payload) => {
                     let block_hash = payload.block_hash();
                     if block_hash == expected_block_hash {
                         return Ok(payload)
                     } else {
-                        tracing::warn!("error opening bid from relay {i}: the returned payload with block hash {block_hash} did not match the expected block hash: {expected_block_hash}");
+                        tracing::warn!("error opening bid from relay {relay}: the returned payload with block hash {block_hash} did not match the expected block hash: {expected_block_hash}");
                     }
                 }
                 Err(err) => {
-                    tracing::warn!("error opening bid from relay {i}: {err}");
+                    tracing::warn!("error opening bid from relay {relay}: {err}");
                 }
             }
         }
