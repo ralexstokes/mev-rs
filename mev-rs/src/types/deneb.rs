@@ -11,6 +11,7 @@ pub type ExecutionPayload = spec::ExecutionPayload;
 pub type ExecutionPayloadHeader = spec::ExecutionPayloadHeader;
 pub type SignedBlindedBeaconBlock = spec::SignedBlindedBeaconBlock;
 pub type SignedBlindedBlobSidecar = spec::SignedBlindedBlobSidecar;
+pub type Blob = spec::Blob;
 
 #[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -42,4 +43,19 @@ pub struct SignedBuilderBid {
 pub struct SignedBlindedBlockAndBlobSidecars {
     pub signed_blinded_block: SignedBlindedBeaconBlock,
     pub signed_blinded_blob_sidecars: List<SignedBlindedBlobSidecar, MAX_BLOBS_PER_BLOCK>,
+}
+
+#[derive(Debug, Default, Clone, SimpleSerialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BlobsBundle {
+    pub commitments: List<KzgCommitment, MAX_BLOBS_PER_BLOCK>,
+    pub proofs: List<KzgProof, MAX_BLOBS_PER_BLOCK>,
+    pub blobs: List<Blob, MAX_BLOBS_PER_BLOCK>,
+}
+
+#[derive(Debug, Default, Clone, SimpleSerialize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExecutionPayloadAndBlobsBundle {
+    pub execution_payload: ExecutionPayload,
+    pub blobs_bundle: BlobsBundle,
 }

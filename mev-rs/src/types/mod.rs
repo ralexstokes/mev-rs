@@ -174,7 +174,7 @@ impl SignedBuilderBid {
 pub enum SignedBlindedBeaconBlock {
     Bellatrix(bellatrix::SignedBlindedBeaconBlock),
     Capella(capella::SignedBlindedBeaconBlock),
-    Deneb(deneb::SignedBlindedBeaconBlock),
+    Deneb(deneb::SignedBlindedBlockAndBlobSidecars),
 }
 
 impl SignedBlindedBeaconBlock {
@@ -182,7 +182,7 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => block.message.slot,
             Self::Capella(block) => block.message.slot,
-            Self::Deneb(block) => block.message.slot,
+            Self::Deneb(block_and_blobs) => block_and_blobs.signed_blinded_block.message.slot,
         }
     }
 
@@ -190,7 +190,9 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => block.message.proposer_index,
             Self::Capella(block) => block.message.proposer_index,
-            Self::Deneb(block) => block.message.proposer_index,
+            Self::Deneb(block_and_blobs) => {
+                block_and_blobs.signed_blinded_block.message.proposer_index
+            }
         }
     }
 
@@ -198,7 +200,14 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => &block.message.body.execution_payload_header.block_hash,
             Self::Capella(block) => &block.message.body.execution_payload_header.block_hash,
-            Self::Deneb(block) => &block.message.body.execution_payload_header.block_hash,
+            Self::Deneb(block_and_blobs) => {
+                &block_and_blobs
+                    .signed_blinded_block
+                    .message
+                    .body
+                    .execution_payload_header
+                    .block_hash
+            }
         }
     }
 
@@ -206,7 +215,14 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => &block.message.body.execution_payload_header.parent_hash,
             Self::Capella(block) => &block.message.body.execution_payload_header.parent_hash,
-            Self::Deneb(block) => &block.message.body.execution_payload_header.parent_hash,
+            Self::Deneb(block_and_blobs) => {
+                &block_and_blobs
+                    .signed_blinded_block
+                    .message
+                    .body
+                    .execution_payload_header
+                    .parent_hash
+            }
         }
     }
 
@@ -239,7 +255,8 @@ impl SignedBlindedBeaconBlock {
                     Some(genesis_validators_root),
                 )
             }
-            Self::Deneb(block) => {
+            Self::Deneb(block_and_blobs) => {
+                let block = &mut block_and_blobs.signed_blinded_block;
                 let slot = block.message.slot;
                 verify_signed_consensus_message(
                     &mut block.message,
@@ -261,7 +278,7 @@ impl SignedBlindedBeaconBlock {
 pub enum ExecutionPayload {
     Bellatrix(bellatrix::ExecutionPayload),
     Capella(capella::ExecutionPayload),
-    Deneb(deneb::ExecutionPayload),
+    Deneb(deneb::ExecutionPayloadAndBlobsBundle),
 }
 
 impl ExecutionPayload {
@@ -269,7 +286,7 @@ impl ExecutionPayload {
         match self {
             Self::Bellatrix(payload) => &payload.block_hash,
             Self::Capella(payload) => &payload.block_hash,
-            Self::Deneb(payload) => &payload.block_hash,
+            Self::Deneb(payload_and_blobs) => &payload_and_blobs.execution_payload.block_hash,
         }
     }
 
@@ -277,7 +294,7 @@ impl ExecutionPayload {
         match self {
             Self::Bellatrix(payload) => payload.gas_limit,
             Self::Capella(payload) => payload.gas_limit,
-            Self::Deneb(payload) => payload.gas_limit,
+            Self::Deneb(payload_and_blobs) => payload_and_blobs.execution_payload.gas_limit,
         }
     }
 }
@@ -295,8 +312,10 @@ impl TryFrom<&mut ExecutionPayload> for ExecutionPayloadHeader {
                 let header = capella::ExecutionPayloadHeader::try_from(payload)?;
                 Ok(Self::Capella(header))
             }
-            ExecutionPayload::Deneb(payload) => {
-                let header = deneb::ExecutionPayloadHeader::try_from(payload)?;
+            ExecutionPayload::Deneb(payload_and_blobs) => {
+                let header = deneb::ExecutionPayloadHeader::try_from(
+                    &mut payload_and_blobs.execution_payload,
+                )?;
                 Ok(Self::Deneb(header))
             }
         }
