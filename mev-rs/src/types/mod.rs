@@ -53,13 +53,7 @@ impl From<(ExecutionPayloadHeader, U256, &BlsPublicKey)> for BuilderBid {
                 value,
                 public_key: public_key.clone(),
             }),
-            ExecutionPayloadHeader::Deneb(header) => BuilderBid::Deneb(deneb::BuilderBid {
-                header,
-                // FIXME: this is a placeholder for now
-                blinded_blobs_bundle: Default::default(),
-                value,
-                public_key: public_key.clone(),
-            }),
+            ExecutionPayloadHeader::Deneb(header) => unimplemented!(),
         }
     }
 }

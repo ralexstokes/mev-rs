@@ -48,7 +48,7 @@ fn validate_execution_payload(
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
     if execution_payload.gas_limit() != preferences.gas_limit {
-        return Err(Error::InvalidGasLimit)
+        return Err(Error::InvalidGasLimit);
     }
 
     // verify payload is valid
@@ -67,7 +67,7 @@ fn validate_signed_block(
     let local_block_hash = local_payload.block_hash();
     let block_hash = signed_block.block_hash();
     if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock)
+        return Err(Error::UnknownBlock);
     }
 
     // OPTIONAL:
@@ -200,19 +200,7 @@ impl BlindedBlockProvider for Relay {
                 let signed_bid = capella::SignedBuilderBid { message: bid, signature };
                 Ok(SignedBuilderBid::Capella(signed_bid))
             }
-            ExecutionPayloadHeader::Deneb(header) => {
-                let mut bid = deneb::BuilderBid {
-                    header,
-                    // FIXME: this is a placeholder
-                    blinded_blobs_bundle: Default::default(),
-                    value,
-                    public_key: self.public_key.clone(),
-                };
-                let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
-
-                let signed_bid = deneb::SignedBuilderBid { message: bid, signature };
-                Ok(SignedBuilderBid::Deneb(signed_bid))
-            }
+            ExecutionPayloadHeader::Deneb(header) => unimplemented!(),
         }
     }
 
