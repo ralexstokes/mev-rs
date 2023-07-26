@@ -1,9 +1,9 @@
 use crate::{
-    blinded_block_provider::Error,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
+    Error,
 };
 use axum::http::StatusCode;
 use beacon_api_client::{
