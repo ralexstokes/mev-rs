@@ -7,7 +7,9 @@ use crate::signing::{
 pub use ethereum_consensus::builder::SignedValidatorRegistration;
 use ethereum_consensus::{
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Hash32, Root, Slot, ValidatorIndex},
+    primitives::{
+        BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Root, Slot, ValidatorIndex,
+    },
     state_transition::{Context, Error},
 };
 use ssz_rs::prelude::*;
@@ -218,13 +220,19 @@ impl SignedBlindedBeaconBlock {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(tag = "version", content = "data"))]
 #[cfg_attr(feature = "serde", serde(rename_all = "lowercase"))]
 pub enum ExecutionPayload {
     Bellatrix(bellatrix::ExecutionPayload),
     Capella(capella::ExecutionPayload),
+}
+
+impl Default for ExecutionPayload {
+    fn default() -> Self {
+        Self::Bellatrix(Default::default())
+    }
 }
 
 impl ExecutionPayload {
@@ -273,4 +281,54 @@ impl ExecutionPayloadHeader {
             Self::Capella(header) => &header.block_hash,
         }
     }
+}
+
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ProposerSchedule {
+    #[serde(with = "crate::serde::as_string")]
+    pub slot: Slot,
+    #[serde(with = "crate::serde::as_string")]
+    pub validator_index: ValidatorIndex,
+    pub entry: SignedValidatorRegistration,
+}
+
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BidTrace {
+    #[serde(with = "crate::serde::as_string")]
+    pub slot: Slot,
+    pub parent_hash: Hash32,
+    pub block_hash: Hash32,
+    #[serde(rename = "builder_pubkey")]
+    pub builder_public_key: BlsPublicKey,
+    pub proposer_fee_recipient: ExecutionAddress,
+    #[serde(with = "crate::serde::as_string")]
+    pub gas_limit: u64,
+    #[serde(with = "crate::serde::as_string")]
+    pub gas_used: u64,
+    pub value: U256,
+}
+
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SignedBidSubmission {
+    pub message: BidTrace,
+    pub execution_payload: ExecutionPayload,
+    pub signature: BlsSignature,
+}
+
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct BidReceipt {
+    #[serde(with = "crate::serde::as_string")]
+    pub receive_timestamp: u64,
+    pub bid_trace: BidTrace,
+}
+
+#[derive(Debug, Default, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct SignedBidReceipt {
+    pub message: BidReceipt,
+    pub signature: BlsSignature,
 }

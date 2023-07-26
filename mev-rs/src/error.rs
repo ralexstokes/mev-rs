@@ -46,3 +46,19 @@ pub enum Error {
     #[error("{0}")]
     EngineApi(#[from] crate::engine_api_proxy::Error),
 }
+
+#[cfg(feature = "api")]
+use axum::extract::Json;
+#[cfg(feature = "api")]
+use axum::http::StatusCode;
+#[cfg(feature = "api")]
+use axum::response::{IntoResponse, Response};
+
+#[cfg(feature = "api")]
+impl IntoResponse for Error {
+    fn into_response(self) -> Response {
+        let message = self.to_string();
+        let code = StatusCode::BAD_REQUEST;
+        (code, Json(beacon_api_client::ApiError::ErrorMessage { code, message })).into_response()
+    }
+}
