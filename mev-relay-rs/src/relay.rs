@@ -4,7 +4,7 @@ use ethereum_consensus::{
     builder::ValidatorRegistration,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Slot, U256},
+    primitives::{BlsPublicKey, Root, Slot, U256},
     state_transition::Context,
 };
 use mev_build_rs::NullBuilder;
@@ -61,7 +61,8 @@ fn validate_execution_payload(
 fn validate_signed_block(
     signed_block: &mut SignedBlindedBeaconBlock,
     public_key: &BlsPublicKey,
-    local_payload: &mut ExecutionPayload,
+    local_payload: &ExecutionPayload,
+    genesis_validators_root: &Root,
     context: &Context,
 ) -> Result<(), Error> {
     let local_block_hash = local_payload.block_hash();
@@ -75,9 +76,8 @@ fn validate_signed_block(
     // verify slot is timely
     // verify proposer_index is correct
     // verify parent_root matches
-    // TODO: use real root value
-    let root = Default::default();
-    Ok(signed_block.verify_signature(public_key, root, context)?)
+
+    signed_block.verify_signature(public_key, *genesis_validators_root, context).map_err(From::from)
 }
 
 #[derive(Clone)]
@@ -94,6 +94,7 @@ impl Deref for Relay {
 pub struct Inner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
+    genesis_validators_root: Root,
     builder: NullBuilder,
     validator_registry: ValidatorRegistry,
     context: Arc<Context>,
@@ -106,12 +107,18 @@ struct State {
 }
 
 impl Relay {
-    pub fn new(beacon_node: Client, secret_key: SecretKey, context: Arc<Context>) -> Self {
+    pub fn new(
+        genesis_validators_root: Root,
+        beacon_node: Client,
+        secret_key: SecretKey,
+        context: Arc<Context>,
+    ) -> Self {
         let public_key = secret_key.public_key();
         let validator_registry = ValidatorRegistry::new(beacon_node);
         let inner = Inner {
             secret_key,
             public_key,
+            genesis_validators_root,
             builder: NullBuilder,
             validator_registry,
             context,
@@ -214,12 +221,18 @@ impl BlindedBlockProvider for Relay {
             self.validator_registry.get_public_key(proposer_index).map_err(Error::from)?;
         let bid_request = BidRequest { slot, parent_hash, public_key };
 
-        let mut payload = {
+        let payload = {
             let mut state = self.state.lock();
             state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?
         };
 
-        validate_signed_block(signed_block, &bid_request.public_key, &mut payload, &self.context)?;
+        validate_signed_block(
+            signed_block,
+            &bid_request.public_key,
+            &payload,
+            &self.genesis_validators_root,
+            &self.context,
+        )?;
 
         Ok(payload)
     }

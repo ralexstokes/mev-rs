@@ -1,15 +1,9 @@
 [workspace]
 resolver = "2"
-members = [
-    "bin/mev",
-    "mev-boost-rs",
-    "mev-relay-rs",
-    "mev-build-rs",
-    "mev-rs",
-]
+members = ["bin/mev", "mev-boost-rs", "mev-relay-rs", "mev-build-rs", "mev-rs"]
 default-members = ["bin/mev"]
 
 [workspace.dependencies]
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "e380108" }
-beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "93d7e8c" }
+beacon-api-client = { git = "https://github.com/ralexstokes/beacon-api-client", rev = "287d4dd" }
 ssz_rs = "0.9.0"
