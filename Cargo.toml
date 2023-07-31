@@ -1,12 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "bin/mev",
-    "mev-boost-rs",
-    "mev-relay-rs",
-    "mev-build-rs",
-    "mev-rs",
-]
+members = ["bin/mev", "mev-boost-rs", "mev-relay-rs", "mev-build-rs", "mev-rs"]
 default-members = ["bin/mev"]
 
 [workspace.dependencies]
