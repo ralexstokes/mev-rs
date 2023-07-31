@@ -5,10 +5,7 @@ use crate::{
 };
 use beacon_api_client::{mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError};
 
-/// A `Client` for a service implementing the Builder APIs.
-/// Note that `Client` does not implement the `Builder` trait so that
-/// it can provide more flexibility to callers with respect to the types
-/// it accepts.
+/// A `Client` for a service implementing the Relay APIs.
 #[derive(Clone)]
 pub struct Client {
     api: BeaconApiClient,

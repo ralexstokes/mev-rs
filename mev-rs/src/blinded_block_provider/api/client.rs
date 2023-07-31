@@ -12,7 +12,7 @@ use beacon_api_client::{
 };
 
 /// A `Client` for a service implementing the Builder APIs.
-/// Note that `Client` does not implement the `Builder` trait so that
+/// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
 /// it can provide more flexibility to callers with respect to the types
 /// it accepts.
 #[derive(Clone)]
