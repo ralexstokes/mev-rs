@@ -54,9 +54,9 @@ impl<R: BlindedBlockRelayer + Clone + Send + Sync + 'static> Server<R> {
     /// Spawns the server on a new task returning the handle for it
     pub fn spawn(&self) -> JoinHandle<()> {
         let server = self.serve();
-        let address = server.local_addr();
+        let addr = server.local_addr();
         tokio::spawn(async move {
-            tracing::info!("listening at {address}...");
+            tracing::info!("listening at {addr}...");
             if let Err(err) = server.await {
                 tracing::error!("error while listening for incoming: {err}")
             }
