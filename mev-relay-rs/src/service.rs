@@ -4,11 +4,11 @@ use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
-use std::{fmt, future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use url::Url;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
@@ -16,18 +16,6 @@ pub struct Config {
     #[serde(default)]
     pub network: Network,
     pub secret_key: SecretKey,
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("host", &self.host)
-            .field("port", &self.port)
-            .field("beacon_node_url", &self.beacon_node_url)
-            .field("network", &self.network)
-            .field("secret_key", &"...")
-            .finish()
-    }
 }
 
 impl Default for Config {
