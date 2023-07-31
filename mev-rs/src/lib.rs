@@ -1,4 +1,5 @@
 pub mod blinded_block_provider;
+pub mod blinded_block_relayer;
 #[cfg(feature = "engine-proxy")]
 pub mod engine_api_proxy;
 mod error;

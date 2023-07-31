@@ -9,11 +9,11 @@ use crate::{
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::{get, post, IntoMakeService},
     Router,
 };
-use beacon_api_client::{ApiError, Error as ApiClientError, VersionedValue};
+use beacon_api_client::{Error as ApiClientError, VersionedValue};
 use hyper::server::conn::AddrIncoming;
 use serde::Deserialize;
 use std::net::{Ipv4Addr, SocketAddr};
@@ -21,14 +21,6 @@ use tokio::task::JoinHandle;
 
 /// Type alias for the configured axum server
 pub type BlockProviderServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
-
-impl IntoResponse for Error {
-    fn into_response(self) -> Response {
-        let message = self.to_string();
-        let code = StatusCode::BAD_REQUEST;
-        (code, Json(ApiError::ErrorMessage { code, message })).into_response()
-    }
-}
 
 async fn handle_status_check() -> impl IntoResponse {
     StatusCode::OK
