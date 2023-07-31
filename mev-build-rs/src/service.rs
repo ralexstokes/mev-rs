@@ -13,7 +13,7 @@ use mev_rs::{
     Error, Network,
 };
 use serde::Deserialize;
-use std::{fmt, future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::{
     sync::mpsc,
     task::{JoinError, JoinHandle},
@@ -22,7 +22,7 @@ use url::Url;
 
 const BUILD_JOB_BUFFER_SIZE: usize = 1;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
@@ -31,19 +31,6 @@ pub struct Config {
     pub network: Network,
     pub engine_api_proxy: EngineApiProxyConfig,
     pub secret_key: SecretKey,
-}
-
-impl fmt::Debug for Config {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Config")
-            .field("host", &self.host)
-            .field("port", &self.port)
-            .field("beacon_api_endpoint", &self.beacon_api_endpoint)
-            .field("network", &self.network)
-            .field("engine_api_proxy", &self.engine_api_proxy)
-            .field("secret_key", &"...")
-            .finish()
-    }
 }
 
 impl Default for Config {
