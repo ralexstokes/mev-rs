@@ -1,4 +1,3 @@
-use crate::relay::Relay;
 use async_trait::async_trait;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, Slot, U256},
@@ -6,6 +5,7 @@ use ethereum_consensus::{
 };
 use futures::{stream, StreamExt};
 use mev_rs::{
+    relay::Relay,
     types::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,

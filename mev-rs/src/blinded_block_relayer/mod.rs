@@ -14,6 +14,5 @@ use async_trait::async_trait;
 pub trait BlindedBlockRelayer {
     async fn get_proposal_schedule(&self) -> Result<Vec<ProposerSchedule>, Error>;
 
-    // TODO: support cancellations?
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error>;
 }

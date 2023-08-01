@@ -44,9 +44,6 @@ pub enum Error {
     ValidatorRegistry(#[from] crate::validator_registry::Error),
     #[error("{0}")]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
-    #[cfg(feature = "engine-proxy")]
-    #[error("{0}")]
-    EngineApi(#[from] crate::engine_api_proxy::Error),
 }
 
 #[cfg(feature = "api")]
