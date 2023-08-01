@@ -21,3 +21,10 @@ toml = "0.5.9"
 
 clap = { version = "4.1.4", features = ["derive", "env"] }
 anyhow = "1.0.57"
+
+reth-payload-builder = { workspace = true }
+reth-primitives = { workspace = true }
+reth = { workspace = true }
+eyre = "0.6.8"
+
+ethereum-consensus = { workspace = true }

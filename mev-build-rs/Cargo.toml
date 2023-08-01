@@ -8,6 +8,7 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
+tokio-stream = "0.1.14"
 tracing = "0.1"
 futures = "0.3.21"
 async-trait = "0.1.53"
@@ -20,5 +21,16 @@ serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
+ssz_rs = { workspace = true }
 
 mev-rs = { path = "../mev-rs" }
+
+revm = { workspace = true }
+reth-payload-builder = { workspace = true }
+reth-primitives = { workspace = true }
+reth-transaction-pool = { workspace = true }
+reth-provider = { workspace = true }
+reth-interfaces = { workspace = true }
+reth-revm = { workspace = true }
+
+ethers = "2.0"
