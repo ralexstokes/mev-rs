@@ -7,7 +7,9 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["serde", "api", "engine-proxy"]
+default = ["serde", "builder-api", "relay-api", "engine-proxy"]
+builder-api = ["api"]
+relay-api = ["api"]
 api = ["tokio", "axum", "hyper", "beacon-api-client", "tracing", "serde_json"]
 engine-proxy = ["serde", "api", "anvil-rpc", "reqwest", "serde_json"]
 

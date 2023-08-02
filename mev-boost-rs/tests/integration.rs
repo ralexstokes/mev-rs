@@ -1,11 +1,13 @@
-use beacon_api_client::{Client as ApiClient, ValidatorStatus, ValidatorSummary, Value};
+use beacon_api_client::{
+    Client as ApiClient, GenesisDetails, ValidatorStatus, ValidatorSummary, Value,
+};
 use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
     capella::mainnet as capella,
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
-    primitives::{DomainType, ExecutionAddress, Hash32},
+    primitives::{DomainType, ExecutionAddress, Hash32, Root},
     signing::sign_with_domain,
     state_transition::{Context, Forks},
 };
@@ -88,10 +90,21 @@ async fn test_end_to_end() {
             },
         })
         .collect::<Vec<_>>();
+    // relay demands validators endpoint
     validator_mock_server.mock(|when, then| {
         when.method(GET).path("/eth/v1/beacon/states/head/validators");
         let response =
             serde_json::to_string(&Value { data: validators, meta: HashMap::new() }).unwrap();
+        then.status(200).body(response);
+    });
+    // relay demands genesis details endpoint
+    let mut genesis_details = GenesisDetails::default();
+    let genesis_validators_root = Root::try_from([23u8; 32].as_ref()).unwrap();
+    genesis_details.genesis_validators_root = genesis_validators_root;
+    validator_mock_server.mock(|when, then| {
+        when.method(GET).path("/eth/v1/beacon/genesis");
+        let response =
+            serde_json::to_string(&Value { data: genesis_details, meta: HashMap::new() }).unwrap();
         then.status(200).body(response);
     });
 
@@ -155,7 +168,7 @@ async fn test_end_to_end() {
     proposers.shuffle(&mut rng);
 
     for (i, proposer) in proposers.iter().enumerate() {
-        propose_block(&beacon_node, proposer, i, &context).await;
+        propose_block(&beacon_node, proposer, i, &context, &genesis_validators_root).await;
     }
 }
 
@@ -164,6 +177,7 @@ async fn propose_block(
     proposer: &Proposer,
     shuffling_index: usize,
     context: &Context,
+    genesis_validators_root: &Root,
 ) {
     let fork = if shuffling_index == 0 { Forks::Bellatrix } else { Forks::Capella };
     let current_slot = match fork {
@@ -199,9 +213,13 @@ async fn propose_block(
                 ..Default::default()
             };
             let fork_version = context.bellatrix_fork_version;
-            let domain =
-                compute_domain(DomainType::BeaconProposer, Some(fork_version), None, context)
-                    .unwrap();
+            let domain = compute_domain(
+                DomainType::BeaconProposer,
+                Some(fork_version),
+                Some(*genesis_validators_root),
+                context,
+            )
+            .unwrap();
             let signature =
                 sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
             let signed_block =
@@ -224,9 +242,13 @@ async fn propose_block(
                 ..Default::default()
             };
             let fork_version = context.capella_fork_version;
-            let domain =
-                compute_domain(DomainType::BeaconProposer, Some(fork_version), None, context)
-                    .unwrap();
+            let domain = compute_domain(
+                DomainType::BeaconProposer,
+                Some(fork_version),
+                Some(*genesis_validators_root),
+                context,
+            )
+            .unwrap();
             let signature =
                 sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
             let signed_block =
