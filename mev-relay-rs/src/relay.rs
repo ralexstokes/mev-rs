@@ -4,11 +4,7 @@ use ethereum_consensus::{
     builder::ValidatorRegistration,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
-<<<<<<< HEAD
     primitives::{BlsPublicKey, Root, Slot, U256},
-=======
-    primitives::{BlsPublicKey, Slot, U256, Root},
->>>>>>> c504720 (merge)
     state_transition::Context,
 };
 use mev_build_rs::NullBuilder;
@@ -52,7 +48,7 @@ fn validate_execution_payload(
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
     if execution_payload.gas_limit() != preferences.gas_limit {
-        return Err(Error::InvalidGasLimit)
+        return Err(Error::InvalidGasLimit);
     }
 
     // verify payload is valid
@@ -66,13 +62,13 @@ fn validate_signed_block(
     signed_block: &mut SignedBlindedBeaconBlock,
     public_key: &BlsPublicKey,
     local_payload: &mut ExecutionPayload,
-    root: Root,
+    genesis_validators_root: Root,
     context: &Context,
 ) -> Result<(), Error> {
     let local_block_hash = local_payload.block_hash();
     let block_hash = signed_block.block_hash();
     if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock)
+        return Err(Error::UnknownBlock);
     }
 
     // OPTIONAL:
@@ -81,7 +77,7 @@ fn validate_signed_block(
     // verify proposer_index is correct
     // verify parent_root matches
 
-    Ok(signed_block.verify_signature(public_key, root, context)?)
+    Ok(signed_block.verify_signature(public_key, genesis_validators_root, context)?)
 }
 
 #[derive(Clone)]
@@ -228,7 +224,13 @@ impl BlindedBlockProvider for Relay {
             state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?
         };
 
-        validate_signed_block(signed_block, &bid_request.public_key, &mut payload, self.genesis_validators_root, &self.context)?;
+        validate_signed_block(
+            signed_block,
+            &bid_request.public_key,
+            &mut payload,
+            self.genesis_validators_root,
+            &self.context,
+        )?;
 
         Ok(payload)
     }
