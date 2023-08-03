@@ -57,10 +57,10 @@ impl Service {
         let Self { host, port, beacon_node, network, secret_key } = self;
 
         let context =
-            if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let clock = context.clock(None);
-        let context = Arc::new(context);
+            if let Some(context) = context { context } else { Context::try_from(network)? };
         let genesis_details = self.beacon_node.get_genesis_details().await?;
+        let clock = context.clock(Some(genesis_details.genesis_time));
+        let context = Arc::new(context);
         let genesis_validators_root = genesis_details.genesis_validators_root;
         let relay = Relay::new(self.beacon_node.clone(), genesis_validators_root, context);
         relay.initialize().await;
