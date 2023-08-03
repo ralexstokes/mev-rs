@@ -207,6 +207,7 @@ impl BlindedBlockProvider for Relay {
                 let signed_bid = capella::SignedBuilderBid { message: bid, signature };
                 Ok(SignedBuilderBid::Capella(signed_bid))
             }
+            ExecutionPayloadHeader::Deneb(_header) => unimplemented!(),
         }
     }
 

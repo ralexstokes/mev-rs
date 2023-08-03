@@ -1,5 +1,6 @@
 pub mod bellatrix;
 pub mod capella;
+pub mod deneb;
 
 use crate::signing::{
     sign_builder_message, verify_signed_builder_message, verify_signed_consensus_message,
@@ -36,6 +37,7 @@ impl std::fmt::Display for BidRequest {
 pub enum BuilderBid {
     Bellatrix(bellatrix::BuilderBid),
     Capella(capella::BuilderBid),
+    Deneb(deneb::BuilderBid),
 }
 
 impl From<(ExecutionPayloadHeader, U256, &BlsPublicKey)> for BuilderBid {
@@ -53,6 +55,7 @@ impl From<(ExecutionPayloadHeader, U256, &BlsPublicKey)> for BuilderBid {
                 value,
                 public_key: public_key.clone(),
             }),
+            ExecutionPayloadHeader::Deneb(_header) => unimplemented!(),
         }
     }
 }
@@ -80,6 +83,12 @@ impl BuilderBid {
                 });
                 Ok(signed_bid)
             }
+            BuilderBid::Deneb(mut bid) => {
+                let signature = sign_builder_message(&mut bid, secret_key, context)?;
+                let signed_bid =
+                    SignedBuilderBid::Deneb(deneb::SignedBuilderBid { message: bid, signature });
+                Ok(signed_bid)
+            }
         }
     }
 }
@@ -91,6 +100,7 @@ impl BuilderBid {
 pub enum SignedBuilderBid {
     Bellatrix(bellatrix::SignedBuilderBid),
     Capella(capella::SignedBuilderBid),
+    Deneb(deneb::SignedBuilderBid),
 }
 
 impl std::fmt::Display for SignedBuilderBid {
@@ -106,6 +116,7 @@ impl SignedBuilderBid {
         match self {
             Self::Bellatrix(bid) => &bid.message.value,
             Self::Capella(bid) => &bid.message.value,
+            Self::Deneb(bid) => &bid.message.value,
         }
     }
 
@@ -113,6 +124,7 @@ impl SignedBuilderBid {
         match self {
             Self::Bellatrix(bid) => &bid.message.public_key,
             Self::Capella(bid) => &bid.message.public_key,
+            Self::Deneb(bid) => &bid.message.public_key,
         }
     }
 
@@ -120,6 +132,7 @@ impl SignedBuilderBid {
         match self {
             Self::Bellatrix(bid) => &bid.message.header.block_hash,
             Self::Capella(bid) => &bid.message.header.block_hash,
+            Self::Deneb(bid) => &bid.message.header.block_hash,
         }
     }
 
@@ -127,6 +140,7 @@ impl SignedBuilderBid {
         match self {
             Self::Bellatrix(bid) => &bid.message.header.parent_hash,
             Self::Capella(bid) => &bid.message.header.parent_hash,
+            Self::Deneb(bid) => &bid.message.header.parent_hash,
         }
     }
 
@@ -145,6 +159,12 @@ impl SignedBuilderBid {
                 &public_key,
                 context,
             ),
+            Self::Deneb(bid) => verify_signed_builder_message(
+                &mut bid.message,
+                &bid.signature,
+                &public_key,
+                context,
+            ),
         }
     }
 }
@@ -156,6 +176,7 @@ impl SignedBuilderBid {
 pub enum SignedBlindedBeaconBlock {
     Bellatrix(bellatrix::SignedBlindedBeaconBlock),
     Capella(capella::SignedBlindedBeaconBlock),
+    Deneb(deneb::SignedBlindedBlockAndBlobSidecars),
 }
 
 impl SignedBlindedBeaconBlock {
@@ -163,6 +184,7 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => block.message.slot,
             Self::Capella(block) => block.message.slot,
+            Self::Deneb(block_and_blobs) => block_and_blobs.signed_blinded_block.message.slot,
         }
     }
 
@@ -170,6 +192,9 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => block.message.proposer_index,
             Self::Capella(block) => block.message.proposer_index,
+            Self::Deneb(block_and_blobs) => {
+                block_and_blobs.signed_blinded_block.message.proposer_index
+            }
         }
     }
 
@@ -177,6 +202,14 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => &block.message.body.execution_payload_header.block_hash,
             Self::Capella(block) => &block.message.body.execution_payload_header.block_hash,
+            Self::Deneb(block_and_blobs) => {
+                &block_and_blobs
+                    .signed_blinded_block
+                    .message
+                    .body
+                    .execution_payload_header
+                    .block_hash
+            }
         }
     }
 
@@ -184,6 +217,14 @@ impl SignedBlindedBeaconBlock {
         match self {
             Self::Bellatrix(block) => &block.message.body.execution_payload_header.parent_hash,
             Self::Capella(block) => &block.message.body.execution_payload_header.parent_hash,
+            Self::Deneb(block_and_blobs) => {
+                &block_and_blobs
+                    .signed_blinded_block
+                    .message
+                    .body
+                    .execution_payload_header
+                    .parent_hash
+            }
         }
     }
 
@@ -216,6 +257,18 @@ impl SignedBlindedBeaconBlock {
                     Some(genesis_validators_root),
                 )
             }
+            Self::Deneb(block_and_blobs) => {
+                let block = &mut block_and_blobs.signed_blinded_block;
+                let slot = block.message.slot;
+                verify_signed_consensus_message(
+                    &mut block.message,
+                    &block.signature,
+                    public_key,
+                    context,
+                    Some(slot),
+                    Some(genesis_validators_root),
+                )
+            }
         }
     }
 }
@@ -227,6 +280,7 @@ impl SignedBlindedBeaconBlock {
 pub enum ExecutionPayload {
     Bellatrix(bellatrix::ExecutionPayload),
     Capella(capella::ExecutionPayload),
+    Deneb(deneb::ExecutionPayloadAndBlobsBundle),
 }
 
 impl Default for ExecutionPayload {
@@ -240,6 +294,7 @@ impl ExecutionPayload {
         match self {
             Self::Bellatrix(payload) => &payload.block_hash,
             Self::Capella(payload) => &payload.block_hash,
+            Self::Deneb(payload_and_blobs) => &payload_and_blobs.execution_payload.block_hash,
         }
     }
 
@@ -247,6 +302,7 @@ impl ExecutionPayload {
         match self {
             Self::Bellatrix(payload) => payload.gas_limit,
             Self::Capella(payload) => payload.gas_limit,
+            Self::Deneb(payload_and_blobs) => payload_and_blobs.execution_payload.gas_limit,
         }
     }
 }
@@ -264,6 +320,12 @@ impl TryFrom<&mut ExecutionPayload> for ExecutionPayloadHeader {
                 let header = capella::ExecutionPayloadHeader::try_from(payload)?;
                 Ok(Self::Capella(header))
             }
+            ExecutionPayload::Deneb(payload_and_blobs) => {
+                let header = deneb::ExecutionPayloadHeader::try_from(
+                    &mut payload_and_blobs.execution_payload,
+                )?;
+                Ok(Self::Deneb(header))
+            }
         }
     }
 }
@@ -272,6 +334,7 @@ impl TryFrom<&mut ExecutionPayload> for ExecutionPayloadHeader {
 pub enum ExecutionPayloadHeader {
     Bellatrix(bellatrix::ExecutionPayloadHeader),
     Capella(capella::ExecutionPayloadHeader),
+    Deneb(deneb::ExecutionPayloadHeader),
 }
 
 impl ExecutionPayloadHeader {
@@ -279,6 +342,7 @@ impl ExecutionPayloadHeader {
         match self {
             Self::Bellatrix(header) => &header.block_hash,
             Self::Capella(header) => &header.block_hash,
+            Self::Deneb(header) => &header.block_hash,
         }
     }
 }

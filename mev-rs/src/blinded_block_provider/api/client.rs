@@ -71,6 +71,9 @@ impl Client {
             SignedBlindedBeaconBlock::Capella(signed_block) => {
                 self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
             }
+            SignedBlindedBeaconBlock::Deneb(signed_block) => {
+                self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
+            }
         };
 
         let result: ApiResult<VersionedValue<ExecutionPayload>> =
