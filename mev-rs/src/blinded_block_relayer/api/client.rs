@@ -27,6 +27,7 @@ impl BlindedBlockRelayer for Client {
     async fn submit_bid(
         &self,
         signed_submission: &SignedBidSubmission,
+        cancellation_enabled: bool,
     ) -> Result<SignedBidReceipt, Error> {
         let response = self.api.http_post("/relay/v1/builder/blocks", signed_submission).await?;
         let receipt: ApiResult<SignedBidReceipt> = response.json().await.map_err(ApiError::from)?;

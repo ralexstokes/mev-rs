@@ -18,5 +18,6 @@ pub trait BlindedBlockRelayer {
     async fn submit_bid(
         &self,
         signed_submission: &SignedBidSubmission,
+        enable_cancellations: bool,
     ) -> Result<SignedBidReceipt, Error>;
 }
