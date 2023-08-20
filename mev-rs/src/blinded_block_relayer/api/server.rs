@@ -24,11 +24,11 @@ async fn handle_get_proposal_schedule<R: BlindedBlockRelayer>(
 
 async fn handle_submit_bid<R: BlindedBlockRelayer>(
     State(relayer): State<R>,
-    Query(with_cancellation): Query<bool>,
+    Query(with_cancellations): Query<bool>,
     Json(signed_bid_submission): Json<SignedBidSubmission>,
 ) -> Result<Json<SignedBidReceipt>, Error> {
     tracing::info!("handling bid submission");
-    Ok(Json(relayer.submit_bid(&signed_bid_submission, with_cancellation).await?))
+    Ok(Json(relayer.submit_bid(&signed_bid_submission, with_cancellations).await?))
 }
 
 pub struct Server<R: BlindedBlockRelayer> {
