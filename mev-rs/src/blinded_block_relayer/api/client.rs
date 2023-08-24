@@ -3,7 +3,7 @@ use crate::{
     types::{ProposerSchedule, SignedBidSubmission},
     Error,
 };
-use beacon_api_client::{api_error_or_ok, mainnet::Client as BeaconApiClient};
+use beacon_api_client::{api_error_or_ok, mainnet::Client as BeaconApiClient, Error as ApiError};
 
 /// A `Client` for a service implementing the Relay APIs.
 #[derive(Clone)]
@@ -24,8 +24,12 @@ impl BlindedBlockRelayer for Client {
     }
 
     // TODO support content types
-    async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
-        let response = self.api.http_post("/relay/v1/builder/blocks", signed_submission).await?;
+    async fn submit_bid(&self, signed_submission: &SignedBidSubmission, with_cancellations: bool) -> Result<(), Error> {
+        let path = format!("/relay/v1/builder/blocks");
+        let target = self.api.endpoint.join(&path).map_err(ApiError::from)?;
+        let mut request = self.api.http.post(target);
+        if with_cancellations { request = request.query(&[("cancellations", with_cancellations)])};
+        let response = request.send().await.map_err(ApiError::from)?;
         api_error_or_ok(response).await.map_err(From::from)
     }
 }

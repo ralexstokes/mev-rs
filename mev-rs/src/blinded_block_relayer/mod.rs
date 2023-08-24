@@ -15,5 +15,5 @@ pub trait BlindedBlockRelayer {
     async fn get_proposal_schedule(&self) -> Result<Vec<ProposerSchedule>, Error>;
 
     // TODO: support cancellations?
-    async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error>;
+    async fn submit_bid(&self, signed_submission: &SignedBidSubmission, with_cancellations: bool) -> Result<(), Error>;
 }
