@@ -380,5 +380,7 @@ pub struct BidTrace {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedBidSubmission {
     pub message: BidTrace,
+    // TODO: support multiple forks
+    pub execution_payload: capella::ExecutionPayload,
     pub signature: BlsSignature,
 }
