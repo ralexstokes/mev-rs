@@ -8,7 +8,7 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("could find a proposer for the requested slot {0}")]
+    #[error("missing proposer for the requested slot {0}")]
     MissingProposer(Slot),
     #[error("api error: {0}")]
     Api(#[from] ApiError),
