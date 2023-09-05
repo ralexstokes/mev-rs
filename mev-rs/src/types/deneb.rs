@@ -1,6 +1,6 @@
 pub use ethereum_consensus::{builder::SignedValidatorRegistration, deneb::mainnet as spec};
 use ethereum_consensus::{
-    deneb::mainnet::MAX_BLOBS_PER_BLOCK,
+    deneb::mainnet::{MAX_BLOBS_PER_BLOCK, MAX_BLOB_COMMITMENTS_PER_BLOCK},
     kzg::{KzgCommitment, KzgProof},
     primitives::{BlsPublicKey, BlsSignature, Root, U256},
 };
@@ -26,9 +26,9 @@ pub struct BuilderBid {
 #[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlindedBlobsBundle {
-    pub commitments: List<KzgCommitment, MAX_BLOBS_PER_BLOCK>,
-    pub proofs: List<KzgProof, MAX_BLOBS_PER_BLOCK>,
-    pub blob_roots: List<Root, MAX_BLOBS_PER_BLOCK>,
+    pub commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+    pub proofs: List<KzgProof, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+    pub blob_roots: List<Root, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
 }
 
 #[derive(Debug, Default, Clone, SimpleSerialize)]
@@ -48,9 +48,9 @@ pub struct SignedBlindedBlockAndBlobSidecars {
 #[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlobsBundle {
-    pub commitments: List<KzgCommitment, MAX_BLOBS_PER_BLOCK>,
-    pub proofs: List<KzgProof, MAX_BLOBS_PER_BLOCK>,
-    pub blobs: List<Blob, MAX_BLOBS_PER_BLOCK>,
+    pub commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+    pub proofs: List<KzgProof, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+    pub blobs: List<Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
 }
 
 #[derive(Debug, Default, Clone, SimpleSerialize)]
