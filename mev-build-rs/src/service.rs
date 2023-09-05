@@ -1,6 +1,6 @@
 use crate::mempool_builder::Builder;
 use beacon_api_client::Client;
-use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
+use ethereum_consensus::{clock::from_system_time, crypto::SecretKey, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
@@ -72,7 +72,13 @@ impl Service {
 
         let genesis_details = client.get_genesis_details().await?;
         let genesis_validators_root = genesis_details.genesis_validators_root;
-        let clock = context.clock(Some(genesis_details.genesis_time));
+        let clock = match context.clock() {
+            Some(clock) => clock,
+            None => {
+                let genesis_time = context.genesis_time()?;
+                from_system_time(genesis_time, context.seconds_per_slot, context.slots_per_epoch)
+            }
+        };
         let builder = Builder::new(
             secret_key,
             genesis_validators_root,
