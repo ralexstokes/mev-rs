@@ -2,7 +2,7 @@ use crate::{
     relay::{Relay, RelayEndpoint},
     relay_mux::RelayMux,
 };
-use ethereum_consensus::state_transition::Context;
+use ethereum_consensus::{clock::from_system_time, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
@@ -69,7 +69,13 @@ impl Service {
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
         let relays = relays.into_iter().map(Relay::from);
-        let clock = context.clock(None);
+        let clock = match context.clock() {
+            Some(clock) => clock,
+            None => {
+                let genesis_time = context.genesis_time()?;
+                from_system_time(genesis_time, context.seconds_per_slot, context.slots_per_epoch)
+            }
+        };
         let relay_mux = RelayMux::new(relays, context);
 
         let relay_mux_clone = relay_mux.clone();

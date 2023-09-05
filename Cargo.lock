@@ -391,10 +391,10 @@ dependencies = [
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/beacon-api-client?rev=d838d93#d838d930f80fdfcadfe32147bcb2e805aec074bc"
+source = "git+https://github.com/ralexstokes/beacon-api-client?rev=7f28993615fde52d563dd601a0511c34fe9b7c38#7f28993615fde52d563dd601a0511c34fe9b7c38"
 dependencies = [
  "clap",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=2bcb975)",
+ "ethereum-consensus",
  "http",
  "itertools",
  "reqwest",
@@ -860,31 +860,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=2354493#2354493fd631b736c189868b7dc1b415a160f0f7"
-dependencies = [
- "async-stream",
- "blst",
- "bs58",
- "enr",
- "hex",
- "integer-sqrt",
- "multiaddr",
- "multihash",
- "rand",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha2 0.9.9",
- "ssz_rs",
- "thiserror",
- "tokio",
- "tokio-stream",
-]
-
-[[package]]
-name = "ethereum-consensus"
-version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=2bcb975#2bcb97563bb8dcb15802d1a280b58f21577ea3e2"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=12508c1f9b0c8f4bf4c5e9b6d441e840c1b37fd9#12508c1f9b0c8f4bf4c5e9b6d441e840c1b37fd9"
 dependencies = [
  "async-stream",
  "blst",
@@ -1582,7 +1558,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=2354493)",
+ "ethereum-consensus",
  "futures",
  "httpmock",
  "mev-build-rs",
@@ -1606,7 +1582,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=2354493)",
+ "ethereum-consensus",
  "futures",
  "mev-rs",
  "parking_lot",
@@ -1624,7 +1600,7 @@ version = "0.3.0"
 dependencies = [
  "async-trait",
  "beacon-api-client",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=2354493)",
+ "ethereum-consensus",
  "futures",
  "http",
  "mev-build-rs",
@@ -1646,7 +1622,7 @@ dependencies = [
  "async-trait",
  "axum",
  "beacon-api-client",
- "ethereum-consensus 0.1.1 (git+https://github.com/ralexstokes/ethereum-consensus?rev=2354493)",
+ "ethereum-consensus",
  "hyper",
  "parking_lot",
  "reqwest",
