@@ -45,6 +45,10 @@ pub enum Error {
     #[cfg(feature = "engine-proxy")]
     #[error("{0}")]
     EngineApi(#[from] crate::engine_api_proxy::Error),
+    #[error("invalid slot")]
+    InvalidSlot,
+    #[error("invalid parent hash")]
+    InvalidParentHash,
 }
 
 #[cfg(feature = "api")]

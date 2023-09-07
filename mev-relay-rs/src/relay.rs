@@ -4,7 +4,7 @@ use ethereum_consensus::{
     builder::ValidatorRegistration,
     clock::get_current_unix_time_in_secs,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Root, Slot, U256},
+    primitives::{BlsPublicKey, Hash32, Root, Slot, U256},
     state_transition::Context,
 };
 use mev_build_rs::NullBuilder;
@@ -26,16 +26,49 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 
-fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
-    // TODO validations
+fn validate_bid_request(
+    bid_request: &BidRequest,
+    context: &Context,
+    validator_registry: &ValidatorRegistry,
+) -> Result<(), Error> {
+    // TDOD: take this as input
+    let fork = "Bellatrix";
+    // Check if the slot is timely
+    if !is_slot_timely(&bid_request.slot, &fork, &context) {
+        return Err(Error::InvalidSlot)
+    }
 
-    // verify slot is timely
+    // Check if the parent_hash is on a chain tip
+    if !is_parent_hash_on_chain_tip(&bid_request.parent_hash, &context) {
+        return Err(Error::InvalidParentHash)
+    }
 
-    // verify parent_hash is on a chain tip
-
-    // verify public_key is one of the possible proposers
+    // Check if public_key is one of the possible proposers
+    if !is_valid_proposer(&bid_request.public_key, &validator_registry) {
+        return Err(Error::ValidatorNotRegistered(bid_request.public_key.clone()))
+    }
 
     Ok(())
+}
+
+fn is_slot_timely(slot: &Slot, fork: &str, context: &Context) -> bool {
+    let current_slot = match fork {
+        "Bellatrix" => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
+        "Capella" => 32 + context.capella_fork_epoch * context.slots_per_epoch,
+        _ => unimplemented!(),
+    };
+    slot + PROPOSAL_TOLERANCE_DELAY >= current_slot
+}
+
+fn is_parent_hash_on_chain_tip(parent_hash: &Hash32, context: &Context) -> bool {
+    let chain_tip = &context.terminal_block_hash;
+    parent_hash == chain_tip
+}
+
+fn is_valid_proposer(public_key: &BlsPublicKey, validator_registry: &ValidatorRegistry) -> bool {
+    // check if validator is in the current validator set\
+    let validator_index = validator_registry.get_validator_index(public_key);
+    validator_index.is_some()
 }
 
 fn validate_execution_payload(
@@ -165,7 +198,7 @@ impl BlindedBlockProvider for Relay {
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        validate_bid_request(bid_request)?;
+        validate_bid_request(bid_request, &self.context, &self.validator_registry)?;
 
         let public_key = &bid_request.public_key;
         let preferences = self
