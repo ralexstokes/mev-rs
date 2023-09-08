@@ -365,7 +365,7 @@ pub struct ProposerSchedule {
     pub entry: SignedValidatorRegistration,
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BidTrace {
     #[serde(with = "crate::serde::as_string")]
@@ -374,6 +374,8 @@ pub struct BidTrace {
     pub block_hash: Hash32,
     #[serde(rename = "builder_pubkey")]
     pub builder_public_key: BlsPublicKey,
+    #[serde(rename = "proposer_pubkey")]
+    pub proposer_public_key: BlsPublicKey,
     pub proposer_fee_recipient: ExecutionAddress,
     #[serde(with = "crate::serde::as_string")]
     pub gas_limit: u64,
@@ -386,21 +388,7 @@ pub struct BidTrace {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedBidSubmission {
     pub message: BidTrace,
-    pub execution_payload: ExecutionPayload,
-    pub signature: BlsSignature,
-}
-
-#[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BidReceipt {
-    #[serde(with = "crate::serde::as_string")]
-    pub receive_timestamp: u64,
-    pub bid_trace: BidTrace,
-}
-
-#[derive(Debug, Default, Clone)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct SignedBidReceipt {
-    pub message: BidReceipt,
+    // TODO: support multiple forks
+    pub execution_payload: capella::ExecutionPayload,
     pub signature: BlsSignature,
 }
