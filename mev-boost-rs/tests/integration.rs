@@ -5,6 +5,7 @@ use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
     capella::mainnet as capella,
+    clock::{convert_timestamp_to_slot, get_current_unix_time_in_secs},
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
     primitives::{DomainType, ExecutionAddress, Hash32, Root},
@@ -180,11 +181,15 @@ async fn propose_block(
     genesis_validators_root: &Root,
 ) {
     let fork = if shuffling_index == 0 { Forks::Bellatrix } else { Forks::Capella };
-    let current_slot = match fork {
+    let _current_slot = match fork {
         Forks::Bellatrix => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
         Forks::Capella => 32 + context.capella_fork_epoch * context.slots_per_epoch,
         _ => unimplemented!(),
     };
+    let timestamp = get_current_unix_time_in_secs();
+    let current_slot =
+        convert_timestamp_to_slot(timestamp, context.min_genesis_time, context.seconds_per_slot)
+            .unwrap();
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
 
     let request = BidRequest {
@@ -192,6 +197,19 @@ async fn propose_block(
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.public_key.clone(),
     };
+
+    // register validator
+    let mut registration = ValidatorRegistration {
+        fee_recipient: proposer.fee_recipient.clone(),
+        gas_limit: 30_000_000,
+        timestamp,
+        public_key: proposer.validator.public_key.clone(),
+    };
+    let signature =
+        sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
+    let signed_registration = [SignedValidatorRegistration { message: registration, signature }];
+    let _ = beacon_node.register_validators(&signed_registration).await;
+
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
     let bid_parent_hash = signed_bid.parent_hash();
     assert_eq!(bid_parent_hash, &parent_hash);
