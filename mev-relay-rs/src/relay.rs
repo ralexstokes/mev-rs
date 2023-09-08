@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{
     builder::ValidatorRegistration,
-    clock::get_current_unix_time_in_secs,
+    clock::{convert_timestamp_to_slot, get_current_unix_time_in_secs},
     crypto::SecretKey,
     primitives::{BlsPublicKey, Root, Slot, U256},
     state_transition::Context,
@@ -31,10 +31,12 @@ fn validate_bid_request(
     context: &Context,
     validator_registry: &ValidatorRegistry,
 ) -> Result<(), Error> {
-    // TDOD: take this as input
-    let fork = "Bellatrix";
-    // Check if the slot is timely
-    if !is_slot_timely(&bid_request.slot, fork, context) {
+    let timestamp = get_current_unix_time_in_secs();
+    let current_slot =
+        convert_timestamp_to_slot(timestamp, context.min_genesis_time, context.seconds_per_slot)
+            .unwrap();
+    // check if slot is timely
+    if bid_request.slot + PROPOSAL_TOLERANCE_DELAY < current_slot {
         return Err(Error::InvalidSlot)
     }
 
@@ -51,15 +53,6 @@ fn validate_bid_request(
     }
 
     Ok(())
-}
-
-fn is_slot_timely(slot: &Slot, fork: &str, context: &Context) -> bool {
-    let current_slot = match fork {
-        "Bellatrix" => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
-        "Capella" => 32 + context.capella_fork_epoch * context.slots_per_epoch,
-        _ => unimplemented!(),
-    };
-    slot + PROPOSAL_TOLERANCE_DELAY >= current_slot
 }
 
 fn validate_execution_payload(
