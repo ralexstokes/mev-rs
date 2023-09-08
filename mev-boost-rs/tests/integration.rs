@@ -206,7 +206,7 @@ async fn propose_block(
         public_key: proposer.validator.public_key.clone(),
     };
     let signature =
-        sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
+        sign_builder_message(&mut registration, &proposer.signing_key, context).unwrap();
     let signed_registration = [SignedValidatorRegistration { message: registration, signature }];
     let _ = beacon_node.register_validators(&signed_registration).await;
 
