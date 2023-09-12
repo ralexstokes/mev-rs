@@ -23,7 +23,6 @@ impl BlindedBlockRelayer for Client {
         self.api.get("/relay/v1/builder/validators").await.map_err(From::from)
     }
 
-    // TODO support content types
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
         let response = self.api.http_post("/relay/v1/builder/blocks", signed_submission).await?;
         api_error_or_ok(response).await.map_err(From::from)

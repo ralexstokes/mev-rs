@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use clap::Args;
 use mev_boost_rs::Config as BoostConfig;
-use mev_build_rs::Config as BuildConfig;
+use mev_build_rs::reth_builder::Config as BuildConfig;
 use mev_relay_rs::Config as RelayConfig;
 use mev_rs::Network;
 use serde::Deserialize;
@@ -10,7 +10,8 @@ use std::{fmt, path::Path};
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub boost: Option<BoostConfig>,
-    pub builder: Option<BuildConfig>,
+    #[serde(rename = "builder")]
+    pub build: Option<BuildConfig>,
     pub relay: Option<RelayConfig>,
 }
 

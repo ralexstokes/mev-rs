@@ -1,9 +1,7 @@
 [boost]
 host = "0.0.0.0"
 port = 18550
-relays = [
-    "http://127.0.0.1:28545",
-]
+relays = ["http://127.0.0.1:28545"]
 
 [relay]
 host = "0.0.0.0"
@@ -12,12 +10,22 @@ beacon_node_url = "http://127.0.0.1:5052"
 secret_key = "0x24b6e79cbc6267c6e527b4bf7a71747d42a58b10279366cf0c7bb4e2aa455901"
 
 [builder]
-host = "0.0.0.0"
-port = 28546
-beacon_api_endpoint = "http://127.0.0.1:5052"
+# builder BLS secret key
 secret_key = "0x14b6e79cbc6267c6e527b4bf7a71747d42a58b10279366cf0c7bb4e2aa455901"
-
-[builder.engine_api_proxy]
-host = "0.0.0.0"
-port = 8551
-engine_api_endpoint = "http://127.0.0.1:8552"
+# list of relays to connect to
+relays = [
+    "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net",
+]
+# extra data to write into built execution payload
+extra_data = "hello world"
+# wallet seed for builder to author payment transactions
+execution_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+# number of milliseconds to submit bids ahead of the target slot
+bidding_deadline_ms = 1000
+# amount of value to bid as a fraction of the payload's revenue
+bid_percent = 0.9
+# amount to add to the bid on top of the payload's revenue,
+# currently sourced from the builder's wallet authoring the payment transaction
+subsidy_gwei = 100000000 # 0.1 eth
+# path for the Engine API credentials shared between consensus and execution clients
+jwt_secret_path = "/secrets/jwt.hex"
