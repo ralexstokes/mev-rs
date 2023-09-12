@@ -13,6 +13,7 @@ pub enum NetworkArg {
     Mainnet,
     Sepolia,
     Goerli,
+    Holesky,
 }
 
 // NOTE: define this mapping so only this crate needs the `clap` dependency while still being able
@@ -23,6 +24,7 @@ impl From<NetworkArg> for Network {
             NetworkArg::Mainnet => Self::Mainnet,
             NetworkArg::Sepolia => Self::Sepolia,
             NetworkArg::Goerli => Self::Goerli,
+            NetworkArg::Holesky => Self::Holesky,
         }
     }
 }

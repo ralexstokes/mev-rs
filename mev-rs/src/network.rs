@@ -8,6 +8,7 @@ pub enum Network {
     Mainnet,
     Sepolia,
     Goerli,
+    Holesky,
     Custom(String),
 }
 
@@ -17,6 +18,7 @@ impl std::fmt::Display for Network {
             Self::Mainnet => write!(f, "mainnet"),
             Self::Sepolia => write!(f, "sepolia"),
             Self::Goerli => write!(f, "goerli"),
+            Self::Holesky => write!(f, "holesky"),
             Self::Custom(config) => write!(f, "custom network with config at `{config}`"),
         }
     }
@@ -30,6 +32,7 @@ impl TryFrom<&Network> for Context {
             Network::Mainnet => Ok(Context::for_mainnet()),
             Network::Sepolia => Ok(Context::for_sepolia()),
             Network::Goerli => Ok(Context::for_goerli()),
+            Network::Holesky => Ok(Context::for_holesky()),
             Network::Custom(config) => Context::try_from_file(config),
         }
     }
