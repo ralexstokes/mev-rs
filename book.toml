@@ -1,0 +1,12 @@
+[book]
+authors = ["mev-rs contributors"]
+language = "en"
+multilingual = false
+src = "book"
+title = "mev-rs"
+
+[output.html]
+git-repository-url = "https://github.com/ralexstokes/mev-rs"
+
+[build]
+build-dir = "target/book"
