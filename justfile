@@ -19,3 +19,8 @@ lint: fmt validate-example-config
 build:
     cargo build --all-targets --all-features --all
 run-ci: lint build test run-integration-tests
+
+build-book:
+    mdbook build
+serve-book:
+    mdbook serve --open
