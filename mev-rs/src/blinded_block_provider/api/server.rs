@@ -2,7 +2,7 @@ use crate::{
     blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
-        bellatrix, capella, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
+        bellatrix, capella, deneb, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
         SignedBuilderBid, SignedValidatorRegistration,
     },
 };
@@ -49,14 +49,17 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(block): Json<serde_json::Value>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
-    let maybe_capella_block = capella::SignedBlindedBeaconBlock::deserialize(&block);
-    let mut block = match maybe_capella_block {
-        Ok(block) => SignedBlindedBeaconBlock::Capella(block),
-        Err(err) => match bellatrix::SignedBlindedBeaconBlock::deserialize(block) {
-            Ok(block) => SignedBlindedBeaconBlock::Bellatrix(block),
-            Err(_) => return Err(ApiClientError::from(err).into()),
-        },
-    };
+    let mut block = deneb::SignedBlindedBlockAndBlobSidecars::deserialize(&block)
+        .map(SignedBlindedBeaconBlock::Deneb)
+        .or_else(|_| {
+            capella::SignedBlindedBeaconBlock::deserialize(&block)
+                .map(SignedBlindedBeaconBlock::Capella)
+        })
+        .or_else(|_| {
+            bellatrix::SignedBlindedBeaconBlock::deserialize(&block)
+                .map(SignedBlindedBeaconBlock::Bellatrix)
+        })
+        .map_err(ApiClientError::from)?;
 
     let payload = builder.open_bid(&mut block).await?;
     let block_hash = payload.block_hash();
