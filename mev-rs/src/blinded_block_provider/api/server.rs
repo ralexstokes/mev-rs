@@ -49,20 +49,17 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(block): Json<serde_json::Value>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
-    // TODO: Using the optional `Eth-Consensus-Version` header once clients have implemented it.
-    let mut block = if block["message"].is_null() {
-        deneb::SignedBlindedBlockAndBlobSidecars::deserialize(&block)
-            .map(SignedBlindedBeaconBlock::Deneb)
-            .map_err(ApiClientError::from)?
-    } else {
-        capella::SignedBlindedBeaconBlock::deserialize(&block)
-            .map(SignedBlindedBeaconBlock::Capella)
-            .or_else(|_| {
-                bellatrix::SignedBlindedBeaconBlock::deserialize(&block)
-                    .map(SignedBlindedBeaconBlock::Bellatrix)
-            })
-            .map_err(ApiClientError::from)?
-    };
+    let mut block = deneb::SignedBlindedBlockAndBlobSidecars::deserialize(&block)
+        .map(SignedBlindedBeaconBlock::Deneb)
+        .or_else(|_| {
+            capella::SignedBlindedBeaconBlock::deserialize(&block)
+                .map(SignedBlindedBeaconBlock::Capella)
+        })
+        .or_else(|_| {
+            bellatrix::SignedBlindedBeaconBlock::deserialize(&block)
+                .map(SignedBlindedBeaconBlock::Bellatrix)
+        })
+        .map_err(ApiClientError::from)?;
 
     let payload = builder.open_bid(&mut block).await?;
     let block_hash = payload.block_hash();
