@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{
     builder::ValidatorRegistration,
-    clock::get_current_unix_time_in_secs,
+    clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
     primitives::{BlsPublicKey, Root, Slot, U256},
     state_transition::Context,
@@ -155,7 +155,7 @@ impl BlindedBlockProvider for Relay {
         &self,
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error> {
-        let current_time = get_current_unix_time_in_secs();
+        let current_time = get_current_unix_time_in_nanos().try_into().expect("fits in type");
         self.validator_registry.validate_registrations(
             registrations,
             current_time,

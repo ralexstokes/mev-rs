@@ -1,6 +1,6 @@
 use crate::relay::Relay;
 use beacon_api_client::mainnet::Client;
-use ethereum_consensus::{clock::from_system_time, crypto::SecretKey, state_transition::Context};
+use ethereum_consensus::{crypto::SecretKey, networks, state_transition::Context};
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
 use serde::Deserialize;
@@ -58,13 +58,10 @@ impl Service {
 
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
-        let clock = match context.clock() {
-            Some(clock) => clock,
-            None => {
-                let genesis_time = context.genesis_time()?;
-                from_system_time(genesis_time, context.seconds_per_slot, context.slots_per_epoch)
-            }
-        };
+        let clock = context.clock().unwrap_or_else(|| {
+            let genesis_time = networks::typical_genesis_time(&context);
+            context.clock_at(genesis_time)
+        });
         let context = Arc::new(context);
         let genesis_details = beacon_node.get_genesis_details().await?;
         let genesis_validators_root = genesis_details.genesis_validators_root;

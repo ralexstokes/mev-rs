@@ -1,7 +1,7 @@
 use crate::types::BidRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
-    primitives::{BlsPublicKey, ExecutionAddress, Hash32},
+    primitives::{BlsPublicKey, ExecutionAddress, Hash32, Slot},
     state_transition::Error as ConsensusError,
 };
 use thiserror::Error;
@@ -16,6 +16,8 @@ pub enum Error {
     NoBids,
     #[error("could not find relay with outstanding bid to accept")]
     MissingOpenBid,
+    #[error("could not find proposer for slot {0}")]
+    MissingProposer(Slot),
     #[error("could not register with any relay")]
     CouldNotRegister,
     #[error("no preferences found for validator with public key {0}")]
@@ -42,9 +44,6 @@ pub enum Error {
     ValidatorRegistry(#[from] crate::validator_registry::Error),
     #[error("{0}")]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
-    #[cfg(feature = "engine-proxy")]
-    #[error("{0}")]
-    EngineApi(#[from] crate::engine_api_proxy::Error),
 }
 
 #[cfg(feature = "api")]

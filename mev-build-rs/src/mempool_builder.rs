@@ -256,7 +256,8 @@ impl BlindedBlockProvider for Builder {
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
         let slot = signed_block.slot();
-        let public_key = self.proposer_scheduler.get_proposer_for(slot)?;
+        let public_key =
+            self.proposer_scheduler.get_proposer_for(slot).ok_or(Error::MissingProposer(slot))?;
         signed_block.verify_signature(&public_key, self.genesis_validators_root, &self.context)?;
 
         let parent_hash = signed_block.parent_hash();

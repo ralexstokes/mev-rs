@@ -59,7 +59,10 @@ fn setup_logging() {
 async fn run_task_until_signal(task: impl Future<Output = Result<()>>) -> Result<()> {
     tokio::select! {
         task = task => task,
-        _ = signal::ctrl_c() => Ok(()),
+        _ = signal::ctrl_c() => {
+            tracing::info!("shutting down...");
+            Ok(())
+        }
     }
 }
 

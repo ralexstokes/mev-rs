@@ -8,8 +8,6 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("could find a proposer for the requested slot {0}")]
-    MissingProposer(Slot),
     #[error("api error: {0}")]
     Api(#[from] ApiError),
 }
@@ -48,8 +46,8 @@ impl ProposerScheduler {
         Ok(duties)
     }
 
-    pub fn get_proposer_for(&self, slot: Slot) -> Result<BlsPublicKey, Error> {
+    pub fn get_proposer_for(&self, slot: Slot) -> Option<BlsPublicKey> {
         let state = self.state.lock();
-        state.proposer_schedule.get(&slot).cloned().ok_or_else(|| Error::MissingProposer(slot))
+        state.proposer_schedule.get(&slot).cloned()
     }
 }

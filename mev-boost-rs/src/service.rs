@@ -1,10 +1,11 @@
-use crate::{
-    relay::{Relay, RelayEndpoint},
-    relay_mux::RelayMux,
-};
-use ethereum_consensus::{clock::from_system_time, state_transition::Context};
+use crate::relay_mux::RelayMux;
+use ethereum_consensus::{networks, state_transition::Context};
 use futures::StreamExt;
-use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
+use mev_rs::{
+    blinded_block_provider::Server as BlindedBlockProviderServer,
+    relay::{Relay, RelayEndpoint},
+    Error, Network,
+};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -69,13 +70,10 @@ impl Service {
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
         let relays = relays.into_iter().map(Relay::from);
-        let clock = match context.clock() {
-            Some(clock) => clock,
-            None => {
-                let genesis_time = context.genesis_time()?;
-                from_system_time(genesis_time, context.seconds_per_slot, context.slots_per_epoch)
-            }
-        };
+        let clock = context.clock().unwrap_or_else(|| {
+            let genesis_time = networks::typical_genesis_time(&context);
+            context.clock_at(genesis_time)
+        });
         let relay_mux = RelayMux::new(relays, context);
 
         let relay_mux_clone = relay_mux.clone();
