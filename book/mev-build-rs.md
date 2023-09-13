@@ -78,6 +78,11 @@ Example commands utilizing [checkpoint sync following the Lighthouse book](https
 
 The pair should start syncing. Once the pair of nodes is fully synced you can stop `reth` and run the `mev` builder in its place.
 
+> You should be able to skip this step [Syncing nodes](#syncing-nodes) and just proceed directly to running the CL and `mev` builder in the [next step](#run-the-builder-on-a-synced-chain), as the builder should also sync if needed.
+> But note:
+> 1) running the builder without having a synced database already has not been tested
+> 2) the builder will wait anyway until the head of the chain has been synced
+
 ### Run the builder on a synced chain
 
 To run the `mev` builder, first you should make the appropriate configuration. You can make a local copy of `example.config.toml` to get started.
