@@ -124,3 +124,5 @@ Once the configuration looks good, you can run the builder as follows alongside 
 * The `--suggested-fee-recipient` for `lighthouse` is ultimately not used, but currently required to run the node. Any valid address should do and it should not affect the builder.
 * If you are seeing slow or lagging operation, you can try to adjust the preparation lookahead with the `--prepare-payload-lookahead` option on `lighthouse`.
 * The builder has been tested on an AWS EC2 instance of `t3.xlarge` variety with a `512Gb` disk.
+* You can control the logging level of `reth` and `mev` with the `RUST_LOG` environment variable.
+  For example, to silence the `reth` logs, you can run `mev` like `RUST_LOG=mev=info mev --network sepolia build config.toml`
