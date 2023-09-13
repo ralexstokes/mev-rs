@@ -1,8 +1,7 @@
 use crate::cmd::config::Config;
 use clap::{Args, Parser};
-use ethereum_consensus::{networks, state_transition::Context};
+use ethereum_consensus::{networks, networks::Network, state_transition::Context};
 use mev_build_rs::reth_builder::{Config as BuildConfig, DeadlineBidder, Service};
-use mev_rs::Network;
 use reth::{
     cli::ext::{RethCliExt, RethNodeCommandConfig},
     node::NodeCommand,

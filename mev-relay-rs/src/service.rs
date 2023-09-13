@@ -1,8 +1,10 @@
 use crate::relay::Relay;
 use beacon_api_client::mainnet::Client;
-use ethereum_consensus::{crypto::SecretKey, networks, state_transition::Context};
+use ethereum_consensus::{
+    crypto::SecretKey, networks, networks::Network, state_transition::Context,
+};
 use futures::StreamExt;
-use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error, Network};
+use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
