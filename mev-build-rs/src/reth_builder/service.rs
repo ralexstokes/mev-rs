@@ -159,7 +159,8 @@ impl<
                         loop {
                             match bidder.bid_for(&build).await {
                                 Ok(Some(bid)) => {
-                                    if let Err(err) = builder.submit_bid(&id).await {
+                                    //NOTE for now we
+                                    if let Err(err) = builder.submit_bid(&id, None).await {
                                         tracing::warn!(id = %id, slot=?build.context.slot, err = %err, "error submitting bid for build");
                                     }
                                     match bid {

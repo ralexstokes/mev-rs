@@ -68,8 +68,12 @@ impl BlindedBlockRelayer for Relay {
         self.relayer.get_proposal_schedule().await
     }
 
-    async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
-        self.relayer.submit_bid(signed_submission).await
+    async fn submit_bid(
+        &self,
+        signed_submission: &SignedBidSubmission,
+        with_cancellations: Option<&String>,
+    ) -> Result<(), Error> {
+        self.relayer.submit_bid(signed_submission, with_cancellations).await
     }
 }
 
