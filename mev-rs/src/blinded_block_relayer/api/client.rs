@@ -31,8 +31,8 @@ impl BlindedBlockRelayer for Client {
         let path = format!("/relay/v1/builder/blocks");
         let target = self.api.endpoint.join(&path).map_err(ApiError::from)?;
         let mut request = self.api.http.post(target).json(signed_submission);
-        if let Some(cancellation) = with_cancellations {
-            if cancellation == "1" {
+        if let Some(cancellations) = with_cancellations {
+            if cancellations == "1" {
                 request = request.query(&[("cancellations", with_cancellations)])
             }
         };
