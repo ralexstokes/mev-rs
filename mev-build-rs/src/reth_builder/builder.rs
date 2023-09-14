@@ -279,7 +279,7 @@ impl<Pool, Client> Builder<Pool, Client> {
     pub async fn submit_bid(
         &self,
         id: &BuildIdentifier,
-        with_cancellations: Option<&String>,
+        with_cancellations: bool,
     ) -> Result<(), Error> {
         let build = self.build_for(id).ok_or_else(|| Error::MissingBuild(id.clone()))?;
 
