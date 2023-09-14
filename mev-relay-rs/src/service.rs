@@ -1,7 +1,9 @@
 use crate::relay::Relay;
 use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{
-    crypto::SecretKey, networks, networks::Network, state_transition::Context,
+    crypto::SecretKey,
+    networks::{self, Network},
+    state_transition::Context,
 };
 use futures::StreamExt;
 use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error};
