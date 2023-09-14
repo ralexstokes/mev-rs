@@ -1,5 +1,8 @@
 use crate::relay_mux::RelayMux;
-use ethereum_consensus::{networks, networks::Network, state_transition::Context};
+use ethereum_consensus::{
+    networks::{self, Network},
+    state_transition::Context,
+};
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
