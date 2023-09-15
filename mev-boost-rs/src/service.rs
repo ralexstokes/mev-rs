@@ -1,10 +1,13 @@
 use crate::relay_mux::RelayMux;
-use ethereum_consensus::{networks, state_transition::Context};
+use ethereum_consensus::{
+    networks::{self, Network},
+    state_transition::Context,
+};
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
     relay::{Relay, RelayEndpoint},
-    Error, Network,
+    Error,
 };
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};

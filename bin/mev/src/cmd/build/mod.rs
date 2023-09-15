@@ -2,7 +2,7 @@ mod reth_ext;
 
 use anyhow::Result;
 use clap::Args;
-use mev_rs::Network;
+use ethereum_consensus::networks::Network;
 use reth_ext::{launch_reth_with, RethNodeExt};
 
 #[derive(Debug, Args)]

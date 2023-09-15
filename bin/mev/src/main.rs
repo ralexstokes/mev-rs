@@ -2,7 +2,7 @@ mod cmd;
 
 use anyhow::Result;
 use clap::{ArgGroup, Parser, Subcommand};
-use mev_rs::Network;
+use ethereum_consensus::networks::Network;
 use std::future::Future;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};

@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
 use clap::Args;
+use ethereum_consensus::networks::Network;
 use mev_boost_rs::Config as BoostConfig;
 use mev_build_rs::reth_builder::Config as BuildConfig;
 use mev_relay_rs::Config as RelayConfig;
-use mev_rs::Network;
 use serde::Deserialize;
 use std::{fmt, path::Path};
 
