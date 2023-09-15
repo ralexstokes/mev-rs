@@ -17,7 +17,7 @@ use mev_rs::{
     BlindedBlockProvider, Error, ValidatorRegistry,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
 // once they have been fetched from builders -- currently in response to an incoming request from a
@@ -25,15 +25,39 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // `1` allows for latency at the slot boundary while still enabling a successful proposal.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+const BID_TOLERANCE_DELAY: u128 = 5000;
 
-fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
+// TODO: Move this to ethereum_consensus::Clock as a helper method
+fn convert_slot_to_timestamp(context: &Context, slot: &Slot) -> u128 {
+    let genesis_time = context.genesis_time().expect("Invalid Genesis Time");
+    let genesis_time = Duration::from_secs(genesis_time).as_nanos();
+    let seconds_per_slot = Duration::from_secs(context.seconds_per_slot).as_nanos();
+    u128::from(*slot) * seconds_per_slot + genesis_time
+}
+
+fn validate_bid_request(
+    is_registered_public_key: &bool,
+    current_slot: &Slot,
+    bid_request: &BidRequest,
+    context: &Context,
+) -> Result<(), Error> {
     // TODO validations
+    // Convert Slots to timestamps
+    let current_slot = convert_slot_to_timestamp(context, current_slot);
+    let slot = convert_slot_to_timestamp(context, &bid_request.slot);
 
     // verify slot is timely
+    if slot < current_slot || slot > current_slot + BID_TOLERANCE_DELAY {
+        return Err(Error::UntimelyBid)
+    }
 
     // verify parent_hash is on a chain tip
+    // TODO: add head event service https://github.com/flashbots/mev-boost-relay/blob/main/beaconclient/prod_beacon_instance.go#L73
 
     // verify public_key is one of the possible proposers
+    if !is_registered_public_key {
+        return Err(Error::UnknownBidProposer)
+    }
 
     Ok(())
 }
@@ -63,19 +87,33 @@ fn validate_signed_block(
     public_key: &BlsPublicKey,
     local_payload: &ExecutionPayload,
     genesis_validators_root: &Root,
+    proposer_index: &usize,
     context: &Context,
+    current_slot: &Slot,
 ) -> Result<(), Error> {
-    let local_block_hash = local_payload.block_hash();
-    let block_hash = signed_block.block_hash();
-    if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock)
+    let current_slot = convert_slot_to_timestamp(context, current_slot);
+    let slot = convert_slot_to_timestamp(context, &signed_block.slot());
+
+    if signed_block.block_hash() != local_payload.block_hash() {
+        return Err(Error::UnknownSignedBlock)
     }
 
     // OPTIONAL:
     // -- verify w/ consensus?
     // verify slot is timely
+    if slot < current_slot || slot > current_slot + BID_TOLERANCE_DELAY {
+        return Err(Error::UntimelyBlock)
+    }
+
     // verify proposer_index is correct
+    if signed_block.proposer_index() != *proposer_index {
+        return Err(Error::UnknownSignedBlock)
+    }
+
     // verify parent_root matches
+    if signed_block.parent_hash() != local_payload.parent_hash() {
+        return Err(Error::UnknownSignedBlock)
+    }
 
     signed_block.verify_signature(public_key, *genesis_validators_root, context).map_err(From::from)
 }
@@ -104,6 +142,7 @@ pub struct Inner {
 #[derive(Debug, Default)]
 struct State {
     execution_payloads: HashMap<BidRequest, ExecutionPayload>,
+    current_slot: Slot,
 }
 
 impl Relay {
@@ -146,6 +185,7 @@ impl Relay {
         state
             .execution_payloads
             .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+        state.current_slot = slot;
     }
 }
 
@@ -165,7 +205,15 @@ impl BlindedBlockProvider for Relay {
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        validate_bid_request(bid_request)?;
+        let is_registered_bid_request =
+            self.validator_registry.get_validator_index(&bid_request.public_key).is_some();
+        let current_slot = self.state.lock().current_slot;
+        validate_bid_request(
+            &is_registered_bid_request,
+            &current_slot,
+            bid_request,
+            &self.context,
+        )?;
 
         let public_key = &bid_request.public_key;
         let preferences = self
@@ -227,12 +275,15 @@ impl BlindedBlockProvider for Relay {
             state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?
         };
 
+        let current_slot = self.state.lock().current_slot;
         validate_signed_block(
             signed_block,
             &bid_request.public_key,
             &payload,
             &self.genesis_validators_root,
+            &proposer_index,
             &self.context,
+            &current_slot,
         )?;
 
         Ok(payload)

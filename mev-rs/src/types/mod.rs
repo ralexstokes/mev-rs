@@ -305,6 +305,22 @@ impl ExecutionPayload {
             Self::Deneb(payload_and_blobs) => payload_and_blobs.execution_payload.gas_limit,
         }
     }
+
+    pub fn parent_hash(&self) -> &Hash32 {
+        match self {
+            Self::Bellatrix(payload) => &payload.parent_hash,
+            Self::Capella(payload) => &payload.parent_hash,
+            Self::Deneb(payload_and_blobs) => &payload_and_blobs.execution_payload.parent_hash,
+        }
+    }
+
+    pub fn fee_recipient(&self) -> &ExecutionAddress {
+        match self {
+            Self::Bellatrix(payload) => &payload.fee_recipient,
+            Self::Capella(payload) => &payload.fee_recipient,
+            Self::Deneb(payload_and_blobs) => &payload_and_blobs.execution_payload.fee_recipient,
+        }
+    }
 }
 
 impl TryFrom<&mut ExecutionPayload> for ExecutionPayloadHeader {

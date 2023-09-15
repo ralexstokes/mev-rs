@@ -30,8 +30,16 @@ pub enum Error {
     InvalidFork,
     #[error("block does not match the provided header")]
     UnknownBlock,
+    #[error("signed block does not match the provided local payload")]
+    UnknownSignedBlock,
+    #[error("signed block slot lies outside accepted time window")]
+    UntimelyBlock,
     #[error("payload request does not match any outstanding bid")]
     UnknownBid,
+    #[error("bid public key does not match a registered proposer")]
+    UnknownBidProposer,
+    #[error("bids slot lies outside accepted time window")]
+    UntimelyBid,
     #[error("validator {0} does not have {1} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
     #[error("validator with public key {0} is not currently registered")]
