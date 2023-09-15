@@ -11,8 +11,9 @@
       (system:
         let
           pkgs = import nixpkgs { inherit system; };
+          lib = pkgs.lib;
         in
         {
-          devShells.default = import ./shell.nix { inherit pkgs; };
+          devShells.default = import ./shell.nix { inherit pkgs lib; };
         });
 }
