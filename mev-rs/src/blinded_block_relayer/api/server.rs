@@ -28,7 +28,7 @@ async fn handle_submit_bid<R: BlindedBlockRelayer>(
     Json(signed_bid_submission): Json<SignedBidSubmission>,
 ) -> Result<(), Error> {
     tracing::info!("handling bid submission");
-    let with_cancellations = if with_cancellations == "1" { true } else { false };
+    let with_cancellations = with_cancellations == "1";
     relayer.submit_bid(&signed_bid_submission, with_cancellations).await
 }
 

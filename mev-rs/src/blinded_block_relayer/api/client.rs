@@ -28,7 +28,7 @@ impl BlindedBlockRelayer for Client {
         signed_submission: &SignedBidSubmission,
         with_cancellations: bool,
     ) -> Result<(), Error> {
-        let path = format!("/relay/v1/builder/blocks");
+        let path = "/relay/v1/builder/blocks".to_string();
         let target = self.api.endpoint.join(&path).map_err(ApiError::from)?;
         let mut request = self.api.http.post(target).json(signed_submission);
         if with_cancellations {
