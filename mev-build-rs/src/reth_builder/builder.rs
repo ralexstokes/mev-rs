@@ -5,17 +5,12 @@ use ethereum_consensus::{
     clock::SystemClock,
     crypto::SecretKey,
     primitives::{BlsPublicKey, Epoch, Slot},
-    ssz::ByteVector,
     state_transition::Context,
 };
 use ethers::signers::{LocalWallet, Signer};
-use mev_rs::{
-    blinded_block_relayer::BlindedBlockRelayer,
-    types::{deneb::BlobsBundle, ProposerSchedule},
-    Relay,
-};
+use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, types::ProposerSchedule, Relay};
 use reth_payload_builder::PayloadBuilderAttributes;
-use reth_primitives::{BlobTransactionSidecar, BlockNumberOrTag, Bytes, ChainSpec, H256, U256};
+use reth_primitives::{BlockNumberOrTag, Bytes, ChainSpec, H256, U256};
 use reth_provider::{BlockReaderIdExt, BlockSource, StateProviderFactory};
 use reth_transaction_pool::TransactionPool;
 use std::{
@@ -282,56 +277,6 @@ where
 
     pub fn cancel_build(&self, id: &BuildIdentifier) {
         self.state.lock().unwrap().cancels.remove(id);
-    }
-
-    /// Returns the sidecar for the given transaction hashes.
-    pub fn get_side_car(&self, tx_hashes: Vec<H256>) -> Vec<BlobTransactionSidecar> {
-        self.pool.get_all_blobs_exact(tx_hashes).unwrap()
-    }
-
-    /// Return BlobsBundle for the sidecars
-    pub fn get_blobs_bundle(&self, sidecars: Vec<BlobTransactionSidecar>) -> BlobsBundle {
-        let mut commitments = List::default();
-        let mut proofs = List::default();
-        let mut blobs = List::default();
-
-        for sidecar in sidecars {
-            for commitment in sidecar.commitments {
-                let mut bytevector = ByteVector::<48>::default();
-                for i in 0..48 {
-                    bytevector[i] = commitment[i];
-                }
-                commitments.push(bytevector);
-            }
-
-            for proof in sidecar.proofs {
-                let mut bytevector = ByteVector::<48>::default();
-                for i in 0..48 {
-                    bytevector[i] = proof[i];
-                }
-                proofs.push(bytevector);
-            }
-
-            for blob in sidecar.blobs {
-                let mut bytevector = ByteVector::<131072>::default();
-                for i in 0..131072 {
-                    bytevector[i] = blob[i];
-                }
-                blobs.push(bytevector);
-            }
-        }
-
-        BlobsBundle { commitments, proofs, blobs }
-
-        // pub struct Bytes48 {
-        //     bytes: [u8; 48usize],
-        // }
-        // pub struct ByteVector<const N: usize>(#[serde(with = "crate::serde::as_hex")] Vector<u8,
-        // N>);
-        // pub struct Blob {
-        //     bytes: [u8; 131072usize],
-        // }
-        // pub type Blob<const BYTES_PER_BLOB: usize> = ByteVector<BYTES_PER_BLOB>;
     }
 
     pub async fn submit_bid(&self, id: &BuildIdentifier) -> Result<(), Error> {

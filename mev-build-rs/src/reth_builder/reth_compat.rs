@@ -13,6 +13,8 @@ use mev_rs::types::{
 };
 use reth_primitives::{Bloom, SealedBlock, H160, H256, U256};
 
+use reth_transaction_pool::TransactionPool;
+
 use ssz_rs::List;
 
 pub(crate) fn to_bytes32(value: H256) -> Bytes32 {
@@ -33,7 +35,7 @@ pub(crate) fn to_u256(value: &U256) -> ssz_rs::U256 {
 
 pub(crate) fn to_execution_payload<Pool>(value: &SealedBlock, pool: &Pool) -> ExecutionPayload
 where
-    Pool: reth_transaction_pool::TransactionPool,
+    Pool: TransactionPool,
 {
     let hash = value.hash();
     let header = &value.header;
@@ -120,7 +122,18 @@ where
     };
 
     let blob_tx_hashes = value.blob_transactions().iter().map(|t| t.hash()).collect::<Vec<_>>();
-    let sidecars = pool.get_all_blobs_exact(blob_tx_hashes.clone()).unwrap();
+    let blobs_bundle = get_blob_bundles(pool, blob_tx_hashes);
+    let deneb_payload_bundles =
+        deneb::ExecutionPayloadAndBlobsBundle { execution_payload: deneb_payload, blobs_bundle };
+
+    ExecutionPayload::Deneb(deneb_payload_bundles)
+}
+
+fn get_blob_bundles<Pool>(pool: &Pool, tx_hashes: Vec<H256>) -> BlobsBundle
+where
+    Pool: TransactionPool,
+{
+    let sidecars = pool.get_all_blobs_exact(tx_hashes).unwrap();
 
     let mut commitments = List::default();
     let mut proofs = List::default();
@@ -152,10 +165,5 @@ where
         }
     }
 
-    let blobs_bundle = BlobsBundle { commitments, proofs, blobs };
-
-    let deneb_payload_bundles =
-        deneb::ExecutionPayloadAndBlobsBundle { execution_payload: deneb_payload, blobs_bundle };
-
-    ExecutionPayload::Deneb(deneb_payload_bundles)
+    BlobsBundle { commitments, proofs, blobs }
 }

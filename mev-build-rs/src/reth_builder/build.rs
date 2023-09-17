@@ -48,9 +48,9 @@ where
         gas_used: payload.gas_used,
         value: to_u256(payment),
     };
-    let res = to_execution_payload(payload, pool);
+    let execution_payload = to_execution_payload(payload, pool);
     let signature = sign_builder_message(&mut message, signing_key, context)?;
-    Ok(SignedBidSubmission { message, execution_payload: res, signature })
+    Ok(SignedBidSubmission { message, execution_payload, signature })
 }
 
 // TODO: drop unnecessary things...
