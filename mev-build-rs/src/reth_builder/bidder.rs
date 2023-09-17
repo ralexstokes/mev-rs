@@ -1,6 +1,7 @@
 use crate::reth_builder::{build::Build, error::Error};
 use async_trait::async_trait;
 use ethereum_consensus::clock::SystemClock;
+use reth_transaction_pool::TransactionPool;
 use std::time::Duration;
 
 pub enum Bid {
@@ -9,10 +10,10 @@ pub enum Bid {
 }
 
 #[async_trait]
-pub trait Bidder {
+pub trait Bidder<Pool> {
     // Determine if a bid should be made given the current state of the `build`.
     // In a context where blocking is ok.
-    async fn bid_for(&self, build: &Build) -> Result<Option<Bid>, Error>;
+    async fn bid_for(&self, build: &Build<Pool>) -> Result<Option<Bid>, Error>;
 }
 
 /// `DeadlineBidder` submits the best payload *once* at the `deadline`
@@ -32,8 +33,11 @@ impl DeadlineBidder {
 }
 
 #[async_trait]
-impl Bidder for DeadlineBidder {
-    async fn bid_for(&self, build: &Build) -> Result<Option<Bid>, Error> {
+impl<Pool> Bidder<Pool> for DeadlineBidder
+where
+    Pool: TransactionPool + Send + Sync + 'static,
+{
+    async fn bid_for(&self, build: &Build<Pool>) -> Result<Option<Bid>, Error> {
         let slot = build.context.slot;
         let target = self.clock.duration_until_slot(slot);
         let duration = target.checked_sub(self.deadline).unwrap_or_default();

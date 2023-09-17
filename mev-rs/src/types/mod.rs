@@ -381,6 +381,6 @@ pub struct BidTrace {
 pub struct SignedBidSubmission {
     pub message: BidTrace,
     // TODO: support multiple forks
-    pub execution_payload: capella::ExecutionPayload,
+    pub execution_payload: ExecutionPayload,
     pub signature: BlsSignature,
 }

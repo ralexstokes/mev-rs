@@ -12,22 +12,31 @@ use ethereum_consensus::{
 use ethers::signers::LocalWallet;
 use mev_rs::{
     signing::sign_builder_message,
-    types::{BidTrace, ExecutionPayload, SignedBidSubmission},
+    types::{BidTrace, SignedBidSubmission},
 };
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, H256, U256};
+
+use reth_transaction_pool::TransactionPool;
 use revm::primitives::{BlockEnv, CfgEnv};
-use std::sync::{Arc, Mutex};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, Mutex},
+};
 
 pub type BuildIdentifier = ByteVector<4>;
 
-fn make_submission(
+fn make_submission<Pool>(
     signing_key: &SecretKey,
     builder_public_key: &BlsPublicKey,
     context: &Context,
     build_context: &BuildContext,
     payload: &SealedBlock,
     payment: &U256,
-) -> Result<SignedBidSubmission, Error> {
+    pool: &Pool,
+) -> Result<SignedBidSubmission, Error>
+where
+    Pool: TransactionPool,
+{
     let mut message = BidTrace {
         slot: build_context.slot,
         parent_hash: to_bytes32(payload.parent_hash),
@@ -39,13 +48,9 @@ fn make_submission(
         gas_used: payload.gas_used,
         value: to_u256(payment),
     };
-    let execution_payload = match to_execution_payload(payload) {
-        ExecutionPayload::Bellatrix(_) => unimplemented!(),
-        ExecutionPayload::Capella(payload) => payload,
-        ExecutionPayload::Deneb(_) => unimplemented!(),
-    };
+    let res = to_execution_payload(payload, pool);
     let signature = sign_builder_message(&mut message, signing_key, context)?;
-    Ok(SignedBidSubmission { message, execution_payload, signature })
+    Ok(SignedBidSubmission { message, execution_payload: res, signature })
 }
 
 // TODO: drop unnecessary things...
@@ -102,9 +107,10 @@ impl BuildContext {
 }
 
 #[derive(Debug)]
-pub struct Build {
+pub struct Build<Pool> {
     pub context: BuildContext,
     pub state: Mutex<State>,
+    _marker: PhantomData<Pool>,
 }
 
 #[derive(Default, Debug)]
@@ -112,9 +118,12 @@ pub struct State {
     pub payload_with_payments: PayloadWithPayments,
 }
 
-impl Build {
+impl<Pool> Build<Pool>
+where
+    Pool: TransactionPool,
+{
     pub fn new(context: BuildContext) -> Self {
-        Self { context, state: Mutex::new(Default::default()) }
+        Self { context, state: Mutex::new(Default::default()), _marker: PhantomData }
     }
 
     pub fn value(&self) -> U256 {
@@ -127,6 +136,7 @@ impl Build {
         secret_key: &SecretKey,
         public_key: &BlsPublicKey,
         context: &Context,
+        pool: &Pool,
     ) -> Result<(SignedBidSubmission, U256), Error> {
         let build_context = &self.context;
         let state = self.state.lock().unwrap();
@@ -138,7 +148,15 @@ impl Build {
         let payment = &payload_with_payments.proposer_payment;
         let builder_payment = payload_with_payments.builder_payment;
         Ok((
-            make_submission(secret_key, public_key, context, build_context, payload, payment)?,
+            make_submission(
+                secret_key,
+                public_key,
+                context,
+                build_context,
+                payload,
+                payment,
+                pool,
+            )?,
             builder_payment,
         ))
     }

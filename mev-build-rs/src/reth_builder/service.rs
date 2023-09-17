@@ -63,7 +63,7 @@ fn parse_relays(urls: &[String]) -> Vec<Relay> {
 impl<
         Pool: reth_transaction_pool::TransactionPool + 'static,
         Client: reth_provider::StateProviderFactory + reth_provider::BlockReaderIdExt + Clone + 'static,
-        B: Bidder + Send + Sync + 'static,
+        B: Bidder<Pool> + Send + Sync + 'static,
     > Service<Pool, Client, B>
 {
     pub fn from(
