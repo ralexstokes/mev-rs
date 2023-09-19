@@ -1,27 +1,30 @@
-use beacon_api_client::{
-    Client as ApiClient, GenesisDetails, ValidatorStatus, ValidatorSummary, Value,
-};
+use async_trait::async_trait;
+use beacon_api_client::Client as ApiClient;
 use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
     capella::mainnet as capella,
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
-    primitives::{DomainType, ExecutionAddress, Hash32, Root},
+    primitives::{BlsPublicKey, DomainType, ExecutionAddress, Hash32, Root, Slot, U256},
     signing::sign_with_domain,
     state_transition::{Context, Forks},
 };
-use httpmock::prelude::*;
 use mev_boost_rs::{Config, Service};
-use mev_relay_rs::{Config as RelayConfig, Service as Relay};
 use mev_rs::{
-    blinded_block_provider::Client as RelayClient,
+    blinded_block_provider::{BlindedBlockProvider, Client as RelayClient, Server as RelayServer},
     signing::sign_builder_message,
-    types::{BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid},
+    types::{
+        bellatrix as bellatrix_builder, capella as capella_builder, BidRequest, ExecutionPayload,
+        SignedBlindedBeaconBlock, SignedBuilderBid,
+    },
+    Error,
 };
 use rand::seq::SliceRandom;
 use std::{
     collections::HashMap,
+    net::Ipv4Addr,
+    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
@@ -64,6 +67,96 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
         .collect()
 }
 
+#[derive(Default, Clone)]
+pub struct IdentityBuilder {
+    signing_key: SecretKey,
+    public_key: BlsPublicKey,
+    context: Arc<Context>,
+    bids: Arc<Mutex<HashMap<Slot, ExecutionPayload>>>,
+    registrations: Arc<Mutex<HashMap<BlsPublicKey, ValidatorRegistration>>>,
+}
+
+impl IdentityBuilder {
+    fn new(context: Context) -> Self {
+        let signing_key = SecretKey::try_from([1u8; 32].as_ref()).unwrap();
+        let public_key = signing_key.public_key();
+        Self { signing_key, public_key, context: Arc::new(context), ..Default::default() }
+    }
+}
+
+#[async_trait]
+impl BlindedBlockProvider for IdentityBuilder {
+    async fn register_validators(
+        &self,
+        registrations: &mut [SignedValidatorRegistration],
+    ) -> Result<(), Error> {
+        let mut state = self.registrations.lock().unwrap();
+        for registration in registrations {
+            let registration = &registration.message;
+            let public_key = registration.public_key.clone();
+            state.insert(public_key, registration.clone());
+        }
+        Ok(())
+    }
+
+    async fn fetch_best_bid(
+        &self,
+        BidRequest { slot, parent_hash, public_key }: &BidRequest,
+    ) -> Result<SignedBuilderBid, Error> {
+        let capella_fork_slot = self.context.capella_fork_epoch * self.context.slots_per_epoch;
+        let state = self.registrations.lock().unwrap();
+        let preferences = state.get(public_key).unwrap();
+        let value = U256::from(1337);
+        let (payload, signed_builder_bid) = if *slot < capella_fork_slot {
+            let mut inner = bellatrix::ExecutionPayload {
+                parent_hash: parent_hash.clone(),
+                fee_recipient: preferences.fee_recipient.clone(),
+                gas_limit: preferences.gas_limit,
+                ..Default::default()
+            };
+            let header = bellatrix::ExecutionPayloadHeader::try_from(&mut inner).unwrap();
+            let payload = ExecutionPayload::Bellatrix(inner);
+            let mut inner = bellatrix_builder::BuilderBid {
+                header,
+                value,
+                public_key: self.public_key.clone(),
+            };
+            let signature =
+                sign_builder_message(&mut inner, &self.signing_key, &self.context).unwrap();
+            let inner = bellatrix_builder::SignedBuilderBid { message: inner, signature };
+            (payload, SignedBuilderBid::Bellatrix(inner))
+        } else {
+            let mut inner = capella::ExecutionPayload {
+                parent_hash: parent_hash.clone(),
+                fee_recipient: preferences.fee_recipient.clone(),
+                gas_limit: preferences.gas_limit,
+                ..Default::default()
+            };
+            let header = capella::ExecutionPayloadHeader::try_from(&mut inner).unwrap();
+            let payload = ExecutionPayload::Capella(inner);
+            let mut inner =
+                capella_builder::BuilderBid { header, value, public_key: self.public_key.clone() };
+            let signature =
+                sign_builder_message(&mut inner, &self.signing_key, &self.context).unwrap();
+            let inner = capella_builder::SignedBuilderBid { message: inner, signature };
+            (payload, SignedBuilderBid::Capella(inner))
+        };
+
+        let mut state = self.bids.lock().unwrap();
+        state.insert(*slot, payload);
+        Ok(signed_builder_bid)
+    }
+
+    async fn open_bid(
+        &self,
+        signed_block: &mut SignedBlindedBeaconBlock,
+    ) -> Result<ExecutionPayload, Error> {
+        let slot = signed_block.slot();
+        let state = self.bids.lock().unwrap();
+        Ok(state.get(&slot).cloned().unwrap())
+    }
+}
+
 #[tokio::test]
 async fn test_end_to_end() {
     setup_logging();
@@ -72,63 +165,24 @@ async fn test_end_to_end() {
 
     let mut proposers = create_proposers(&mut rng, 4);
 
-    // start mock consensus node
-    let validator_mock_server = MockServer::start();
-    let balance = 32_000_000_000;
-    let validators = proposers
-        .iter()
-        .map(|proposer| ValidatorSummary {
-            index: proposer.index,
-            balance,
-            status: ValidatorStatus::ActiveOngoing,
-            validator: Validator {
-                public_key: proposer.signing_key.public_key(),
-                effective_balance: balance,
-                ..Default::default()
-            },
-        })
-        .collect::<Vec<_>>();
-    // relay demands validators endpoint
-    validator_mock_server.mock(|when, then| {
-        when.method(GET).path("/eth/v1/beacon/states/head/validators");
-        let response =
-            serde_json::to_string(&Value { data: validators, meta: HashMap::new() }).unwrap();
-        then.status(200).body(response);
-    });
-    // relay demands genesis details endpoint
-    let mut genesis_details = GenesisDetails::default();
     let genesis_validators_root = Root::try_from([23u8; 32].as_ref()).unwrap();
-    genesis_details.genesis_validators_root = genesis_validators_root;
-    validator_mock_server.mock(|when, then| {
-        when.method(GET).path("/eth/v1/beacon/genesis");
-        let response =
-            serde_json::to_string(&Value { data: genesis_details, meta: HashMap::new() }).unwrap();
-        then.status(200).body(response);
-    });
 
     let mut context = Context::for_mainnet();
     // mock epoch values to transition across forks
     context.bellatrix_fork_epoch = 12;
     context.capella_fork_epoch = 22;
 
-    // start upstream relay
-    let validator_mock_server_url = validator_mock_server.url("");
-
     // NOTE: non-default secret key required. otherwise public key is point at infinity and
     // signature verification will fail.
     let key_bytes: &[u8] = &[1u8; 32];
     let secret_key = SecretKey::try_from(key_bytes).unwrap();
+    let relay_public_key = secret_key.public_key();
 
-    let relay_config = RelayConfig {
-        beacon_node_url: validator_mock_server_url,
-        secret_key,
-        ..Default::default()
-    };
-
-    let port = relay_config.port;
-    let relay_public_key = relay_config.secret_key.public_key();
-    let relay = Relay::from(relay_config);
-    relay.spawn(Some(context.clone())).await.unwrap();
+    let host = Ipv4Addr::LOCALHOST;
+    let port = 28545;
+    let builder = IdentityBuilder::new(context.clone());
+    let relay = RelayServer::new(host, port, builder);
+    std::mem::drop(relay.spawn());
 
     // start mux server
     let mut config = Config::default();
