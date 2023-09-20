@@ -26,7 +26,6 @@ url = { version = "2.2.2", default-features = false }
 
 serde_json = { version = "1.0.92", optional = true }
 
-ssz_rs = { workspace = true }
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true, optional = true }
 

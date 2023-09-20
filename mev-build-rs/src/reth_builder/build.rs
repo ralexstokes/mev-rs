@@ -6,7 +6,7 @@ use crate::reth_builder::{
 use ethereum_consensus::{
     crypto::{hash, SecretKey},
     primitives::{BlsPublicKey, ExecutionAddress, Slot},
-    ssz::ByteVector,
+    ssz::prelude::*,
     state_transition::Context,
 };
 use ethers::signers::LocalWallet;
@@ -16,7 +16,6 @@ use mev_rs::{
 };
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, H256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
-use ssz_rs::prelude::*;
 use std::sync::{Arc, Mutex};
 
 pub type BuildIdentifier = ByteVector<4>;

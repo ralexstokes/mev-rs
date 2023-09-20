@@ -5,9 +5,9 @@ use ethereum_consensus::{
     phase0::mainnet::compute_domain,
     primitives::{BlsPublicKey, BlsSignature, Root, Slot},
     signing::{sign_with_domain, verify_signed_data},
+    ssz::prelude::SimpleSerialize,
     state_transition::{Context, Error, Forks},
 };
-use ssz_rs::prelude::SimpleSerialize;
 
 pub fn verify_signed_consensus_message<T: SimpleSerialize>(
     message: &mut T,

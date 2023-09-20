@@ -3,8 +3,8 @@ use ethereum_consensus::{
     deneb::mainnet::{MAX_BLOBS_PER_BLOCK, MAX_BLOB_COMMITMENTS_PER_BLOCK},
     kzg::{KzgCommitment, KzgProof},
     primitives::{BlsPublicKey, BlsSignature, Root, U256},
+    ssz::prelude::*,
 };
-use ssz_rs::prelude::*;
 
 // NOTE: type alias here to call out the important types clearly, in lieu of just `pub use ...`
 pub type ExecutionPayload = spec::ExecutionPayload;

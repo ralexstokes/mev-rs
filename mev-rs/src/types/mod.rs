@@ -11,9 +11,9 @@ use ethereum_consensus::{
     primitives::{
         BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Root, Slot, ValidatorIndex,
     },
+    ssz::prelude::*,
     state_transition::{Context, Error},
 };
-use ssz_rs::prelude::*;
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
