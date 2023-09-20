@@ -1,7 +1,10 @@
 use ethereum_consensus::{
     capella::mainnet as spec,
     primitives::{Bytes32, ExecutionAddress},
-    ssz::{ByteList, ByteVector},
+    ssz::{
+        prelude as ssz_rs,
+        prelude::{ByteList, ByteVector},
+    },
 };
 use mev_rs::types::{capella, ExecutionPayload};
 use reth_primitives::{Bloom, SealedBlock, H160, H256, U256};

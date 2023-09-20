@@ -1,9 +1,10 @@
 use crate::reth_builder::build::BuildIdentifier;
-use ethereum_consensus::{primitives::Slot, state_transition::Error as ConsensusError};
+use ethereum_consensus::{
+    primitives::Slot, ssz::prelude::SimpleSerializeError, state_transition::Error as ConsensusError,
+};
 use reth_interfaces::Error as RethError;
 use reth_primitives::H256;
 use revm::primitives::EVMError;
-use ssz_rs::prelude::*;
 use thiserror::Error;
 
 #[derive(Error, Debug)]

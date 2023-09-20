@@ -13,7 +13,6 @@ use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{BlockNumberOrTag, Bytes, ChainSpec, H256, U256};
 use reth_provider::{BlockReaderIdExt, BlockSource, StateProviderFactory};
 use reth_transaction_pool::TransactionPool;
-use ssz_rs::prelude::*;
 use std::{
     cmp::Ordering,
     collections::{BTreeMap, HashMap},

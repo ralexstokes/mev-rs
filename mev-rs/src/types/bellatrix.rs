@@ -1,6 +1,8 @@
-use ethereum_consensus::primitives::{BlsPublicKey, BlsSignature, U256};
 pub use ethereum_consensus::{bellatrix::mainnet as spec, builder::SignedValidatorRegistration};
-use ssz_rs::prelude::*;
+use ethereum_consensus::{
+    primitives::{BlsPublicKey, BlsSignature, U256},
+    ssz::prelude::*,
+};
 
 // NOTE: type alias here to call out the important types clearly, in lieu of just `pub use ...`
 pub type ExecutionPayload = spec::ExecutionPayload;

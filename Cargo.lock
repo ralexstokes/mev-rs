@@ -619,7 +619,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=2a851385a13c8f0e5d8f482417c1923dcae45f66#2a851385a13c8f0e5d8f482417c1923dcae45f66"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=afbf74216b49d30562aa3e966b9daa9aa416d534#afbf74216b49d30562aa3e966b9daa9aa416d534"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -2215,7 +2215,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=2a851385a13c8f0e5d8f482417c1923dcae45f66#2a851385a13c8f0e5d8f482417c1923dcae45f66"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=afbf74216b49d30562aa3e966b9daa9aa416d534#afbf74216b49d30562aa3e966b9daa9aa416d534"
 dependencies = [
  "async-stream",
  "blst",
@@ -4161,7 +4161,6 @@ dependencies = [
  "reth-transaction-pool",
  "revm",
  "serde",
- "ssz_rs",
  "thiserror",
  "tokio",
  "tokio-stream",
@@ -4202,7 +4201,6 @@ dependencies = [
  "rand 0.8.5",
  "serde",
  "serde_json",
- "ssz_rs",
  "thiserror",
  "tokio",
  "tracing",
@@ -7306,8 +7304,7 @@ checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "057291e5631f280978fa9c8009390663ca4613359fc1318e36a8c24c392f6d1f"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=51f3932d1578a62f856c19175482056912de5f3e#51f3932d1578a62f856c19175482056912de5f3e"
 dependencies = [
  "bitvec",
  "hex",
@@ -7320,8 +7317,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f07d54c4d01a1713eb363b55ba51595da15f6f1211435b71466460da022aa140"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=51f3932d1578a62f856c19175482056912de5f3e#51f3932d1578a62f856c19175482056912de5f3e"
 dependencies = [
  "proc-macro2 1.0.66",
  "quote 1.0.33",

@@ -21,7 +21,6 @@ serde = { version = "1.0", features = ["derive"] }
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
-ssz_rs = { workspace = true }
 
 mev-rs = { path = "../mev-rs" }
 
