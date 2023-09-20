@@ -7,7 +7,6 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, Root, Slot, U256},
     state_transition::Context,
 };
-use mev_build_rs::NullBuilder;
 use mev_rs::{
     signing::sign_builder_message,
     types::{
@@ -95,7 +94,6 @@ pub struct Inner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
     genesis_validators_root: Root,
-    builder: NullBuilder,
     validator_registry: ValidatorRegistry,
     context: Arc<Context>,
     state: Mutex<State>,
@@ -119,7 +117,6 @@ impl Relay {
             secret_key,
             public_key,
             genesis_validators_root,
-            builder: NullBuilder,
             validator_registry,
             context,
             state: Default::default(),
@@ -172,12 +169,9 @@ impl BlindedBlockProvider for Relay {
             .validator_registry
             .get_preferences(public_key)
             .ok_or_else(|| Error::MissingPreferences(public_key.clone()))?;
-        let (mut payload, value) = self.builder.get_payload_with_value(
-            bid_request,
-            &preferences.fee_recipient,
-            preferences.gas_limit,
-            &self.context,
-        )?;
+
+        let mut payload = ExecutionPayload::default();
+        let value = U256::default();
 
         let header = {
             let mut state = self.state.lock();
