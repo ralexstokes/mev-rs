@@ -25,6 +25,7 @@ use std::{
 
 pub type BuildIdentifier = ByteVector<4>;
 
+#[allow(clippy::too_many_arguments)]
 fn make_submission<Pool>(
     signing_key: &SecretKey,
     builder_public_key: &BlsPublicKey,
@@ -32,6 +33,7 @@ fn make_submission<Pool>(
     build_context: &BuildContext,
     payload: &SealedBlock,
     payment: &U256,
+    current_epoch: u64,
     pool: &Pool,
 ) -> Result<SignedBidSubmission, Error>
 where
@@ -48,7 +50,16 @@ where
         gas_used: payload.gas_used,
         value: to_u256(payment),
     };
-    let execution_payload = to_execution_payload(payload, pool);
+
+    let fork: &str = if current_epoch > context.deneb_fork_epoch {
+        "deneb"
+    } else if current_epoch > context.capella_fork_epoch {
+        "capella"
+    } else {
+        "bellatrix"
+    };
+
+    let execution_payload = to_execution_payload(payload, pool, fork);
     let signature = sign_builder_message(&mut message, signing_key, context)?;
     Ok(SignedBidSubmission { message, execution_payload, signature })
 }
@@ -136,6 +147,7 @@ where
         secret_key: &SecretKey,
         public_key: &BlsPublicKey,
         context: &Context,
+        current_epoch: u64,
         pool: &Pool,
     ) -> Result<(SignedBidSubmission, U256), Error> {
         let build_context = &self.context;
@@ -155,6 +167,7 @@ where
                 build_context,
                 payload,
                 payment,
+                current_epoch,
                 pool,
             )?,
             builder_payment,

@@ -283,9 +283,15 @@ where
         let build = self.build_for(id).ok_or_else(|| Error::MissingBuild(id.clone()))?;
 
         let context = &build.context;
+        let current_epoch = self.clock.current_epoch().unwrap();
 
-        let (signed_submission, builder_payment) =
-            build.prepare_bid(&self.secret_key, &self.public_key, &self.context, &self.pool)?;
+        let (signed_submission, builder_payment) = build.prepare_bid(
+            &self.secret_key,
+            &self.public_key,
+            &self.context,
+            current_epoch,
+            &self.pool,
+        )?;
 
         // TODO: make calls concurrently
         for index in &context.relays {
@@ -295,7 +301,7 @@ where
             let block_hash = &signed_submission.message.block_hash;
             let value = &signed_submission.message.value;
             tracing::info!(id = %id, relay = ?relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
-            match relay.submit_bid(&signed_submission.clone()).await {
+            match relay.submit_bid(&signed_submission).await {
                 Ok(_) => tracing::info!(%id, ?relay, "successfully submitted bid"),
                 Err(err) => {
                     tracing::warn!(%err, %id,?relay, "error submitting bid");
