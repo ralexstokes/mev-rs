@@ -1,27 +1,24 @@
 use crate::{types::SignedBidSubmission, Error};
-use beacon_api_client::mainnet::Client;
+
 use ethereum_consensus::primitives::BlsPublicKey;
-use parking_lot::Mutex;
+
 use std::collections::HashMap;
 
 #[derive(Default, Debug)]
-pub struct State {
-    _builders: HashMap<BlsPublicKey, SignedBidSubmission>,
-}
 
 pub struct _BuilderRegistry {
-    client: Client,
-    state: Mutex<State>,
+    _submissions: HashMap<BlsPublicKey, Vec<SignedBidSubmission>>,
 }
 
 impl _BuilderRegistry {
     pub fn _store_submission(
-        &self,
+        &mut self,
         builder_public_key: &BlsPublicKey,
         submission: &SignedBidSubmission,
     ) -> Result<(), Error> {
-        let mut state = self.state.lock();
-        state._builders.insert(builder_public_key.clone(), submission.clone());
+        self._submissions.entry(builder_public_key.clone()).and_modify(|e| {
+            e.push(submission.clone());
+        });
         Ok(())
     }
 }
