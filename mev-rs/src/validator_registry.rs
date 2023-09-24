@@ -68,14 +68,14 @@ fn validate_validator_status(
 
 #[derive(Default, Debug)]
 pub struct State {
-    validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
+    pub validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
     validators: HashMap<BlsPublicKey, ValidatorSummary>,
     pubkeys_by_index: HashMap<ValidatorIndex, BlsPublicKey>,
 }
 
 pub struct ValidatorRegistry {
     client: Client,
-    state: Mutex<State>,
+    pub state: Mutex<State>,
 }
 
 impl ValidatorRegistry {
