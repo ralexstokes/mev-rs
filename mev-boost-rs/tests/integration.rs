@@ -12,7 +12,9 @@ use ethereum_consensus::{
 };
 use mev_boost_rs::{Config, Service};
 use mev_rs::{
-    blinded_block_provider::{BlindedBlockProvider, Client as RelayClient, Server as RelayServer},
+    blinded_block_provider::{
+        BidderTrait, Client as RelayClient, Server as RelayServer, ValidatorTrait,
+    },
     signing::sign_builder_message,
     types::{
         bellatrix as bellatrix_builder, capella as capella_builder, BidRequest, ExecutionPayload,
@@ -85,7 +87,7 @@ impl IdentityBuilder {
 }
 
 #[async_trait]
-impl BlindedBlockProvider for IdentityBuilder {
+impl ValidatorTrait for IdentityBuilder {
     async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
@@ -98,7 +100,10 @@ impl BlindedBlockProvider for IdentityBuilder {
         }
         Ok(())
     }
+}
 
+#[async_trait]
+impl BidderTrait for IdentityBuilder {
     async fn fetch_best_bid(
         &self,
         BidRequest { slot, parent_hash, public_key }: &BidRequest,

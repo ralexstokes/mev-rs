@@ -1,10 +1,10 @@
 use crate::{
-    blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
         bellatrix, capella, deneb, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
         SignedBuilderBid, SignedValidatorRegistration,
     },
+    BidderTrait, ValidatorTrait,
 };
 use axum::{
     extract::{Json, Path, State},
@@ -26,7 +26,7 @@ async fn handle_status_check() -> impl IntoResponse {
     StatusCode::OK
 }
 
-async fn handle_validator_registration<B: BlindedBlockProvider>(
+async fn handle_validator_registration<B: ValidatorTrait>(
     State(builder): State<B>,
     Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
 ) -> Result<(), Error> {
@@ -35,7 +35,7 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
     builder.register_validators(&mut registrations).await.map_err(From::from)
 }
 
-async fn handle_fetch_bid<B: BlindedBlockProvider>(
+async fn handle_fetch_bid<B: BidderTrait>(
     State(builder): State<B>,
     Path(bid_request): Path<BidRequest>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
@@ -45,7 +45,7 @@ async fn handle_fetch_bid<B: BlindedBlockProvider>(
     Ok(Json(response))
 }
 
-async fn handle_open_bid<B: BlindedBlockProvider>(
+async fn handle_open_bid<B: BidderTrait>(
     State(builder): State<B>,
     Json(block): Json<serde_json::Value>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
@@ -69,13 +69,13 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
     Ok(Json(response))
 }
 
-pub struct Server<B: BlindedBlockProvider> {
+pub struct Server<B: ValidatorTrait + BidderTrait> {
     host: Ipv4Addr,
     port: u16,
     builder: B,
 }
 
-impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
+impl<B: ValidatorTrait + BidderTrait + Clone + Send + Sync + 'static> Server<B> {
     pub fn new(host: Ipv4Addr, port: u16, builder: B) -> Self {
         Self { host, port, builder }
     }

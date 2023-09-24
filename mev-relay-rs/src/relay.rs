@@ -13,7 +13,7 @@ use mev_rs::{
         bellatrix, capella, BidRequest, ExecutionPayload, ExecutionPayloadHeader,
         SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
     },
-    BlindedBlockProvider, Error, ValidatorRegistry,
+    BidderTrait, Error, ValidatorRegistry, ValidatorTrait,
 };
 use parking_lot::Mutex;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -147,7 +147,7 @@ impl Relay {
 }
 
 #[async_trait]
-impl BlindedBlockProvider for Relay {
+impl ValidatorTrait for Relay {
     async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
@@ -160,7 +160,10 @@ impl BlindedBlockProvider for Relay {
         )?;
         Ok(())
     }
+}
 
+#[async_trait]
+impl BidderTrait for Relay {
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         validate_bid_request(bid_request)?;
 

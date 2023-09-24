@@ -10,7 +10,7 @@ use mev_rs::{
         BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-    BlindedBlockProvider, Error,
+    BidderTrait, Error, ValidatorTrait,
 };
 use parking_lot::Mutex;
 use rand::prelude::*;
@@ -90,7 +90,7 @@ impl RelayMux {
 }
 
 #[async_trait]
-impl BlindedBlockProvider for RelayMux {
+impl ValidatorTrait for RelayMux {
     async fn register_validators(
         &self,
         registrations: &mut [SignedValidatorRegistration],
@@ -119,7 +119,10 @@ impl BlindedBlockProvider for RelayMux {
             Ok(())
         }
     }
+}
 
+#[async_trait]
+impl BidderTrait for RelayMux {
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
         let responses = stream::iter(self.relays.iter().cloned())
             .enumerate()
