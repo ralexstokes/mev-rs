@@ -25,7 +25,6 @@ pub enum Error {
 pub struct ProposerScheduler {
     api: Client,
     state: Mutex<State>,
-    validator_registry: ValidatorRegistry,
 }
 
 #[derive(Default)]
@@ -34,8 +33,8 @@ struct State {
 }
 
 impl ProposerScheduler {
-    pub fn new(api: Client, registry: ValidatorRegistry) -> Self {
-        Self { api, state: Mutex::new(State::default()), validator_registry: registry }
+    pub fn new(api: Client) -> Self {
+        Self { api, state: Mutex::new(State::default()) }
     }
 
     pub async fn dispatch_proposer_preparations(
@@ -67,6 +66,7 @@ impl ProposerScheduler {
         &self,
         coordinate: Coordinate,
         _context: &Context,
+        registry: &ValidatorRegistry,
     ) -> Result<Proposal, Error> {
         let (_slot, _parent_hash, public_key) = coordinate;
         let summary = self
@@ -74,8 +74,10 @@ impl ProposerScheduler {
             .get_validator(StateId::Head, PublicKeyOrIndex::PublicKey(public_key.clone()))
             .await?;
         let validator_index = summary.index;
-        let state = &self.validator_registry.state.lock();
-        let registration = state
+
+        let registration = registry
+            .state
+            .lock()
             .validator_preferences
             .get(&public_key.clone())
             .map(|registration| registration.message.clone())
