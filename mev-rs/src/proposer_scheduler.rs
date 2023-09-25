@@ -4,7 +4,7 @@ use beacon_api_client::{
 };
 use ethereum_consensus::{
     builder::SignedValidatorRegistration,
-    primitives::{BlsPublicKey, BlsSignature, Epoch, Hash32, Slot, ValidatorIndex},
+    primitives::{BlsPublicKey, Epoch, Hash32, Slot, ValidatorIndex},
     state_transition::Context,
 };
 use parking_lot::Mutex;
@@ -30,6 +30,7 @@ pub struct ProposerScheduler {
 #[derive(Default)]
 struct State {
     proposer_schedule: HashMap<Slot, BlsPublicKey>,
+    proposer_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
 }
 
 impl ProposerScheduler {
@@ -75,16 +76,22 @@ impl ProposerScheduler {
             .await?;
         let validator_index = summary.index;
 
-        let registration = registry
+        // index an internal copy of validator preferences
+        let preferences = registry.state.lock().validator_preferences.clone();
+        let state = &mut self.state.lock();
+        state.proposer_preferences = preferences;
+
+        let (registration, signature) = registry
             .state
             .lock()
             .validator_preferences
             .get(&public_key.clone())
-            .map(|registration| registration.message.clone())
+            .map(|preference| {
+                let registration = preference.message.clone();
+                let signature = preference.signature.clone();
+                (registration, signature)
+            })
             .unwrap();
-
-        // TODO: get the validator actual signature
-        let signature = BlsSignature::default();
 
         Ok((
             validator_index,
