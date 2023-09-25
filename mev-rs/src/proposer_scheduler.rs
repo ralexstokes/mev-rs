@@ -5,7 +5,6 @@ use beacon_api_client::{
 use ethereum_consensus::{
     builder::SignedValidatorRegistration,
     primitives::{BlsPublicKey, Epoch, Hash32, Slot, ValidatorIndex},
-    state_transition::Context,
 };
 use parking_lot::Mutex;
 use std::collections::HashMap;
@@ -46,9 +45,18 @@ impl ProposerScheduler {
     }
 
     // fetch proposer schedule
-    pub async fn fetch_duties(&self, epoch: Epoch) -> Result<Vec<ProposerDuty>, Error> {
+    pub async fn fetch_duties(
+        &self,
+        epoch: Epoch,
+        registry: &ValidatorRegistry,
+    ) -> Result<Vec<ProposerDuty>, Error> {
         // TODO be tolerant to re-orgs
         let (_dependent_root, duties) = self.api.get_proposer_duties(epoch).await?;
+        // index an internal copy of validator preferences
+        let preferences = registry.state.lock().validator_preferences.clone();
+        let state = &mut self.state.lock();
+        state.proposer_preferences = preferences;
+
         let mut state = self.state.lock();
         for duty in &duties {
             let slot = duty.slot;
@@ -63,12 +71,7 @@ impl ProposerScheduler {
         state.proposer_schedule.get(&slot).cloned()
     }
 
-    pub async fn get_proposal(
-        &self,
-        coordinate: Coordinate,
-        _context: &Context,
-        registry: &ValidatorRegistry,
-    ) -> Result<Proposal, Error> {
+    pub async fn get_proposal(&self, coordinate: Coordinate) -> Result<Proposal, Error> {
         let (_slot, _parent_hash, public_key) = coordinate;
         let summary = self
             .api
@@ -76,27 +79,9 @@ impl ProposerScheduler {
             .await?;
         let validator_index = summary.index;
 
-        // index an internal copy of validator preferences
-        let preferences = registry.state.lock().validator_preferences.clone();
-        let state = &mut self.state.lock();
-        state.proposer_preferences = preferences;
+        let registration =
+            self.state.lock().proposer_preferences.get(&public_key).cloned().unwrap();
 
-        let (registration, signature) = registry
-            .state
-            .lock()
-            .validator_preferences
-            .get(&public_key.clone())
-            .map(|preference| {
-                let registration = preference.message.clone();
-                let signature = preference.signature.clone();
-                (registration, signature)
-            })
-            .unwrap();
-
-        Ok((
-            validator_index,
-            public_key,
-            SignedValidatorRegistration { message: registration, signature },
-        ))
+        Ok((validator_index, public_key, registration))
     }
 }
