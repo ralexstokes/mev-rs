@@ -18,9 +18,13 @@ thiserror = "1.0.30"
 http = "0.2.7"
 url = { version = "2.2.2", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
+clap = { version = "4", features = ["derive"] }
+eyre = "0.6"
+jsonrpsee = "0.20.1"
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
+reth = { workspace = true }
 
 mev-rs = { path = "../mev-rs" }
 mev-build-rs = { path = "../mev-build-rs" }

@@ -384,3 +384,8 @@ pub struct SignedBidSubmission {
     pub execution_payload: capella::ExecutionPayload,
     pub signature: BlsSignature,
 }
+
+pub enum ValidationStatus {
+    Valid,
+    Invalid,
+}

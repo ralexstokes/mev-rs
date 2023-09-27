@@ -1,3 +1,4 @@
+pub mod bid_submission_processor;
 pub mod blinded_block_provider;
 pub mod blinded_block_relayer;
 mod builder_registry;
@@ -8,7 +9,7 @@ pub mod relay;
 pub mod serde;
 pub mod signing;
 pub mod types;
-mod validator_registry;
+pub mod validator_registry;
 
 pub use blinded_block_provider::{BidderTrait, ValidatorTrait};
 pub use blinded_block_relayer::BlindedBlockRelayer;
