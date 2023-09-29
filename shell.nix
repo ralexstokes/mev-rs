@@ -1,11 +1,9 @@
-{ pkgs, lib }:
+{ pkgs, rustToolchain }:
 with pkgs;
 mkShell {
-  buildInputs = lib.lists.optionals stdenv.isDarwin [
-    darwin.apple_sdk.frameworks.Network
-  ] ++ [
-    iconv
+  buildInputs = [
+    just
     mdbook
-    zlib
+    rustToolchain
   ];
 }
