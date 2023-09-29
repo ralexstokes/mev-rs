@@ -4,7 +4,6 @@ members = ["bin/mev", "mev-boost-rs", "mev-relay-rs", "mev-build-rs", "mev-rs"]
 default-members = ["bin/mev"]
 
 [workspace.package]
-name = "mev-rs"
 version = "0.3.0"
 
 [workspace.dependencies]
