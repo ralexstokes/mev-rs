@@ -5,10 +5,7 @@ let
     pname = "mev-rs";
     src = crane.cleanCargoSource (crane.path ../.);
     buildInputs = [ ] ++ lib.optionals pkgs.stdenv.isDarwin [
-      libiconv
-    ];
-    nativeBuildInputs = [
-      # pkgs.rustPlatform.bindgenHook
+      darwin.apple_sdk.frameworks.Network
     ];
   };
   cargoArtifacts = crane.buildDepsOnly commonArgs;
