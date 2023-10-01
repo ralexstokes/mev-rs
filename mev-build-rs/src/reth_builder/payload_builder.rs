@@ -11,7 +11,7 @@ use ethers::{
         transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160 as ethers_H160,
     },
 };
-use reth_interfaces::{db, RethError};
+use reth_interfaces::RethError;
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_OMMER_ROOT},
     proofs, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, TransactionSigned,
