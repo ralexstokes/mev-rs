@@ -14,12 +14,12 @@ use ethers::{
 use reth_interfaces::RethError;
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_OMMER_ROOT},
-    proofs, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, TransactionSigned,
+    proofs, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, TransactionSigned,
     TransactionSignedEcRecovered, Withdrawal, H256, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProvider, StateProviderFactory};
 use reth_revm::{
-    database::StateProviderDatabase, env::tx_env_with_recovered,
+    database::StateProviderDatabase, env::tx_env_with_recovered, into_reth_log,
     state_change::post_block_withdrawals_balance_increments,
 };
 use revm::{
@@ -265,21 +265,18 @@ impl<'a> ExecutionContext<'a> {
 
         let ResultAndState { result, state } = evm.transact().unwrap();
 
-        let _block_number = self.build.number();
+        let block_number = self.build.number();
         self.db.commit(state);
 
         let gas_used = result.gas_used();
         self.cumulative_gas_used += gas_used;
-
-        // self.bundle_state.add_receipt(
-        //     block_number,
-        //     Receipt {
-        //         tx_type: tx.tx_type(),
-        //         success: result.is_success(),
-        //         cumulative_gas_used: self.cumulative_gas_used,
-        //         logs: result.logs().into_iter().map(into_reth_log).collect(),
-        //     },
-        // );
+        let receipt = Receipt {
+            tx_type: tx.tx_type(),
+            success: result.is_success(),
+            cumulative_gas_used: self.cumulative_gas_used,
+            logs: result.logs().into_iter().map(into_reth_log).collect(),
+        };
+        self.bundle_state.receipts_by_block(block_number).to_vec().push(Some(receipt));
 
         let base_fee = self.build.base_fee();
         let fee = tx.effective_tip_per_gas(base_fee).expect("fee is valid; execution succeeded");
