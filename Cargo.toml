@@ -10,20 +10,20 @@ version = "0.3.0"
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "afbf74216b49d30562aa3e966b9daa9aa416d534" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "afbf74216b49d30562aa3e966b9daa9aa416d534" }
 
-reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-provider = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
+reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", rev = "900ada5aaa4b5d4a633df78764e7dd7169a13405" }
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
+revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
 
 [patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
-revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
+revm-primitives = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
 
 # NOTE: this is not strictly required to build
 # but, it works better with the default nix rust build environment
