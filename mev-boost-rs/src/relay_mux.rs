@@ -52,17 +52,17 @@ fn select_best_bids<'a>(bids: impl Iterator<Item = (&'a U256, usize)>) -> Vec<us
 }
 
 #[derive(Clone)]
-pub struct RelayMux(Arc<RelayMuxInner>);
+pub struct RelayMux(Arc<Inner>);
 
 impl Deref for RelayMux {
-    type Target = RelayMuxInner;
+    type Target = Inner;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-pub struct RelayMuxInner {
+pub struct Inner {
     relays: Vec<Relay>,
     context: Context,
     state: Mutex<State>,
@@ -77,7 +77,7 @@ struct State {
 
 impl RelayMux {
     pub fn new(relays: impl Iterator<Item = Relay>, context: Context) -> Self {
-        let inner = RelayMuxInner { relays: relays.collect(), context, state: Default::default() };
+        let inner = Inner { relays: relays.collect(), context, state: Default::default() };
         Self(Arc::new(inner))
     }
 
