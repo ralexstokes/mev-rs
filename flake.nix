@@ -28,7 +28,7 @@
           mev = pkgs.callPackage ./nix/mev.nix { inherit pkgs; crane = craneLib; };
         in
         {
-          devShells.default = import ./shell.nix { inherit pkgs rustToolchain; };
+          devShells.default = import ./shell.nix { inherit pkgs; };
           overlays.default = _: _: {
             inherit mev;
           };
