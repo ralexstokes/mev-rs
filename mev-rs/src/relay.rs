@@ -12,7 +12,7 @@ use ethereum_consensus::{
 use std::{fmt, ops::Deref};
 use url::Url;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct RelayEndpoint {
     url: Url,
     public_key: BlsPublicKey,
@@ -26,6 +26,12 @@ impl TryFrom<Url> for RelayEndpoint {
         let public_key = BlsPublicKey::try_from(&public_key[..])?;
 
         Ok(Self { url, public_key })
+    }
+}
+
+impl fmt::Debug for RelayEndpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        write!(f, "{0}", self.url)
     }
 }
 
