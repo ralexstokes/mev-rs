@@ -12,6 +12,7 @@ use mev_rs::{
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
+use tracing::info;
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -60,16 +61,23 @@ impl Service {
     pub fn from(config: Config) -> Self {
         let relays = parse_relay_endpoints(&config.relays);
 
-        if relays.is_empty() {
-            tracing::error!("no valid relays provided; please restart with correct configuration");
-        }
-
         Self { host: config.host, port: config.port, relays, network: config.network }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
     pub fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network } = self;
+
+        if relays.is_empty() {
+            tracing::error!("no valid relays provided; please restart with correct configuration");
+        } else {
+            let count = relays.len();
+            info!("configured with {count} relays");
+            for relay in &relays {
+                info!(?relay, "configured with relay");
+            }
+        }
+
         let context =
             if let Some(context) = context { context } else { Context::try_from(&network)? };
         let relays = relays.into_iter().map(Relay::from);

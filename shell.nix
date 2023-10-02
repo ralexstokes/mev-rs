@@ -1,9 +1,13 @@
-{ pkgs, rustToolchain }:
+{ pkgs }:
 with pkgs;
 mkShell {
-  buildInputs = [
+  buildInputs = lib.optionals pkgs.stdenv.isLinux [
+    openssl
+  ] ++ lib.optionals pkgs.stdenv.isDarwin [
+    libiconv
+    darwin.apple_sdk.frameworks.Network
+  ] ++ [
     just
     mdbook
-    rustToolchain
   ];
 }
