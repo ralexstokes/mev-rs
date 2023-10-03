@@ -23,6 +23,13 @@ const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
+fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
+    let slot = signed_block.slot();
+    let parent_hash = signed_block.parent_hash().clone();
+
+    BidRequest { slot, parent_hash, public_key: public_key.clone() }
+}
+
 fn validate_bid(
     bid: &mut SignedBuilderBid,
     public_key: &BlsPublicKey,
@@ -232,13 +239,6 @@ impl BlindedBlockProvider for RelayMux {
 
         Err(Error::MissingPayload(expected_block_hash.clone()))
     }
-}
-
-fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
-    let slot = signed_block.slot();
-    let parent_hash = signed_block.parent_hash().clone();
-
-    BidRequest { slot, parent_hash, public_key: public_key.clone() }
 }
 
 #[cfg(test)]
