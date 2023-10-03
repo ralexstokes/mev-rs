@@ -72,9 +72,9 @@ impl Service {
             tracing::error!("no valid relays provided; please restart with correct configuration");
         } else {
             let count = relays.len();
-            info!("configured with {count} relays");
+            info!("configured with {count} relay(s)");
             for relay in &relays {
-                info!(?relay, "configured with relay");
+                info!(%relay, "configured with relay");
             }
         }
 
