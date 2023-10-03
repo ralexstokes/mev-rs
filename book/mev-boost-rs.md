@@ -9,11 +9,11 @@ connecting validators to an external block builder network.
 
 ### Build from source
 
-The best way right now to use this right now is to build from source.
+The best way to use this right now is to build from source.
 
 ## Run `mev-boost-rs`
 
-You'll need to put some configuration into a config file like `example.config.toml` found
+You'll need to construct a configuration file like the `example.config.toml` found
 at the root of this directory.
 
 For example, this configuration
