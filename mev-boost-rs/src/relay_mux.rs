@@ -15,7 +15,7 @@ use mev_rs::{
 use parking_lot::Mutex;
 use rand::prelude::*;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc, time::Duration};
-use tracing::warn;
+use tracing::{info, warn};
 
 // See note in the `mev-relay-rs::Relay` about this constant.
 // TODO likely drop this feature...
@@ -188,6 +188,13 @@ impl BlindedBlockProvider for RelayMux {
                 best_relays.push(relay.clone());
             }
         }
+
+        let relays_desc = best_relays
+            .iter()
+            .map(|relay| format!("{relay}"))
+            .reduce(|desc, next| format!("{desc}, {next}"))
+            .expect("at least one relay");
+        info!(slot = bid_request.slot, block_hash = %best_block_hash, relays=relays_desc, "acquired best bid");
 
         {
             let mut state = self.state.lock();
