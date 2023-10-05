@@ -30,23 +30,19 @@ use reth::{
     transaction_pool::TransactionPool,
 };
 
+use crate::types::ValidationRequestBody;
+
 /// Payloadverifier ext
-pub struct PayloadVerifierExt;
+pub struct PayloadValidationExt;
+
+impl RethCliExt for PayloadValidationExt {
+    type Node = RethCliValidationExt;
+}
 
 #[derive(Debug, Clone, Copy, Default, clap::Args)]
 pub struct RethCliValidationExt {
     #[clap(long)]
     pub enable_ext: bool,
-}
-
-pub struct ValidationExt<Provider> {
-    provider: Provider,
-}
-#[rpc(server, namespace = "validationExt")]
-#[async_trait]
-pub trait ValidationExtApi {
-    #[method(name = "validate_payload")]
-    async fn verify_payload(&self, payload: &ExecutionPayload) -> RpcResult<()>;
 }
 
 impl RethNodeCommandConfig for RethCliValidationExt {
@@ -85,6 +81,13 @@ impl RethNodeCommandConfig for RethCliValidationExt {
     }
 }
 
+#[rpc(server, namespace = "validationExt")]
+#[async_trait]
+pub trait ValidationExtApi {
+    #[method(name = "validate_payload")]
+    async fn validate_payload(&self, payload: &ValidationRequestBody) -> RpcResult<()>;
+}
+
 #[async_trait]
 impl<Provider> ValidationExtApiServer for ValidationExt<Provider>
 where
@@ -97,7 +100,11 @@ where
         + WithdrawalsProvider
         + 'static,
 {
-    async fn verify_payload(&self, payload: &ExecutionPayload) -> RpcResult<()> {
+    async fn validate_payload(&self, payload: &ValidationRequestBody) -> RpcResult<()> {
         todo!()
     }
+}
+
+pub struct ValidationExt<Provider> {
+    provider: Provider,
 }
