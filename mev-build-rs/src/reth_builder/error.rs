@@ -28,7 +28,7 @@ pub enum Error {
     #[error(transparent)]
     Reth(#[from] RethError),
     #[error("evm execution error: {0:?}")]
-    Execution(EVMError<reth_interfaces::RethError>),
+    Execution(EVMError<RethError>),
     #[error("{0}")]
     Internal(&'static str),
 }
