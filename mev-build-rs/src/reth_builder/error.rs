@@ -2,7 +2,7 @@ use crate::reth_builder::build::BuildIdentifier;
 use ethereum_consensus::{
     primitives::Slot, ssz::prelude::SimpleSerializeError, state_transition::Error as ConsensusError,
 };
-use reth_interfaces::Error as RethError;
+use reth_interfaces::RethError;
 use reth_primitives::H256;
 use revm::primitives::EVMError;
 use thiserror::Error;
@@ -28,7 +28,7 @@ pub enum Error {
     #[error(transparent)]
     Reth(#[from] RethError),
     #[error("evm execution error: {0:?}")]
-    Execution(EVMError<reth_interfaces::Error>),
+    Execution(EVMError<RethError>),
     #[error("{0}")]
     Internal(&'static str),
 }

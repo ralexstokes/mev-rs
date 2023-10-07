@@ -78,6 +78,10 @@ impl PayloadJob for Job {
         let payload = Arc::new(build_default_payload(self.payload_id));
         (future::ready(Ok(payload)), KeepPayloadJobAlive::No)
     }
+
+    fn payload_attributes(&self) -> Result<PayloadBuilderAttributes, PayloadBuilderError> {
+        unimplemented!()
+    }
 }
 
 fn build_default_payload(payload_id: PayloadId) -> BuiltPayload {

@@ -11,41 +11,33 @@ use ethers::{
         transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160 as ethers_H160,
     },
 };
+use reth_interfaces::RethError;
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_OMMER_ROOT},
     proofs, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, TransactionSigned,
     TransactionSignedEcRecovered, Withdrawal, H256, U256,
 };
-use reth_provider::{PostState, StateProviderBox};
+use reth_provider::{BundleStateWithReceipts, StateProvider, StateProviderFactory};
 use reth_revm::{
-    database::{State, SubState},
-    env::tx_env_with_recovered,
-    executor::{
-        commit_state_changes, increment_account_balance, post_block_withdrawals_balance_increments,
-    },
-    into_reth_log,
+    database::StateProviderDatabase, env::tx_env_with_recovered, into_reth_log,
+    state_change::post_block_withdrawals_balance_increments,
 };
 use revm::{
-    db::{CacheDB, DatabaseRef},
+    db::WrapDatabaseRef,
     primitives::{EVMError, Env, InvalidTransaction, ResultAndState},
+    Database, DatabaseCommit, State,
 };
 use std::fmt;
 
-fn process_withdrawals<DB: DatabaseRef>(
+fn process_withdrawals<DB: Database<Error = RethError>>(
     withdrawals: &[Withdrawal],
     chain_spec: &ChainSpec,
-    db: &mut CacheDB<DB>,
-    post_state: &mut PostState,
+    db: &mut State<DB>,
     timestamp: u64,
-    block_number: u64,
-) -> Result<H256, <DB as DatabaseRef>::Error> {
+) -> Result<H256, Error> {
     let balance_increments =
         post_block_withdrawals_balance_increments(chain_spec, timestamp, withdrawals);
-
-    for (address, increment) in balance_increments {
-        increment_account_balance(db, post_state, block_number, address, increment)?;
-    }
-
+    db.increment_balances(balance_increments)?;
     let withdrawals_root = proofs::calculate_withdrawals_root(withdrawals);
     Ok(withdrawals_root)
 }
@@ -96,7 +88,10 @@ fn assemble_txs_from_pool<Pool: reth_transaction_pool::TransactionPool>(
     Ok(())
 }
 
-fn assemble_payload_with_payments(mut context: ExecutionContext) -> Result<BuildOutcome, Error> {
+fn assemble_payload_with_payments(
+    mut context: ExecutionContext,
+    client: &dyn StateProviderFactory,
+) -> Result<BuildOutcome, Error> {
     let base_fee = context.build.base_fee();
     let block_number = context.build.number();
     let block_gas_limit = context.build.gas_limit();
@@ -105,19 +100,25 @@ fn assemble_payload_with_payments(mut context: ExecutionContext) -> Result<Build
         &context.build.withdrawals,
         &context.build.chain_spec,
         &mut context.db,
-        &mut context.post_state,
         context.build.timestamp,
-        block_number,
     )?;
 
     if context.is_cancelled() {
         return Ok(BuildOutcome::Cancelled)
     }
 
-    let receipts_root = context.post_state.receipts_root(block_number);
-    let logs_bloom = context.post_state.logs_bloom(block_number);
-    let state_root = context.db.db.0.state_root(context.post_state)?;
+    let bundle_state = context.bundle_state;
     let transactions_root = proofs::calculate_transaction_root(&context.executed_txs);
+
+    let state_root = client.latest().unwrap().state_root(&bundle_state.clone()).unwrap();
+    let receipts = bundle_state.receipts_by_block(block_number);
+    let bundle = BundleStateWithReceipts::new(
+        context.db.take_bundle(),
+        vec![receipts.to_vec()],
+        block_number,
+    );
+    let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
+    let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
 
     let header = Header {
         parent_hash: context.build.parent_hash,
@@ -161,8 +162,9 @@ fn construct_payment_tx(
     context: &mut ExecutionContext,
 ) -> Result<TransactionSignedEcRecovered, Error> {
     let sender = context.build.builder_wallet.address();
-    let signer_account = context.db.load_account(sender.into())?;
-    let nonce = signer_account.info.nonce;
+    let signer_account = context.db.load_cache_account(sender.into())?;
+    let nonce = signer_account.account_info().unwrap().nonce;
+    let chain_id = context.build.chain_spec.genesis().config.chain_id;
 
     let fee_recipient = ethers_H160::from_slice(context.build.proposer_fee_recipient.as_ref());
     let tx = Eip1559TransactionRequest::new()
@@ -176,7 +178,8 @@ fn construct_payment_tx(
         .data(ethers::types::Bytes::default())
         .access_list(ethers::types::transaction::eip2930::AccessList::default())
         .nonce(nonce)
-        .chain_id(context.build.cfg_env.chain_id.to::<u64>());
+        .chain_id(chain_id);
+
     let tx = TypedTransaction::Eip1559(tx);
     let wallet = &context.build.builder_wallet;
     let signature = wallet.sign_transaction_sync(&tx).expect("can make transaction");
@@ -191,8 +194,8 @@ fn construct_payment_tx(
 struct ExecutionContext<'a> {
     build: &'a BuildContext,
     cancel: &'a Cancelled,
-    db: CacheDB<State<StateProviderBox<'a>>>,
-    post_state: PostState,
+    db: revm::State<WrapDatabaseRef<StateProviderDatabase<Box<dyn StateProvider + 'a>>>>,
+    bundle_state: BundleStateWithReceipts,
     cumulative_gas_used: u64,
     total_fees: U256,
     executed_txs: Vec<TransactionSigned>,
@@ -213,18 +216,24 @@ impl<'a> fmt::Debug for ExecutionContext<'a> {
 }
 
 impl<'a> ExecutionContext<'a> {
-    fn try_from<P: reth_provider::StateProviderFactory>(
+    fn try_from<P: reth_provider::StateProviderFactory + 'a>(
         context: &'a BuildContext,
         cancel: &'a Cancelled,
         provider: &'a P,
     ) -> Result<Self, Error> {
-        let state = State::new(provider.state_by_block_hash(context.parent_hash)?);
-        let db = SubState::new(state);
+        let state = provider.state_by_block_hash(context.parent_hash)?;
+        let mut db =
+            revm::State::builder().with_database_ref(StateProviderDatabase::new(state)).build();
+        let bundle_state = BundleStateWithReceipts::new(
+            db.take_bundle(),
+            vec![],
+            u64::from_le_bytes(context.block_env.number.to_le_bytes()),
+        );
         Ok(ExecutionContext {
             build: context,
             cancel,
             db,
-            post_state: Default::default(),
+            bundle_state,
             cumulative_gas_used: 0,
             total_fees: U256::ZERO,
             executed_txs: Default::default(),
@@ -254,23 +263,20 @@ impl<'a> ExecutionContext<'a> {
         let mut evm = revm::EVM::with_env(env);
         evm.database(&mut self.db);
 
-        let ResultAndState { result, state } = evm.transact().map_err(Error::Execution)?;
+        let ResultAndState { result, state } = evm.transact().unwrap();
 
         let block_number = self.build.number();
-        commit_state_changes(&mut self.db, &mut self.post_state, block_number, state, true);
+        self.db.commit(state);
 
         let gas_used = result.gas_used();
         self.cumulative_gas_used += gas_used;
-
-        self.post_state.add_receipt(
-            block_number,
-            Receipt {
-                tx_type: tx.tx_type(),
-                success: result.is_success(),
-                cumulative_gas_used: self.cumulative_gas_used,
-                logs: result.logs().into_iter().map(into_reth_log).collect(),
-            },
-        );
+        let receipt = Receipt {
+            tx_type: tx.tx_type(),
+            success: result.is_success(),
+            cumulative_gas_used: self.cumulative_gas_used,
+            logs: result.logs().into_iter().map(into_reth_log).collect(),
+        };
+        self.bundle_state.receipts_by_block(block_number).to_vec().push(Some(receipt));
 
         let base_fee = self.build.base_fee();
         let fee = tx.effective_tip_per_gas(base_fee).expect("fee is valid; execution succeeded");
@@ -317,5 +323,5 @@ pub fn build_payload<
         return Ok(BuildOutcome::Cancelled)
     }
 
-    assemble_payload_with_payments(context)
+    assemble_payload_with_payments(context, provider)
 }
