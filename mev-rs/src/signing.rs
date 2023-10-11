@@ -6,7 +6,8 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, BlsSignature, Root, Slot},
     signing::{sign_with_domain, verify_signed_data},
     ssz::prelude::SimpleSerialize,
-    state_transition::{Context, Error, Forks},
+    state_transition::{Context, Error},
+    Fork,
 };
 
 pub fn verify_signed_consensus_message<T: SimpleSerialize>(
@@ -18,8 +19,8 @@ pub fn verify_signed_consensus_message<T: SimpleSerialize>(
     root_hint: Option<Root>,
 ) -> Result<(), Error> {
     let fork_version = slot_hint.map(|slot| match context.fork_for(slot) {
-        Forks::Bellatrix => context.bellatrix_fork_version,
-        Forks::Capella => context.capella_fork_version,
+        Fork::Bellatrix => context.bellatrix_fork_version,
+        Fork::Capella => context.capella_fork_version,
         _ => unimplemented!(),
     });
     let domain =
