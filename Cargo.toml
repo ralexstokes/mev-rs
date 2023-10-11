@@ -24,9 +24,3 @@ revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
 [patch.crates-io]
 revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
 revm-primitives = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
-
-# NOTE: this is not strictly required to build
-# but, it works better with the default nix rust build environment
-# TODO: remove this patch once we have updated to at least `reth@v0.1.0-alpha.10`
-[patch.'https://github.com/ethereum/c-kzg-4844']
-c-kzg = "0.1.1"
