@@ -1,3 +1,4 @@
+pub use ethereum_consensus::signing::{compute_signing_root, verify_signature};
 use ethereum_consensus::{
     builder::compute_builder_domain,
     crypto::SecretKey,
@@ -29,17 +30,6 @@ pub fn verify_signed_consensus_message<T: SimpleSerialize>(
     Ok(())
 }
 
-pub fn verify_signed_builder_message<T: SimpleSerialize>(
-    message: &mut T,
-    signature: &BlsSignature,
-    public_key: &BlsPublicKey,
-    context: &Context,
-) -> Result<(), Error> {
-    let domain = compute_builder_domain(context)?;
-    verify_signed_data(message, signature, public_key, domain)?;
-    Ok(())
-}
-
 pub fn sign_builder_message<T: SimpleSerialize>(
     message: &mut T,
     signing_key: &SecretKey,
@@ -48,4 +38,12 @@ pub fn sign_builder_message<T: SimpleSerialize>(
     let domain = compute_builder_domain(context)?;
     let signature = sign_with_domain(message, signing_key, domain)?;
     Ok(signature)
+}
+
+pub fn compute_builder_signing_root<T: SimpleSerialize>(
+    data: &mut T,
+    context: &Context,
+) -> Result<Root, Error> {
+    let domain = compute_builder_domain(context)?;
+    compute_signing_root(data, domain)
 }
