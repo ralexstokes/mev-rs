@@ -1,7 +1,5 @@
 use crate::reth_builder::build::BuildIdentifier;
-use ethereum_consensus::{
-    primitives::Slot, ssz::prelude::SimpleSerializeError, state_transition::Error as ConsensusError,
-};
+use ethereum_consensus::{primitives::Slot, state_transition::Error as ConsensusError};
 use reth_interfaces::RethError;
 use reth_primitives::H256;
 use revm::primitives::EVMError;
@@ -21,8 +19,6 @@ pub enum Error {
     MissingParentBlock(H256),
     #[error("payload requested but build {0} has not produced one yet")]
     PayloadNotPrepared(BuildIdentifier),
-    #[error("{0}")]
-    Ssz(#[from] SimpleSerializeError),
     #[error("{0}")]
     Consensus(#[from] ConsensusError),
     #[error(transparent)]
