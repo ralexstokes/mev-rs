@@ -1,5 +1,5 @@
 use crate::reth_builder::build::BuildIdentifier;
-use ethereum_consensus::{primitives::Slot, state_transition::Error as ConsensusError};
+use ethereum_consensus::{primitives::Slot, Error as ConsensusError};
 use reth_interfaces::RethError;
 use reth_primitives::H256;
 use revm::primitives::EVMError;

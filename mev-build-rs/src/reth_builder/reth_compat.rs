@@ -6,7 +6,7 @@ use ethereum_consensus::{
         prelude::{ByteList, ByteVector},
     },
 };
-use mev_rs::types::{capella, ExecutionPayload};
+use mev_rs::types::ExecutionPayload;
 use reth_primitives::{Bloom, SealedBlock, H160, H256, U256};
 
 pub(crate) fn to_bytes32(value: H256) -> Bytes32 {
@@ -46,7 +46,7 @@ pub(crate) fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
         })
         .collect::<Vec<_>>();
 
-    let payload = capella::ExecutionPayload {
+    let payload = spec::ExecutionPayload {
         parent_hash: to_bytes32(header.parent_hash),
         fee_recipient: to_bytes20(header.beneficiary),
         state_root: to_bytes32(header.state_root),

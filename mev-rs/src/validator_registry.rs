@@ -8,7 +8,8 @@ use beacon_api_client::{
 use ethereum_consensus::{
     builder::ValidatorRegistration,
     primitives::{BlsPublicKey, ExecutionAddress, ValidatorIndex},
-    state_transition::{Context, Error as ConsensusError},
+    state_transition::Context,
+    Error as ConsensusError,
 };
 use parking_lot::Mutex;
 use std::{cmp::Ordering, collections::HashMap};
@@ -172,7 +173,7 @@ impl ValidatorRegistry {
             .ok_or(Error::UnknownPubkey)?;
         validate_validator_status(validator_status, public_key)?;
 
-        let signing_root = compute_builder_signing_root(&mut registration.message, context)?;
+        let signing_root = compute_builder_signing_root(message, context)?;
         let public_key = &message.public_key;
         verify_signature(public_key, signing_root.as_ref(), &registration.signature)?;
 

@@ -2,8 +2,8 @@ use crate::{
     blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
-        bellatrix, capella, deneb, BidRequest, ExecutionPayload, SignedBlindedBeaconBlock,
-        SignedBuilderBid, SignedValidatorRegistration,
+        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
     },
 };
 use axum::{
@@ -13,9 +13,8 @@ use axum::{
     routing::{get, post, IntoMakeService},
     Router,
 };
-use beacon_api_client::{Error as ApiClientError, VersionedValue};
+use beacon_api_client::VersionedValue;
 use hyper::server::conn::AddrIncoming;
-use serde::Deserialize;
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::task::JoinHandle;
 
@@ -41,31 +40,21 @@ async fn handle_fetch_bid<B: BlindedBlockProvider>(
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     let signed_bid = builder.fetch_best_bid(&bid_request).await?;
     tracing::info!("returning bid with {signed_bid} for bid request at {bid_request}");
-    let response = VersionedValue { payload: signed_bid, meta: Default::default() };
+    let version = signed_bid.version();
+    let response = VersionedValue { version, data: signed_bid, meta: Default::default() };
     Ok(Json(response))
 }
 
 async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
-    Json(block): Json<serde_json::Value>,
+    Json(mut block): Json<SignedBlindedBeaconBlock>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
-    let mut block = deneb::SignedBlindedBlockAndBlobSidecars::deserialize(&block)
-        .map(SignedBlindedBeaconBlock::Deneb)
-        .or_else(|_| {
-            capella::SignedBlindedBeaconBlock::deserialize(&block)
-                .map(SignedBlindedBeaconBlock::Capella)
-        })
-        .or_else(|_| {
-            bellatrix::SignedBlindedBeaconBlock::deserialize(&block)
-                .map(SignedBlindedBeaconBlock::Bellatrix)
-        })
-        .map_err(ApiClientError::from)?;
-
     let payload = builder.open_bid(&mut block).await?;
     let block_hash = payload.block_hash();
-    let slot = block.slot();
+    let slot = *block.message().slot();
     tracing::info!("returning provided payload in slot {slot} with block_hash {block_hash}");
-    let response = VersionedValue { payload, meta: Default::default() };
+    let version = payload.version();
+    let response = VersionedValue { version, data: payload, meta: Default::default() };
     Ok(Json(response))
 }
 

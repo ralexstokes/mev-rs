@@ -55,7 +55,7 @@ impl Client {
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =
             response.json().await.map_err(beacon_api_client::Error::Http)?;
         match result {
-            ApiResult::Ok(result) => Ok(result.payload),
+            ApiResult::Ok(result) => Ok(result.data),
             ApiResult::Err(err) => Err(Error::Api(err.into())),
         }
     }
@@ -79,7 +79,7 @@ impl Client {
         let result: ApiResult<VersionedValue<ExecutionPayload>> =
             response.json().await.map_err(beacon_api_client::Error::Http)?;
         match result {
-            ApiResult::Ok(result) => Ok(result.payload),
+            ApiResult::Ok(result) => Ok(result.data),
             ApiResult::Err(err) => Err(ApiError::from(err).into()),
         }
     }
