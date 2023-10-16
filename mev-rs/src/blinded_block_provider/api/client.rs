@@ -64,17 +64,7 @@ impl Client {
         &self,
         signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let response = match signed_block {
-            SignedBlindedBeaconBlock::Bellatrix(signed_block) => {
-                self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
-            }
-            SignedBlindedBeaconBlock::Capella(signed_block) => {
-                self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
-            }
-            SignedBlindedBeaconBlock::Deneb(signed_block) => {
-                self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?
-            }
-        };
+        let response = self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?;
 
         let result: ApiResult<VersionedValue<ExecutionPayload>> =
             response.json().await.map_err(beacon_api_client::Error::Http)?;
