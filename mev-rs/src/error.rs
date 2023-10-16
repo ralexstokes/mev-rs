@@ -2,7 +2,7 @@ use crate::types::BidRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, ExecutionAddress, Hash32, Slot},
-    state_transition::Error as ConsensusError,
+    Error as ConsensusError,
 };
 use thiserror::Error;
 

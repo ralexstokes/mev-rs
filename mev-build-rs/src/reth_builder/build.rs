@@ -12,7 +12,7 @@ use ethereum_consensus::{
 use ethers::signers::LocalWallet;
 use mev_rs::{
     signing::sign_builder_message,
-    types::{BidTrace, ExecutionPayload, SignedBidSubmission},
+    types::{BidTrace, SignedBidSubmission},
 };
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, H256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
@@ -39,11 +39,7 @@ fn make_submission(
         gas_used: payload.gas_used,
         value: to_u256(payment),
     };
-    let execution_payload = match to_execution_payload(payload) {
-        ExecutionPayload::Bellatrix(_) => unimplemented!(),
-        ExecutionPayload::Capella(payload) => payload,
-        ExecutionPayload::Deneb(_) => unimplemented!(),
-    };
+    let execution_payload = to_execution_payload(payload);
     let signature = sign_builder_message(&mut message, signing_key, context)?;
     Ok(SignedBidSubmission { message, execution_payload, signature })
 }

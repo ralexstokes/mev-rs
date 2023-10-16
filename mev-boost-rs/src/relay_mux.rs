@@ -24,8 +24,9 @@ const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
 fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
-    let slot = signed_block.slot();
-    let parent_hash = signed_block.parent_hash().clone();
+    let slot = *signed_block.message().slot();
+    let parent_hash =
+        signed_block.message().body().execution_payload_header().parent_hash().clone();
 
     BidRequest { slot, parent_hash, public_key: public_key.clone() }
 }
@@ -35,9 +36,10 @@ fn validate_bid(
     public_key: &BlsPublicKey,
     context: &Context,
 ) -> Result<(), Error> {
-    if bid.public_key() != public_key {
+    let bid_public_key = &bid.message.public_key;
+    if bid_public_key != public_key {
         return Err(Error::BidPublicKeyMismatch {
-            bid: bid.public_key().clone(),
+            bid: bid_public_key.clone(),
             relay: public_key.clone(),
         })
     }
@@ -169,7 +171,7 @@ impl BlindedBlockProvider for RelayMux {
 
         // TODO: change `value` so it does the copy internally
         let mut best_bid_indices =
-            select_best_bids(bids.iter().map(|(_, bid)| bid.value().clone()).enumerate());
+            select_best_bids(bids.iter().map(|(_, bid)| bid.message.value.clone()).enumerate());
 
         // if multiple distinct bids with same bid value, break tie by randomly picking one
         let mut rng = rand::thread_rng();
@@ -179,12 +181,12 @@ impl BlindedBlockProvider for RelayMux {
             best_bid_indices.split_first().expect("there is at least one bid");
 
         let (best_relay, best_bid) = &bids[*best_bid_index];
-        let best_block_hash = best_bid.block_hash();
+        let best_block_hash = best_bid.message.header.block_hash();
 
         let mut best_relays = vec![best_relay.clone()];
         for bid_index in rest {
             let (relay, bid) = &bids[*bid_index];
-            if bid.block_hash() == best_block_hash {
+            if bid.message.header.block_hash() == best_block_hash {
                 best_relays.push(relay.clone());
             }
         }
@@ -227,7 +229,10 @@ impl BlindedBlockProvider for RelayMux {
             .collect::<Vec<_>>()
             .await;
 
-        let expected_block_hash = signed_block.block_hash();
+        let block = signed_block.message();
+        let block_body = block.body();
+        let payload_header = block_body.execution_payload_header();
+        let expected_block_hash = payload_header.block_hash();
         for (relay, response) in responses.into_iter() {
             match response {
                 Ok(payload) => {
