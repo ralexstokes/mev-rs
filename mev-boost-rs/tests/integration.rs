@@ -1,4 +1,5 @@
-use async_trait::async_trait;
+mod identity_builder;
+
 use beacon_api_client::Client as ApiClient;
 use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
@@ -6,25 +7,21 @@ use ethereum_consensus::{
     capella::mainnet as capella,
     crypto::SecretKey,
     phase0::mainnet::{compute_domain, Validator},
-    primitives::{BlsPublicKey, DomainType, ExecutionAddress, Hash32, Root, Slot, U256},
+    primitives::{DomainType, ExecutionAddress, Hash32, Root},
     signing::sign_with_domain,
-    state_transition::{Context, Forks},
+    state_transition::Context,
+    Fork,
 };
+use identity_builder::*;
 use mev_boost_rs::{Config, Service};
 use mev_rs::{
-    blinded_block_provider::{BlindedBlockProvider, Client as RelayClient, Server as RelayServer},
+    blinded_block_provider::{Client as RelayClient, Server as RelayServer},
     signing::sign_builder_message,
-    types::{
-        bellatrix as bellatrix_builder, capella as capella_builder, BidRequest, ExecutionPayload,
-        SignedBlindedBeaconBlock, SignedBuilderBid,
-    },
-    Error,
+    types::{BidRequest, SignedBlindedBeaconBlock},
 };
 use rand::seq::SliceRandom;
 use std::{
-    collections::HashMap,
     net::Ipv4Addr,
-    sync::{Arc, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
@@ -65,96 +62,6 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
             Proposer { index: i, validator, signing_key, fee_recipient }
         })
         .collect()
-}
-
-#[derive(Default, Clone)]
-pub struct IdentityBuilder {
-    signing_key: SecretKey,
-    public_key: BlsPublicKey,
-    context: Arc<Context>,
-    bids: Arc<Mutex<HashMap<Slot, ExecutionPayload>>>,
-    registrations: Arc<Mutex<HashMap<BlsPublicKey, ValidatorRegistration>>>,
-}
-
-impl IdentityBuilder {
-    fn new(context: Context) -> Self {
-        let signing_key = SecretKey::try_from([1u8; 32].as_ref()).unwrap();
-        let public_key = signing_key.public_key();
-        Self { signing_key, public_key, context: Arc::new(context), ..Default::default() }
-    }
-}
-
-#[async_trait]
-impl BlindedBlockProvider for IdentityBuilder {
-    async fn register_validators(
-        &self,
-        registrations: &mut [SignedValidatorRegistration],
-    ) -> Result<(), Error> {
-        let mut state = self.registrations.lock().unwrap();
-        for registration in registrations {
-            let registration = &registration.message;
-            let public_key = registration.public_key.clone();
-            state.insert(public_key, registration.clone());
-        }
-        Ok(())
-    }
-
-    async fn fetch_best_bid(
-        &self,
-        BidRequest { slot, parent_hash, public_key }: &BidRequest,
-    ) -> Result<SignedBuilderBid, Error> {
-        let capella_fork_slot = self.context.capella_fork_epoch * self.context.slots_per_epoch;
-        let state = self.registrations.lock().unwrap();
-        let preferences = state.get(public_key).unwrap();
-        let value = U256::from(1337);
-        let (payload, signed_builder_bid) = if *slot < capella_fork_slot {
-            let mut inner = bellatrix::ExecutionPayload {
-                parent_hash: parent_hash.clone(),
-                fee_recipient: preferences.fee_recipient.clone(),
-                gas_limit: preferences.gas_limit,
-                ..Default::default()
-            };
-            let header = bellatrix::ExecutionPayloadHeader::try_from(&mut inner).unwrap();
-            let payload = ExecutionPayload::Bellatrix(inner);
-            let mut inner = bellatrix_builder::BuilderBid {
-                header,
-                value,
-                public_key: self.public_key.clone(),
-            };
-            let signature =
-                sign_builder_message(&mut inner, &self.signing_key, &self.context).unwrap();
-            let inner = bellatrix_builder::SignedBuilderBid { message: inner, signature };
-            (payload, SignedBuilderBid::Bellatrix(inner))
-        } else {
-            let mut inner = capella::ExecutionPayload {
-                parent_hash: parent_hash.clone(),
-                fee_recipient: preferences.fee_recipient.clone(),
-                gas_limit: preferences.gas_limit,
-                ..Default::default()
-            };
-            let header = capella::ExecutionPayloadHeader::try_from(&mut inner).unwrap();
-            let payload = ExecutionPayload::Capella(inner);
-            let mut inner =
-                capella_builder::BuilderBid { header, value, public_key: self.public_key.clone() };
-            let signature =
-                sign_builder_message(&mut inner, &self.signing_key, &self.context).unwrap();
-            let inner = capella_builder::SignedBuilderBid { message: inner, signature };
-            (payload, SignedBuilderBid::Capella(inner))
-        };
-
-        let mut state = self.bids.lock().unwrap();
-        state.insert(*slot, payload);
-        Ok(signed_builder_bid)
-    }
-
-    async fn open_bid(
-        &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
-        let slot = signed_block.slot();
-        let state = self.bids.lock().unwrap();
-        Ok(state.get(&slot).cloned().unwrap())
-    }
 }
 
 #[tokio::test]
@@ -231,10 +138,10 @@ async fn propose_block(
     context: &Context,
     genesis_validators_root: &Root,
 ) {
-    let fork = if shuffling_index == 0 { Forks::Bellatrix } else { Forks::Capella };
+    let fork = if shuffling_index == 0 { Fork::Bellatrix } else { Fork::Capella };
     let current_slot = match fork {
-        Forks::Bellatrix => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
-        Forks::Capella => 32 + context.capella_fork_epoch * context.slots_per_epoch,
+        Fork::Bellatrix => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
+        Fork::Capella => 32 + context.capella_fork_epoch * context.slots_per_epoch,
         _ => unimplemented!(),
     };
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
@@ -245,17 +152,14 @@ async fn propose_block(
         public_key: proposer.validator.public_key.clone(),
     };
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
-    let bid_parent_hash = signed_bid.parent_hash();
+    let bid_parent_hash = signed_bid.message.header.parent_hash();
     assert_eq!(bid_parent_hash, &parent_hash);
 
     let signed_block = match fork {
-        Forks::Bellatrix => {
-            let bid = match signed_bid {
-                SignedBuilderBid::Bellatrix(bid) => bid,
-                _ => unimplemented!(),
-            };
+        Fork::Bellatrix => {
+            let header = signed_bid.message.header.bellatrix().unwrap().clone();
             let beacon_block_body = bellatrix::BlindedBeaconBlockBody {
-                execution_payload_header: bid.message.header,
+                execution_payload_header: header,
                 ..Default::default()
             };
             let mut beacon_block = bellatrix::BlindedBeaconBlock {
@@ -278,13 +182,10 @@ async fn propose_block(
                 bellatrix::SignedBlindedBeaconBlock { message: beacon_block, signature };
             SignedBlindedBeaconBlock::Bellatrix(signed_block)
         }
-        Forks::Capella => {
-            let bid = match signed_bid {
-                SignedBuilderBid::Capella(bid) => bid,
-                _ => unimplemented!(),
-            };
+        Fork::Capella => {
+            let header = signed_bid.message.header.capella().unwrap().clone();
             let beacon_block_body = capella::BlindedBeaconBlockBody {
-                execution_payload_header: bid.message.header,
+                execution_payload_header: header,
                 ..Default::default()
             };
             let mut beacon_block = capella::BlindedBeaconBlock {
@@ -314,17 +215,11 @@ async fn propose_block(
 
     let payload = beacon_node.open_bid(&signed_block).await.unwrap();
 
-    match payload {
-        ExecutionPayload::Bellatrix(payload) => {
-            assert_eq!(payload.parent_hash, parent_hash);
-            assert_eq!(payload.fee_recipient, proposer.fee_recipient);
-        }
-        ExecutionPayload::Capella(payload) => {
-            assert_eq!(payload.parent_hash, parent_hash);
-            assert_eq!(payload.fee_recipient, proposer.fee_recipient);
-        }
-        _ => unimplemented!(),
-    }
+    let payload_parent_hash = payload.parent_hash();
+    assert_eq!(payload_parent_hash, &parent_hash);
+
+    let payload_fee_recipient = payload.fee_recipient();
+    assert_eq!(payload_fee_recipient, &proposer.fee_recipient);
 
     beacon_node.check_status().await.unwrap();
 }
