@@ -98,7 +98,7 @@ impl BlindedBlockProvider for IdentityBuilder {
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let slot = *signed_block.message().slot();
+        let slot = signed_block.message().slot();
         let state = self.bids.lock().unwrap();
         Ok(state.get(&slot).cloned().unwrap())
     }

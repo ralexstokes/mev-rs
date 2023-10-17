@@ -47,7 +47,7 @@ fn validate_execution_payload(
 
     // TODO allow for "adjustment cap" per the protocol rules
     // towards the proposer's preference
-    if execution_payload.gas_limit() != &preferences.gas_limit {
+    if execution_payload.gas_limit() != preferences.gas_limit {
         return Err(Error::InvalidGasLimit)
     }
 
@@ -81,7 +81,7 @@ fn validate_signed_block(
     // verify proposer_index is correct
     // verify parent_root matches
 
-    let slot = *block.slot();
+    let slot = block.slot();
     let signing_root =
         compute_consensus_signing_root(&mut block, slot, genesis_validators_root, context)?;
     let signature = signed_block.signature();
@@ -204,11 +204,11 @@ impl BlindedBlockProvider for Relay {
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
         let block = signed_block.message();
-        let slot = *block.slot();
+        let slot = block.slot();
         let body = block.body();
         let payload_header = body.execution_payload_header();
         let parent_hash = payload_header.parent_hash().clone();
-        let proposer_index = *block.proposer_index();
+        let proposer_index = block.proposer_index();
         let public_key =
             self.validator_registry.get_public_key(proposer_index).map_err(Error::from)?;
         let bid_request = BidRequest { slot, parent_hash, public_key };

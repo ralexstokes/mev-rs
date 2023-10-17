@@ -610,7 +610,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=bfb6af698311226d55ec7c7ba6eabbc1abc072a0#bfb6af698311226d55ec7c7ba6eabbc1abc072a0"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=766aca6c5d10ee8dac015fbe705667f60097149d#766aca6c5d10ee8dac015fbe705667f60097149d"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -2271,7 +2271,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=bfb6af698311226d55ec7c7ba6eabbc1abc072a0#bfb6af698311226d55ec7c7ba6eabbc1abc072a0"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=766aca6c5d10ee8dac015fbe705667f60097149d#766aca6c5d10ee8dac015fbe705667f60097149d"
 dependencies = [
  "async-stream",
  "blst",
@@ -7359,7 +7359,7 @@ checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=c00a4659b9d1980d410c487a88e983cf2506c928#c00a4659b9d1980d410c487a88e983cf2506c928"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=20829edcaa48e5f5f39939a69928debc477be4e2#20829edcaa48e5f5f39939a69928debc477be4e2"
 dependencies = [
  "bitvec",
  "hex",
@@ -7372,7 +7372,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=c00a4659b9d1980d410c487a88e983cf2506c928#c00a4659b9d1980d410c487a88e983cf2506c928"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=20829edcaa48e5f5f39939a69928debc477be4e2#20829edcaa48e5f5f39939a69928debc477be4e2"
 dependencies = [
  "proc-macro2",
  "quote",

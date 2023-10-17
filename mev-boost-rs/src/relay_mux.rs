@@ -24,7 +24,7 @@ const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
 fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
-    let slot = *signed_block.message().slot();
+    let slot = signed_block.message().slot();
     let parent_hash =
         signed_block.message().body().execution_payload_header().parent_hash().clone();
 
