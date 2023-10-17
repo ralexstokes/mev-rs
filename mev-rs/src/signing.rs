@@ -6,7 +6,7 @@ use ethereum_consensus::{
     signing::sign_with_domain,
     ssz::prelude::Merkleized,
     state_transition::Context,
-    Error, Fork,
+    Error,
 };
 pub use ethereum_consensus::{
     crypto::SecretKey,
@@ -19,12 +19,8 @@ pub fn compute_consensus_signing_root<T: Merkleized>(
     genesis_validators_root: &Root,
     context: &Context,
 ) -> Result<Root, Error> {
-    let fork_version = match context.fork_for(slot) {
-        Fork::Bellatrix => context.bellatrix_fork_version,
-        Fork::Capella => context.capella_fork_version,
-        Fork::Deneb => context.deneb_fork_version,
-        _ => unimplemented!("fork not supported"),
-    };
+    let fork = context.fork_for(slot);
+    let fork_version = context.fork_version_for(fork);
     let domain = compute_domain(
         DomainType::BeaconProposer,
         Some(fork_version),
