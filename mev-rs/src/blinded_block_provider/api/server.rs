@@ -51,7 +51,7 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
     let payload = builder.open_bid(&mut block).await?;
     let block_hash = payload.block_hash();
-    let slot = *block.message().slot();
+    let slot = block.message().slot();
     tracing::info!("returning provided payload in slot {slot} with block_hash {block_hash}");
     let version = payload.version();
     let response = VersionedValue { version, data: payload, meta: Default::default() };
