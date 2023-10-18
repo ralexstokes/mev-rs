@@ -3,7 +3,7 @@ use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot};
 #[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BidRequest {
-    #[serde(with = "crate::serde::as_string")]
+    #[serde(with = "crate::serde::as_str")]
     pub slot: Slot,
     pub parent_hash: Hash32,
     pub public_key: BlsPublicKey,

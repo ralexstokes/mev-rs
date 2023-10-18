@@ -7,7 +7,7 @@ use ethereum_consensus::{
 #[derive(Debug, Default, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BidTrace {
-    #[serde(with = "crate::serde::as_string")]
+    #[serde(with = "crate::serde::as_str")]
     pub slot: Slot,
     pub parent_hash: Hash32,
     pub block_hash: Hash32,
@@ -16,9 +16,9 @@ pub struct BidTrace {
     #[serde(rename = "proposer_pubkey")]
     pub proposer_public_key: BlsPublicKey,
     pub proposer_fee_recipient: ExecutionAddress,
-    #[serde(with = "crate::serde::as_string")]
+    #[serde(with = "crate::serde::as_str")]
     pub gas_limit: u64,
-    #[serde(with = "crate::serde::as_string")]
+    #[serde(with = "crate::serde::as_str")]
     pub gas_used: u64,
     pub value: U256,
 }
