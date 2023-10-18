@@ -2,7 +2,6 @@ mod reth_ext;
 
 use anyhow::Result;
 use clap::Args;
-use ethereum_consensus::networks::Network;
 use reth_ext::{launch_reth_with, RethNodeExt};
 
 #[derive(Debug, Args)]
@@ -13,8 +12,9 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn execute(&self, network: Network) -> Result<()> {
-        let ext = RethNodeExt { config_file: self.config_file.clone(), network, config: None };
+    pub async fn execute(self) -> Result<()> {
+        let ext =
+            RethNodeExt { config_file: self.config_file.clone(), network: None, config: None };
         launch_reth_with(ext).await;
         Ok(())
     }

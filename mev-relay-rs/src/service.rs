@@ -17,8 +17,6 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub beacon_node_url: String,
-    #[serde(default)]
-    pub network: Network,
     pub secret_key: SecretKey,
 }
 
@@ -28,7 +26,6 @@ impl Default for Config {
             host: Ipv4Addr::LOCALHOST,
             port: 28545,
             beacon_node_url: "http://127.0.0.1:5052".into(),
-            network: Default::default(),
             secret_key: Default::default(),
         }
     }
@@ -43,14 +40,14 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(config: Config) -> Self {
+    pub fn from(network: Network, config: Config) -> Self {
         let endpoint: Url = config.beacon_node_url.parse().unwrap();
         let beacon_node = Client::new(endpoint);
         Self {
             host: config.host,
             port: config.port,
             beacon_node,
-            network: config.network,
+            network,
             secret_key: config.secret_key,
         }
     }

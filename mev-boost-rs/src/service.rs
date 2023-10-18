@@ -20,18 +20,11 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub relays: Vec<String>,
-    #[serde(default)]
-    pub network: Network,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self {
-            host: Ipv4Addr::UNSPECIFIED,
-            port: 18550,
-            relays: vec![],
-            network: Network::default(),
-        }
+        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
     }
 }
 
@@ -58,10 +51,10 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(config: Config) -> Self {
+    pub fn from(network: Network, config: Config) -> Self {
         let relays = parse_relay_endpoints(&config.relays);
 
-        Self { host: config.host, port: config.port, relays, network: config.network }
+        Self { host: config.host, port: config.port, relays, network }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task

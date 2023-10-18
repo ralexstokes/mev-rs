@@ -6,9 +6,11 @@ use mev_build_rs::reth_builder::Config as BuildConfig;
 use mev_relay_rs::Config as RelayConfig;
 use serde::Deserialize;
 use std::{fmt, path::Path};
+use tracing::info;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
+    pub network: Network,
     pub boost: Option<BoostConfig>,
     #[serde(rename = "builder")]
     pub build: Option<BuildConfig>,
@@ -19,10 +21,10 @@ impl Config {
     pub fn from_toml_file<P: AsRef<Path> + fmt::Display + Clone>(path: P) -> Result<Config> {
         tracing::info!("loading config from `{path}`...");
 
-        let config_data = std::fs::read(path.as_ref())
+        let config_data = std::fs::read_to_string(path.as_ref())
             .with_context(|| format!("could not read config from `{path}`"))?;
 
-        toml::from_slice(&config_data).context("could not parse TOML")
+        toml::from_str(&config_data).context("could not parse TOML")
     }
 }
 
@@ -34,12 +36,11 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn execute(&self, network: Network) -> Result<()> {
-        let config_file = &self.config_file;
+    pub async fn execute(self) -> Result<()> {
+        let config_file = self.config_file;
 
         let config = Config::from_toml_file(config_file)?;
-
-        tracing::info!("configured for network `{}` with configuration {:#?}", network, config);
+        info!("{config:#?}");
 
         Ok(())
     }

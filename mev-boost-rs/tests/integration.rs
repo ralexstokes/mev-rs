@@ -6,6 +6,7 @@ use ethereum_consensus::{
     builder::{SignedValidatorRegistration, ValidatorRegistration},
     capella::mainnet as capella,
     crypto::SecretKey,
+    networks::Network,
     phase0::mainnet::{compute_domain, Validator},
     primitives::{DomainType, ExecutionAddress, Hash32, Root},
     signing::sign_with_domain,
@@ -96,7 +97,8 @@ async fn test_end_to_end() {
     config.relays.push(format!("http://{relay_public_key}@127.0.0.1:{port}"));
 
     let mux_port = config.port;
-    let service = Service::from(config);
+    let network = Network::Sepolia;
+    let service = Service::from(network, config);
     service.spawn(Some(context.clone())).unwrap();
 
     let beacon_node = RelayClient::new(ApiClient::new(
