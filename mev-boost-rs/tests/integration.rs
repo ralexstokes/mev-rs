@@ -75,10 +75,8 @@ async fn test_end_to_end() {
 
     let genesis_validators_root = Root::try_from([23u8; 32].as_ref()).unwrap();
 
-    let mut context = Context::for_mainnet();
-    // mock epoch values to transition across forks
-    context.bellatrix_fork_epoch = 12;
-    context.capella_fork_epoch = 22;
+    let network = Network::Sepolia;
+    let context = Context::try_from(&network).unwrap();
 
     // NOTE: non-default secret key required. otherwise public key is point at infinity and
     // signature verification will fail.
@@ -94,12 +92,11 @@ async fn test_end_to_end() {
 
     // start mux server
     let mut config = Config::default();
-    config.relays.push(format!("http://{relay_public_key}@127.0.0.1:{port}"));
+    config.relays.push(format!("http://{relay_public_key:?}@127.0.0.1:{port}"));
 
     let mux_port = config.port;
-    let network = Network::Sepolia;
     let service = Service::from(network, config);
-    service.spawn(Some(context.clone())).unwrap();
+    service.spawn().unwrap();
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
@@ -142,8 +139,8 @@ async fn propose_block(
 ) {
     let fork = if shuffling_index == 0 { Fork::Bellatrix } else { Fork::Capella };
     let current_slot = match fork {
-        Fork::Bellatrix => 32 + context.bellatrix_fork_epoch * context.slots_per_epoch,
-        Fork::Capella => 32 + context.capella_fork_epoch * context.slots_per_epoch,
+        Fork::Bellatrix => 30 + context.bellatrix_fork_epoch * context.slots_per_epoch,
+        Fork::Capella => 30 + context.capella_fork_epoch * context.slots_per_epoch,
         _ => unimplemented!(),
     };
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();

@@ -58,7 +58,7 @@ impl Service {
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+    pub fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network } = self;
 
         if relays.is_empty() {
@@ -71,8 +71,7 @@ impl Service {
             }
         }
 
-        let context =
-            if let Some(context) = context { context } else { Context::try_from(&network)? };
+        let context = Context::try_from(&network)?;
         let relays = relays.into_iter().map(Relay::from);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);

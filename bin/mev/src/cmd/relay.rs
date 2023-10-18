@@ -35,7 +35,7 @@ impl Command {
         info!("configured for {network}");
 
         if let Some(config) = config.relay {
-            let service = Service::from(network, config).spawn(None).await?;
+            let service = Service::from(network, config).spawn().await?;
             Ok(service.await?)
         } else {
             Err(anyhow!("missing relay config from file provided"))

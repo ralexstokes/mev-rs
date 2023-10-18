@@ -54,11 +54,10 @@ impl Service {
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+    pub async fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, beacon_node, network, secret_key } = self;
 
-        let context =
-            if let Some(context) = context { context } else { Context::try_from(&network)? };
+        let context = Context::try_from(&network)?;
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)
