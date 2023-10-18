@@ -110,7 +110,7 @@ fn assemble_payload_with_payments(
     let bundle_state = context.bundle_state;
     let transactions_root = proofs::calculate_transaction_root(&context.executed_txs);
 
-    let state_root = client.latest().unwrap().state_root(&bundle_state.clone()).unwrap();
+    let state_root = client.latest()?.state_root(&bundle_state.clone())?;
     let receipts = bundle_state.receipts_by_block(block_number);
     let bundle = BundleStateWithReceipts::new(
         context.db.take_bundle(),
@@ -163,7 +163,7 @@ fn construct_payment_tx(
 ) -> Result<TransactionSignedEcRecovered, Error> {
     let sender = context.build.builder_wallet.address();
     let signer_account = context.db.load_cache_account(sender.into())?;
-    let nonce = signer_account.account_info().unwrap().nonce;
+    let nonce = signer_account.account_info().expect("account exists").nonce;
     let chain_id = context.build.chain_spec.genesis().config.chain_id;
 
     let fee_recipient = ethers_H160::from_slice(context.build.proposer_fee_recipient.as_ref());
@@ -263,7 +263,7 @@ impl<'a> ExecutionContext<'a> {
         let mut evm = revm::EVM::with_env(env);
         evm.database(&mut self.db);
 
-        let ResultAndState { result, state } = evm.transact().unwrap();
+        let ResultAndState { result, state } = evm.transact()?;
 
         let block_number = self.build.number();
         self.db.commit(state);
