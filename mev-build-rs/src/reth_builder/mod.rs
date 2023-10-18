@@ -9,7 +9,9 @@ mod payload_builder;
 mod reth_compat;
 mod reth_ext;
 mod service;
+mod service_ext;
 mod types;
 
 pub use bidder::DeadlineBidder;
-pub use service::{Config, Service};
+pub use service::Config;
+pub use service_ext::ServiceExt as Service;
