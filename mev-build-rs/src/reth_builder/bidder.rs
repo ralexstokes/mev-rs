@@ -4,7 +4,6 @@ use ethereum_consensus::clock::SystemClock;
 use std::time::Duration;
 
 pub enum Bid {
-    Continue,
     Done,
 }
 
