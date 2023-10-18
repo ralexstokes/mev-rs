@@ -9,10 +9,6 @@ use thiserror::Error;
 pub enum Error {
     #[error("no validators registered for slot {0}")]
     NoRegisteredValidatorsForSlot(Slot),
-    #[error("already building for identifier {0:?}")]
-    DuplicatebuildRequest(BuildIdentifier),
-    #[error("channel was unexpectedly closed")]
-    UnexpectedChannelClosure,
     #[error("missing a build request with identifier {0}")]
     MissingBuild(BuildIdentifier),
     #[error("missing parent block {0}")]

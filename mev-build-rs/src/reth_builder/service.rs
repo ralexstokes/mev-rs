@@ -162,12 +162,9 @@ impl<
                                     if let Err(err) = builder.submit_bid(&id).await {
                                         tracing::warn!(id = %id, slot=?build.context.slot, err = %err, "error submitting bid for build");
                                     }
-                                    match bid {
-                                        Bid::Continue => {}
-                                        Bid::Done => {
-                                            builder.cancel_build(&id);
-                                            break;
-                                        }
+                                    if matches!(bid, Bid::Done) {
+                                        builder.cancel_build(&id);
+                                        break;
                                     }
                                 }
                                 Ok(None) => continue,
