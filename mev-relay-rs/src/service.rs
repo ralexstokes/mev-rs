@@ -17,8 +17,6 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub beacon_node_url: String,
-    #[serde(default)]
-    pub network: Network,
     pub secret_key: SecretKey,
 }
 
@@ -28,7 +26,6 @@ impl Default for Config {
             host: Ipv4Addr::LOCALHOST,
             port: 28545,
             beacon_node_url: "http://127.0.0.1:5052".into(),
-            network: Default::default(),
             secret_key: Default::default(),
         }
     }
@@ -43,25 +40,24 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(config: Config) -> Self {
+    pub fn from(network: Network, config: Config) -> Self {
         let endpoint: Url = config.beacon_node_url.parse().unwrap();
         let beacon_node = Client::new(endpoint);
         Self {
             host: config.host,
             port: config.port,
             beacon_node,
-            network: config.network,
+            network,
             secret_key: config.secret_key,
         }
     }
 
     /// Configures the [`Relay`] and the [`BlindedBlockProviderServer`] and spawns both to
     /// individual tasks
-    pub async fn spawn(self, context: Option<Context>) -> Result<ServiceHandle, Error> {
+    pub async fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, beacon_node, network, secret_key } = self;
 
-        let context =
-            if let Some(context) = context { context } else { Context::try_from(&network)? };
+        let context = Context::try_from(&network)?;
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)

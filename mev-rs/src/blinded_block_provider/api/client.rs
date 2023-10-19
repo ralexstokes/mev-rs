@@ -43,7 +43,7 @@ impl Client {
         bid_request: &BidRequest,
     ) -> Result<SignedBuilderBid, Error> {
         let target = format!(
-            "/eth/v1/builder/header/{}/{}/{}",
+            "/eth/v1/builder/header/{}/{:?}/{:?}",
             bid_request.slot, bid_request.parent_hash, bid_request.public_key
         );
         let response = self.api.http_get(&target).await?;

@@ -1,8 +1,8 @@
 use crate::cmd::config::Config;
 use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
-use ethereum_consensus::networks::Network;
 use mev_relay_rs::Service;
+use tracing::info;
 
 #[derive(Debug, Args)]
 #[clap(about = "🏗 connecting builders to proposers", subcommand_negates_reqs = true)]
@@ -20,7 +20,7 @@ pub enum Commands {
 }
 
 impl Command {
-    pub async fn execute(&self, network: Network) -> Result<()> {
+    pub async fn execute(self) -> Result<()> {
         let (config_file, _mock) = if let Some(subcommand) = self.command.as_ref() {
             match subcommand {
                 Commands::Mock { config_file } => (config_file, true),
@@ -31,9 +31,11 @@ impl Command {
 
         let config = Config::from_toml_file(config_file)?;
 
-        if let Some(mut config) = config.relay {
-            config.network = network;
-            let service = Service::from(config).spawn(None).await?;
+        let network = config.network;
+        info!("configured for {network}");
+
+        if let Some(config) = config.relay {
+            let service = Service::from(network, config).spawn().await?;
             Ok(service.await?)
         } else {
             Err(anyhow!("missing relay config from file provided"))

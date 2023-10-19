@@ -17,7 +17,7 @@ mev-build-rs = { path = "../../mev-build-rs" }
 mev-rs = { path = "../../mev-rs" }
 
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.5.9"
+toml = "0.8.2"
 
 clap = { version = "4.1.4", features = ["derive", "env"] }
 anyhow = "1.0.57"

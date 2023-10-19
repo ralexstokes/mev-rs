@@ -610,7 +610,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=766aca6c5d10ee8dac015fbe705667f60097149d#766aca6c5d10ee8dac015fbe705667f60097149d"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=c84f44ee7ec04613adf5f2be845df35e05de1efc#c84f44ee7ec04613adf5f2be845df35e05de1efc"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -2271,7 +2271,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=766aca6c5d10ee8dac015fbe705667f60097149d#766aca6c5d10ee8dac015fbe705667f60097149d"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=c84f44ee7ec04613adf5f2be845df35e05de1efc#c84f44ee7ec04613adf5f2be845df35e05de1efc"
 dependencies = [
  "async-stream",
  "blst",
@@ -4189,7 +4189,7 @@ dependencies = [
  "reth-primitives",
  "serde",
  "tokio",
- "toml 0.5.11",
+ "toml 0.8.2",
  "tracing",
  "tracing-subscriber",
 ]
@@ -7359,7 +7359,7 @@ checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=20829edcaa48e5f5f39939a69928debc477be4e2#20829edcaa48e5f5f39939a69928debc477be4e2"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=6755022b7727e3392bfbc2b9c683cb7bf9caa4ce#6755022b7727e3392bfbc2b9c683cb7bf9caa4ce"
 dependencies = [
  "bitvec",
  "hex",
@@ -7372,7 +7372,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=20829edcaa48e5f5f39939a69928debc477be4e2#20829edcaa48e5f5f39939a69928debc477be4e2"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=6755022b7727e3392bfbc2b9c683cb7bf9caa4ce#6755022b7727e3392bfbc2b9c683cb7bf9caa4ce"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -7829,7 +7829,19 @@ dependencies = [
  "serde",
  "serde_spanned",
  "toml_datetime",
- "toml_edit",
+ "toml_edit 0.19.15",
+]
+
+[[package]]
+name = "toml"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "185d8ab0dfbb35cf1399a6344d8484209c088f75f8f68230da55d48d95d43e3d"
+dependencies = [
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "toml_edit 0.20.2",
 ]
 
 [[package]]
@@ -7846,6 +7858,19 @@ name = "toml_edit"
 version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+dependencies = [
+ "indexmap 2.0.2",
+ "serde",
+ "serde_spanned",
+ "toml_datetime",
+ "winnow",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.20.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "396e4d48bbb2b7554c944bde63101b5ae446cff6ec4a24227428f15eb72ef338"
 dependencies = [
  "indexmap 2.0.2",
  "serde",

@@ -103,7 +103,8 @@ mod tests {
         let public_key = sk.public_key();
 
         let mut url = Url::parse(URL).unwrap();
-        url.set_username(&public_key.to_string()).unwrap();
+        let public_key_str = format!("{public_key:?}");
+        url.set_username(&public_key_str).unwrap();
 
         let endpoint = RelayEndpoint::try_from(url.clone()).unwrap();
         assert_eq!(endpoint.url, url);

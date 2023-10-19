@@ -13,6 +13,7 @@ use reth::{
 };
 use reth_payload_builder::PayloadBuilderService;
 use std::{sync::Arc, time::Duration};
+use tracing::warn;
 
 struct RethExt;
 
@@ -25,7 +26,7 @@ pub struct RethNodeExt {
     #[clap(skip)]
     pub config_file: String,
     #[clap(skip)]
-    pub network: Network,
+    pub network: Option<Network>,
     #[clap(skip)]
     pub config: Option<BuildConfig>,
 }
@@ -34,6 +35,7 @@ impl RethNodeExt {
     pub fn get_build_config(&mut self) -> BuildConfig {
         self.config.take().unwrap_or_else(|| {
             let config = Config::from_toml_file(&self.config_file).unwrap();
+            self.network = Some(config.network);
             let config = config.build.unwrap();
             self.config = Some(config.clone());
             config
@@ -61,7 +63,7 @@ impl RethNodeCommandConfig for RethNodeExt {
         Tasks: reth::tasks::TaskSpawner + Clone + Unpin + 'static,
     {
         let build_config = self.get_build_config();
-        let network = &self.network;
+        let network = self.network.as_ref().unwrap();
         let context = Arc::new(Context::try_from(network)?);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
@@ -110,7 +112,8 @@ pub(crate) async fn launch_reth_with(mut ext: RethNodeExt) {
 
     let config = ext.get_build_config();
 
-    let network_name = format!("{0}", ext.network);
+    let network = ext.network.as_ref().unwrap();
+    let network_name = format!("{network}");
 
     let mut params = vec!["".into(), "--chain".into(), network_name.to_string(), "--http".into()];
     if let Some(path) = config.jwt_secret_path {
@@ -122,6 +125,6 @@ pub(crate) async fn launch_reth_with(mut ext: RethNodeExt) {
     // NOTE: shim to pass in config
     node.ext = ext;
     if let Err(err) = node.execute(ctx).await {
-        tracing::warn!("{err:?}");
+        warn!("{err:?}");
     }
 }
