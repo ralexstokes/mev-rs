@@ -1,7 +1,7 @@
 use crate::reth_builder::{service::Service, Config, DeadlineBidder};
 use clap::{Args, Parser};
 use ethereum_consensus::{
-    networks::{self},
+    networks::{self, Network},
     state_transition::Context,
 };
 use reth::{
@@ -17,12 +17,14 @@ use tracing::warn;
 #[derive(Debug, Args)]
 pub struct ServiceExt {
     #[clap(skip)]
+    network: Network,
+    #[clap(skip)]
     config: Config,
 }
 
 impl ServiceExt {
-    pub fn from(config: Config) -> Self {
-        Self { config }
+    pub fn from(network: Network, config: Config) -> Self {
+        Self { network, config }
     }
 
     pub async fn spawn(self) {
@@ -30,7 +32,7 @@ impl ServiceExt {
         let task_executor = task_manager.executor();
         let ctx = CliContext { task_executor };
 
-        let network = &self.config.network;
+        let network = &self.network;
         let network_name = format!("{0}", network);
 
         let mut params =
@@ -73,7 +75,7 @@ impl RethNodeCommandConfig for ServiceExt {
         Tasks: reth::tasks::TaskSpawner + Clone + Unpin + 'static,
     {
         let build_config = self.config.clone();
-        let network = &build_config.network;
+        let network = &self.network;
         let context = Arc::new(Context::try_from(network)?);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);

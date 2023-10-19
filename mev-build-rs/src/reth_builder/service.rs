@@ -6,7 +6,6 @@ use crate::reth_builder::{
 use ethereum_consensus::{
     clock::{Clock, SystemTimeProvider},
     crypto::SecretKey,
-    networks::Network,
     state_transition::Context,
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
@@ -22,8 +21,6 @@ const DEFAULT_BID_PERCENT: f64 = 0.9;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    #[serde(default)]
-    pub network: Network,
     pub secret_key: SecretKey,
     pub relays: Vec<String>,
     pub extra_data: String,
