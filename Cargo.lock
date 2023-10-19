@@ -6678,8 +6678,7 @@ dependencies = [
 [[package]]
 name = "revm-primitives"
 version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51187b852d9e458816a2e19c81f1dd6c924077e1a8fccd16e4f044f865f299d7"
+source = "git+https://github.com/ralexstokes/revm?rev=929530a5b2575c97f3c055f4f8d8b9ba273cb3dd#929530a5b2575c97f3c055f4f8d8b9ba273cb3dd"
 dependencies = [
  "alloy-primitives",
  "alloy-rlp",

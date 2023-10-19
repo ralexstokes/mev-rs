@@ -19,3 +19,10 @@ reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c
 reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
 revm = "3.5.0"
+
+[patch.crates-io]
+# We patch `revm-primitives` so that all generated files go into the expected place ("OUT_DIR") which
+# works well with rust `nix` builders and does not work well otherwise.
+# TODO: It looks like later versions of this crate remove the problematic build script and so once `reth` updates
+# (which indirectly uses this dependency) then we can drop this patch.
+revm-primitives = { git = "https://github.com/ralexstokes/revm", rev = "929530a5b2575c97f3c055f4f8d8b9ba273cb3dd" }
