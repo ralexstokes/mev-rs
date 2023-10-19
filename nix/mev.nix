@@ -12,6 +12,7 @@ let
     nativeBuildInputs = lib.optionals pkgs.stdenv.isLinux [
       clang
       perl
+      pkg-config
     ];
     LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   };
