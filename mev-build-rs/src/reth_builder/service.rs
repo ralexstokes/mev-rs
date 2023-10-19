@@ -101,7 +101,7 @@ impl<
             pool,
             client,
             chain_spec,
-            Bytes::from(config.extra_data.as_bytes()),
+            Bytes::from(config.extra_data),
             builder_wallet,
             config.bid_percent.unwrap_or(DEFAULT_BID_PERCENT),
             config.subsidy_gwei.unwrap_or_default(),

@@ -8,14 +8,15 @@ use crate::reth_builder::{
 use ethers::{
     signers::Signer,
     types::{
-        transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160 as ethers_H160,
+        transaction::eip2718::TypedTransaction, Eip1559TransactionRequest, H160,
+        U256 as ethers_U256,
     },
 };
 use reth_interfaces::RethError;
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_OMMER_ROOT},
-    proofs, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, TransactionSigned,
-    TransactionSignedEcRecovered, Withdrawal, H256, U256,
+    proofs, Address, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, Receipts,
+    TransactionSigned, TransactionSignedEcRecovered, Withdrawal, B256, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProvider, StateProviderFactory};
 use reth_revm::{
@@ -34,7 +35,7 @@ fn process_withdrawals<DB: Database<Error = RethError>>(
     chain_spec: &ChainSpec,
     db: &mut State<DB>,
     timestamp: u64,
-) -> Result<H256, Error> {
+) -> Result<B256, Error> {
     let balance_increments =
         post_block_withdrawals_balance_increments(chain_spec, timestamp, withdrawals);
     db.increment_balances(balance_increments)?;
@@ -111,10 +112,10 @@ fn assemble_payload_with_payments(
     let transactions_root = proofs::calculate_transaction_root(&context.executed_txs);
 
     let state_root = client.latest()?.state_root(&bundle_state.clone())?;
-    let receipts = bundle_state.receipts_by_block(block_number);
+    let receipts = bundle_state.receipts_by_block(block_number).to_vec();
     let bundle = BundleStateWithReceipts::new(
         context.db.take_bundle(),
-        vec![receipts.to_vec()],
+        Receipts::from_vec(vec![receipts]),
         block_number,
     );
     let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
@@ -130,7 +131,7 @@ fn assemble_payload_with_payments(
         receipts_root,
         logs_bloom,
         timestamp: context.build.timestamp,
-        mix_hash: H256::from_slice(context.build.prev_randao.as_ref()),
+        mix_hash: B256::from_slice(context.build.prev_randao.as_ref()),
         nonce: BEACON_NONCE,
         base_fee_per_gas: Some(base_fee),
         number: block_number,
@@ -162,11 +163,13 @@ fn construct_payment_tx(
     context: &mut ExecutionContext,
 ) -> Result<TransactionSignedEcRecovered, Error> {
     let sender = context.build.builder_wallet.address();
-    let signer_account = context.db.load_cache_account(sender.into())?;
+    let reth_sender = Address::from(sender.to_fixed_bytes());
+    let signer_account = context.db.load_cache_account(reth_sender)?;
     let nonce = signer_account.account_info().expect("account exists").nonce;
     let chain_id = context.build.chain_spec.genesis().config.chain_id;
 
-    let fee_recipient = ethers_H160::from_slice(context.build.proposer_fee_recipient.as_ref());
+    let fee_recipient = H160::from_slice(context.build.proposer_fee_recipient.as_ref());
+    let value = ethers_U256::from_big_endian(&context.total_payment.to_be_bytes::<32>());
     let tx = Eip1559TransactionRequest::new()
         .from(sender)
         .to(fee_recipient)
@@ -174,7 +177,7 @@ fn construct_payment_tx(
         .gas(21000)
         .max_fee_per_gas(context.build.base_fee())
         .max_priority_fee_per_gas(0)
-        .value(context.total_payment)
+        .value(value)
         .data(ethers::types::Bytes::default())
         .access_list(ethers::types::transaction::eip2930::AccessList::default())
         .nonce(nonce)
@@ -185,10 +188,10 @@ fn construct_payment_tx(
     let signature = wallet.sign_transaction_sync(&tx).expect("can make transaction");
     let tx_encoded = tx.rlp_signed(&signature);
 
-    let payment_tx = TransactionSigned::decode_enveloped(Bytes::from(tx_encoded.as_ref()))
-        .expect("can decode valid txn");
+    let tx_encoded = Bytes::from(tx_encoded.0);
+    let payment_tx = TransactionSigned::decode_enveloped(tx_encoded).expect("can decode valid txn");
 
-    Ok(TransactionSignedEcRecovered::from_signed_transaction(payment_tx, sender.into()))
+    Ok(TransactionSignedEcRecovered::from_signed_transaction(payment_tx, reth_sender))
 }
 
 struct ExecutionContext<'a> {
@@ -226,7 +229,7 @@ impl<'a> ExecutionContext<'a> {
             revm::State::builder().with_database_ref(StateProviderDatabase::new(state)).build();
         let bundle_state = BundleStateWithReceipts::new(
             db.take_bundle(),
-            vec![],
+            Receipts::default(),
             u64::from_le_bytes(context.block_env.number.to_le_bytes()),
         );
         Ok(ExecutionContext {
