@@ -5,12 +5,16 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use reth::{
-    cli::ext::{RethCliExt, RethNodeCommandConfig},
+    cli::{
+        components::RethNodeComponents,
+        config::PayloadBuilderConfig,
+        ext::{RethCliExt, RethNodeCommandConfig},
+    },
     node::NodeCommand,
     runner::CliContext,
-    tasks::TaskManager,
+    tasks::{TaskManager, TaskSpawner},
 };
-use reth_payload_builder::PayloadBuilderService;
+use reth_payload_builder::{PayloadBuilderHandle, PayloadBuilderService};
 use std::{sync::Arc, time::Duration};
 use tracing::warn;
 
@@ -56,23 +60,14 @@ impl RethCliExt for ServiceExt {
 }
 
 impl RethNodeCommandConfig for ServiceExt {
-    fn spawn_payload_builder_service<Conf, Provider, Pool, Tasks>(
+    fn spawn_payload_builder_service<Conf, Reth>(
         &mut self,
         _conf: &Conf,
-        provider: Provider,
-        pool: Pool,
-        executor: Tasks,
-        chain_spec: std::sync::Arc<reth_primitives::ChainSpec>,
-    ) -> eyre::Result<reth_payload_builder::PayloadBuilderHandle>
+        components: &Reth,
+    ) -> eyre::Result<PayloadBuilderHandle>
     where
-        Conf: reth::cli::config::PayloadBuilderConfig,
-        Provider: reth::providers::StateProviderFactory
-            + reth::providers::BlockReaderIdExt
-            + Clone
-            + Unpin
-            + 'static,
-        Pool: reth::transaction_pool::TransactionPool + Unpin + 'static,
-        Tasks: reth::tasks::TaskSpawner + Clone + Unpin + 'static,
+        Conf: PayloadBuilderConfig,
+        Reth: RethNodeComponents,
     {
         let build_config = self.config.clone();
         let network = &self.network;
@@ -87,10 +82,10 @@ impl RethNodeCommandConfig for ServiceExt {
             build_config,
             context,
             clock,
-            pool.clone(),
-            provider.clone(),
+            components.pool(),
+            components.provider(),
             bidder,
-            chain_spec.clone(),
+            components.chain_spec(),
         )
         .unwrap();
 
@@ -110,8 +105,10 @@ impl RethNodeCommandConfig for ServiceExt {
             }
         });
 
-        executor.spawn_critical("boost builder", fut);
-        executor.spawn_critical("payload builder service", Box::pin(payload_service));
+        components.task_executor().spawn_critical("boost builder", fut);
+        components
+            .task_executor()
+            .spawn_critical("payload builder service", Box::pin(payload_service));
 
         Ok(payload_builder)
     }

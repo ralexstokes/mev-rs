@@ -7,18 +7,18 @@ use ethereum_consensus::{
     },
 };
 use mev_rs::types::ExecutionPayload;
-use reth_primitives::{Bloom, SealedBlock, H160, H256, U256};
+use reth_primitives::{Address, Bloom, SealedBlock, B256, U256};
 
-pub(crate) fn to_bytes32(value: H256) -> Bytes32 {
-    Bytes32::try_from(value.as_bytes()).unwrap()
+pub(crate) fn to_bytes32(value: B256) -> Bytes32 {
+    Bytes32::try_from(value.as_ref()).unwrap()
 }
 
-fn to_bytes20(value: H160) -> ExecutionAddress {
-    ExecutionAddress::try_from(value.as_bytes()).unwrap()
+fn to_bytes20(value: Address) -> ExecutionAddress {
+    ExecutionAddress::try_from(value.as_ref()).unwrap()
 }
 
 fn to_byte_vector(value: Bloom) -> ByteVector<256> {
-    ByteVector::<256>::try_from(value.as_bytes()).unwrap()
+    ByteVector::<256>::try_from(value.as_ref()).unwrap()
 }
 
 pub(crate) fn to_u256(value: &U256) -> ssz_rs::U256 {

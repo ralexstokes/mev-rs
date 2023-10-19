@@ -10,7 +10,7 @@ use ethereum_consensus::{
 use ethers::signers::{LocalWallet, Signer};
 use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, types::ProposerSchedule, Relay};
 use reth_payload_builder::PayloadBuilderAttributes;
-use reth_primitives::{BlockNumberOrTag, Bytes, ChainSpec, H256, U256};
+use reth_primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256};
 use reth_provider::{BlockReaderIdExt, BlockSource, StateProviderFactory};
 use reth_transaction_pool::TransactionPool;
 use std::{
@@ -313,7 +313,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
     fn construct_build_context(
         &self,
         slot: Slot,
-        parent_hash: H256,
+        parent_hash: B256,
         proposer: &BlsPublicKey,
         payload_attributes: PayloadBuilderAttributes,
         validator_preferences: &ValidatorPreferences,
@@ -345,7 +345,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
 
         // TODO: configurable "fee collection strategy"
         // fee collection strategy: drive all fees to builder
-        block_env.coinbase = self.builder_wallet.address().into();
+        block_env.coinbase = Address::from(self.builder_wallet.address().to_fixed_bytes());
 
         let subsidy = U256::from(self.subsidy_gwei);
         let subsidy_in_wei = subsidy * U256::from(10u64.pow(9));

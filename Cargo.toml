@@ -10,17 +10,12 @@ version = "0.3.0"
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "c84f44ee7ec04613adf5f2be845df35e05de1efc" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "c84f44ee7ec04613adf5f2be845df35e05de1efc" }
 
-reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-provider = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-rpc-types = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-
-reth = { git = "https://github.com/paradigmxyz/reth", rev = "1b16d804ef01f4ec3c25e7986381c22739c105b9" }
-revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
-
-[patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
-revm-primitives = { git = "https://github.com/bluealloy/revm/", rev = "516f62cc" }
+reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-rpc-types = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
+revm = "3.5.0"

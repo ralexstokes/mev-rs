@@ -14,7 +14,7 @@ use mev_rs::{
     signing::sign_builder_message,
     types::{BidTrace, SignedBidSubmission},
 };
-use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, H256, U256};
+use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, B256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
 use std::sync::{Arc, Mutex};
 
@@ -48,11 +48,11 @@ fn make_submission(
 #[derive(Debug, Clone)]
 pub struct BuildContext {
     pub slot: Slot,
-    pub parent_hash: H256,
+    pub parent_hash: B256,
     pub proposer: BlsPublicKey,
     pub timestamp: u64,
     pub proposer_fee_recipient: ExecutionAddress,
-    pub prev_randao: H256,
+    pub prev_randao: B256,
     pub withdrawals: Vec<Withdrawal>,
     pub relays: Vec<RelayIndex>,
     pub chain_spec: Arc<ChainSpec>,
@@ -69,7 +69,7 @@ pub struct BuildContext {
     pub subsidy: U256,
 }
 
-pub fn compute_build_id(slot: Slot, parent_hash: H256, proposer: &BlsPublicKey) -> BuildIdentifier {
+pub fn compute_build_id(slot: Slot, parent_hash: B256, proposer: &BlsPublicKey) -> BuildIdentifier {
     let mut data = Vec::with_capacity(88);
     slot.serialize(&mut data).expect("can serialize");
     parent_hash.serialize(&mut data).expect("can serialize");
