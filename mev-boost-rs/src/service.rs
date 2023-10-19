@@ -85,8 +85,16 @@ impl Service {
 
             tokio::pin!(slots);
 
+            let mut current_epoch = clock.current_epoch().expect("after genesis");
+            relay_mux_clone.on_epoch(current_epoch);
             while let Some(slot) = slots.next().await {
                 relay_mux_clone.on_slot(slot);
+
+                let epoch = clock.current_epoch().expect("after genesis");
+                if epoch != current_epoch {
+                    relay_mux_clone.on_epoch(epoch);
+                    current_epoch = epoch;
+                }
             }
         });
 
