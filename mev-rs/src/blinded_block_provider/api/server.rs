@@ -17,6 +17,7 @@ use beacon_api_client::VersionedValue;
 use hyper::server::conn::AddrIncoming;
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::task::JoinHandle;
+use tracing::{error, info, trace};
 
 /// Type alias for the configured axum server
 pub type BlockProviderServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
@@ -29,8 +30,7 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
 ) -> Result<(), Error> {
-    let registration_count = registrations.len();
-    tracing::info!("processing {registration_count} validator registrations");
+    trace!(count = registrations.len(), "processing validator registrations");
     builder.register_validators(&mut registrations).await.map_err(From::from)
 }
 
@@ -39,7 +39,7 @@ async fn handle_fetch_bid<B: BlindedBlockProvider>(
     Path(bid_request): Path<BidRequest>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
     let signed_bid = builder.fetch_best_bid(&bid_request).await?;
-    tracing::info!("returning bid with {signed_bid} for bid request at {bid_request}");
+    trace!(%bid_request, %signed_bid, "returning bid");
     let version = signed_bid.version();
     let response = VersionedValue { version, data: signed_bid, meta: Default::default() };
     Ok(Json(response))
@@ -52,7 +52,7 @@ async fn handle_open_bid<B: BlindedBlockProvider>(
     let payload = builder.open_bid(&mut block).await?;
     let block_hash = payload.block_hash();
     let slot = block.message().slot();
-    tracing::info!("returning provided payload in slot {slot} with block_hash {block_hash}");
+    trace!(%slot, %block_hash, "returning payload");
     let version = payload.version();
     let response = VersionedValue { version, data: payload, meta: Default::default() };
     Ok(Json(response))
@@ -89,9 +89,9 @@ impl<B: BlindedBlockProvider + Clone + Send + Sync + 'static> Server<B> {
         let server = self.serve();
         let address = server.local_addr();
         tokio::spawn(async move {
-            tracing::info!("listening at {address}...");
+            info!("listening at {address}...");
             if let Err(err) = server.await {
-                tracing::error!("error while listening for incoming: {err}")
+                error!(%err, "error while listening for incoming")
             }
         })
     }
