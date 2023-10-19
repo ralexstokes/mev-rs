@@ -10,8 +10,8 @@ let
       darwin.apple_sdk.frameworks.Network
     ];
     nativeBuildInputs = lib.optionals pkgs.stdenv.isLinux [
-      perl
       clang
+      perl
     ];
     LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
   };
