@@ -12,7 +12,7 @@ use mev_rs::{
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use tracing::info;
+use tracing::{error, info, warn};
 use url::Url;
 
 #[derive(Debug, Deserialize)]
@@ -35,9 +35,9 @@ fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
         match relay_url.parse::<Url>() {
             Ok(url) => match RelayEndpoint::try_from(url) {
                 Ok(relay) => relays.push(relay),
-                Err(err) => tracing::warn!("error parsing relay from URL `{relay_url}`: {err}"),
+                Err(err) => warn!(%err, %relay_url, "error parsing relay from URL"),
             },
-            Err(err) => tracing::warn!("error parsing relay URL `{relay_url}` from config: {err}"),
+            Err(err) => warn!(%err, %relay_url, "error parsing relay URL from config"),
         }
     }
     relays
@@ -62,7 +62,7 @@ impl Service {
         let Self { host, port, relays, network } = self;
 
         if relays.is_empty() {
-            tracing::error!("no valid relays provided; please restart with correct configuration");
+            error!("no valid relays provided; please restart with correct configuration");
         } else {
             let count = relays.len();
             info!("configured with {count} relay(s)");
