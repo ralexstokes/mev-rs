@@ -10,7 +10,7 @@ use thiserror::Error;
 pub enum Error {
     #[error("bid public key {bid} does not match relay public key {relay}")]
     BidPublicKeyMismatch { bid: BlsPublicKey, relay: BlsPublicKey },
-    #[error("no bid prepared for request {0:?}")]
+    #[error("no bid prepared for request {0}")]
     NoBidPrepared(Box<BidRequest>),
     #[error("no valid bids returned for proposal")]
     NoBids,
@@ -36,13 +36,13 @@ pub enum Error {
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
     #[error("validator with public key {0} is not currently registered")]
     ValidatorNotRegistered(BlsPublicKey),
-    #[error("{0}")]
+    #[error(transparent)]
     Consensus(#[from] ConsensusError),
-    #[error("{0}")]
+    #[error(transparent)]
     Api(#[from] ApiError),
-    #[error("{0}")]
+    #[error(transparent)]
     ValidatorRegistry(#[from] crate::validator_registry::Error),
-    #[error("{0}")]
+    #[error(transparent)]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
 }
 
