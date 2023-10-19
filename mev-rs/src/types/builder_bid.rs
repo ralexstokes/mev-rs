@@ -8,6 +8,7 @@ use ethereum_consensus::{
     state_transition::Context,
     Error, Fork,
 };
+use std::fmt;
 
 #[derive(Debug, Clone, Merkleized)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -41,7 +42,7 @@ impl SignedBuilderBid {
     }
 }
 
-impl std::fmt::Display for SignedBuilderBid {
+impl fmt::Display for SignedBuilderBid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let block_hash = self.message.header.block_hash();
         let value = &self.message.value;
