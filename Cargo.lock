@@ -4419,6 +4419,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mev-utils"
+version = "0.3.0"
+dependencies = [
+ "beacon-api-client",
+ "ethereum-consensus",
+ "mev-rs",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
+]
+
+[[package]]
 name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
