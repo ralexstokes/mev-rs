@@ -18,6 +18,11 @@
   };
 
   outputs = { self, flake-utils, nixpkgs, rust-overlay, crane }:
+    {
+      overlays.default = final: prev: {
+        inherit (self.packages.${final.system}) mev-rs;
+      };
+    } //
     flake-utils.lib.eachDefaultSystem
       (system:
         let
@@ -29,9 +34,6 @@
         in
         {
           devShells.default = import ./shell.nix { inherit pkgs; };
-          overlays.default = _: _: {
-            inherit mev;
-          };
           packages = { inherit mev-rs; };
         });
 }
