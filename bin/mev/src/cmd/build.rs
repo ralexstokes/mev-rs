@@ -24,7 +24,7 @@ impl Command {
             Service::from(network, config).spawn().await;
             Ok(())
         } else {
-            Err(anyhow!("missing boost config from file provided"))
+            Err(anyhow!("missing build config from file provided"))
         }
     }
 }
