@@ -23,7 +23,7 @@ You can install the `mev-rs` binary, named `mev`, with the following steps:
 ```sh
 git clone https://github.com/ralexstokes/mev-rs
 cd mev-rs
-cargo install --locked
+cargo install --locked --path bin/mev 
 ```
 
 > The builder has been verified as of this commit `bf3d41f026e9728233dd3e1c40e75c49b9ae00b3`. No guarantees about other states of the repository currently.
