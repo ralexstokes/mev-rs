@@ -22,6 +22,7 @@
       overlays.default = final: prev: {
         inherit (self.packages.${final.system}) mev-rs;
       };
+      nixosModules.default = import ./nix/module.nix;
     } //
     flake-utils.lib.eachDefaultSystem
       (system:
@@ -33,7 +34,7 @@
           mev-rs = pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
         in
         {
-          devShells.default = import ./shell.nix { inherit pkgs; };
           packages = { inherit mev-rs; };
+          devShells.default = import ./shell.nix { inherit pkgs; };
         });
 }
