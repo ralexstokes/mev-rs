@@ -25,13 +25,13 @@
           pkgs = import nixpkgs { inherit system overlays; };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-          mev = pkgs.callPackage ./nix/mev.nix { inherit pkgs; crane = craneLib; };
+          mev-rs = pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
         in
         {
           devShells.default = import ./shell.nix { inherit pkgs; };
           overlays.default = _: _: {
             inherit mev;
           };
-          packages = { inherit mev; };
+          packages = { inherit mev-rs; };
         });
 }
