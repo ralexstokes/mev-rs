@@ -7,7 +7,7 @@ let
     buildInputs = lib.optionals pkgs.stdenv.isLinux [
       openssl
     ] ++ lib.optionals pkgs.stdenv.isDarwin [
-      darwin.apple_sdk.frameworks.Network
+      darwin.apple_sdk.frameworks.CFNetwork
     ];
     nativeBuildInputs = lib.optionals pkgs.stdenv.isLinux [
       clang
