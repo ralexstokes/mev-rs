@@ -32,6 +32,6 @@
           overlays.default = _: _: {
             inherit mev;
           };
-          packages.mev = mev;
+          packages = { inherit mev; };
         });
 }
