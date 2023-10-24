@@ -1,8 +1,9 @@
+pkg:
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.mev-rs;
 
-  mev-rs = pkgs.mev-rs;
+  mev-rs = pkg.mev-rs pkgs.system;
 
   name = "mev-${cfg.enable}-rs";
 

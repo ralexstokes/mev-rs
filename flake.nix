@@ -25,12 +25,8 @@
         pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
     in
     {
-      nixosModules.mev-rs = import ./nix/module.nix;
+      nixosModules.mev-rs = import ./nix/module.nix { inherit mev-rs; };
       nixosModules.default = self.nixosModules.mev-rs;
-
-      overlays.default = _:_: {
-        inherit mev-rs;
-      };
 
       packages.x86_64-darwin.mev-rs = mev-rs "x86_64-darwin";
       packages.x86_64-darwin.default = self.packages.x86_64-darwin.mev-rs;
