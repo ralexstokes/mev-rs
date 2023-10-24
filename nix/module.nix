@@ -28,7 +28,7 @@ in
   };
 
   config = {
-    network.firewall = lib.mkIf (cfg.enable == "build") {
+    networking.firewall = lib.mkIf (cfg.enable == "build") {
       allowedTCPPorts = [ 30303 ];
       allowedUDPPorts = [ 30303 ];
     };
