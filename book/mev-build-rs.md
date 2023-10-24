@@ -23,71 +23,25 @@ You can install the `mev-rs` binary, named `mev`, with the following steps:
 ```sh
 git clone https://github.com/ralexstokes/mev-rs
 cd mev-rs
-cargo install --locked --path bin/mev 
+cargo install --locked --path bin/mev
 ```
 
-> The builder has been verified as of this commit `bf3d41f026e9728233dd3e1c40e75c49b9ae00b3`. No guarantees about other states of the repository currently.
+> The builder has been verified as of this commit `08973a298268a3ad5f5d2c247b69b47dbb7bf97f`. No guarantees about other states of the repository currently.
 
 The `cargo install` command should place the `mev` binary under the default `.cargo/bin` folder which is also in your `PATH` following the suggested Rust installation process.
 
 ## Run the builder
 
-Once installed, we are ready to run the builder.
-
-### Syncing nodes
-
-Before we can run the builder, we need to sync a CL and EL node pair on our target network.
-
-The remainder of this document will assume we are building for the `sepolia` network.
-
-> Repository has only been tested on the **Sepolia** network and there is no guarantee the builder works on other networks.
-
-The builder requires a synced CL client like [Lighthouse](https://github.com/sigp/lighthouse/).
-You can find instructions on [how to sync a `lighthouse` node here](https://lighthouse-book.sigmaprime.io).
-
-> Repository has only been tested with **Lighthouse** and there is no guarantee other CLs will work.
-
-Doing the initial/bulk sync from the `mev` builder should be possible, but has not been tested.
-
-The recommended approach will be to run `reth` (ideally built from source at the same commit pinned in this repo) for the target network alongside the CL until the pair has reached the head of the chain.
-
-Example commands utilizing [checkpoint sync following the Lighthouse book](https://lighthouse-book.sigmaprime.io/run_a_node.html) to do this:
-
-1. Make the JWT secret (refer to the Lighthouse guide for more info).
-
-2. [recommended] Obtain a checkpoint sync URL if you wish to use this sync mode.
-
-3. Run `reth`:
-  ```sh
-  reth --chain sepolia \
-    node \
-    --http \
-    --authrpc.jwtsecret $JWT_SECRET_FILE_PATH
-  ````
-
-4. Run `lighthouse`:
-  ```sh
-  lighthouse --network sepolia \
-    bn \
-    --http \
-    --execution-endpoint http://localhost:8551 \
-    --execution-jwt $JWT_SECRET_FILE_PATH \
-    --disable-deposit-contract-sync \
-    --checkpoint-sync-url $CHECKPOINT_SYNC_PROVIDER
-  ```
-
-The pair should start syncing. Once the pair of nodes is fully synced you can stop `reth` and run the `mev` builder in its place.
-
-> You should be able to skip this step [Syncing nodes](#syncing-nodes) and just proceed directly to running the CL and `mev` builder in the [next step](#run-the-builder-on-a-synced-chain), as the builder should also sync if needed.
-> But note:
-> 1) running the builder without having a synced database already has not been tested
-> 2) the builder will wait anyway until the head of the chain has been synced
-
-### Run the builder on a synced chain
+### Configuration
 
 To run the `mev` builder, first you should make the appropriate configuration. You can make a local copy of `example.config.toml` to get started.
 
-To configure the builder, you can edit the fields under the `[builder]` key of the TOML.
+First, you will need to construct a JWT secret for use in the Engine API. You can refer to [these instructions from the Lighthouse guide](https://lighthouse-book.sigmaprime.io/run_a_node.html#step-1-create-a-jwt-secret-file) to see how to do this.
+
+Ensure the `network` key in the TOML matches the target network you wish to run the builder on. This network applies to any of the `mev-rs` tools
+that consume this configuration. The remainder of this document (including examples below) will assume we are building for the `sepolia` network.
+
+To configure the builder specifically, you can edit the fields under the `[builder]` key of the TOML.
 
 Fields you should change:
 
@@ -95,15 +49,20 @@ Fields you should change:
   This wallet will be used to author payment transactions to the proposer and also is used as the source of funds for any subsidy value you wish to add to the block.
   You can select a particular index (following BIP-39) by terminating the seed phrase with a `:N` and integer index `N`. Otherwise the builder will just use the first index from the key tree.
 * `subsidy_gwei`: set this value to 0 if your execution layer address has no ETH in it; otherwise, the blocks will be invalid.
-* `jwt_secret_path`: ensure this value matches the one used previously when doing the initial sync.
+* `jwt_secret_path`: this path points to the JWT secret file created previously and is specific to your deployment.
 
-Once the configuration looks good, you can run the builder as follows alongside `lighthouse`.
+### Launch
 
-> `lighthouse` has some additional configuration from above to ensure the builder always receives head updates from the chain.
+Once the configuration looks good, you can run the builder as follows alongside `lighthouse`. If you are running from a fresh install or have fallen far enough behind
+the tip of the chain, the CL and EL nodes will sync. To expedite syncing times, use of checkpoint sync is recommended. You can see more info in [this guide from the Lighthouse book](https://lighthouse-book.sigmaprime.io/run_a_node.html).
+
+> Repository has only been tested on the **Sepolia** network and there is no guarantee the builder works on other networks.
+
+> Repository has only been tested with **Lighthouse** and there is no guarantee other CLs will work.
 
 1. Run `mev` with config file `config.toml`:
   ```sh
-  mev --network sepolia build config.toml
+  mev build config.toml
   ```
 
 2. Run `lighthouse`:
@@ -119,10 +78,12 @@ Once the configuration looks good, you can run the builder as follows alongside 
     --suggested-fee-recipient $FEE_RECIPIENT
   ```
 
+> NOTE: the builder will not be active until the local CL and EL are fully synced.
+
 ### Additional notes
 
 * The `--suggested-fee-recipient` for `lighthouse` is ultimately not used, but currently required to run the node. Any valid address should do and it should not affect the builder.
 * If you are seeing slow or lagging operation, you can try to adjust the preparation lookahead with the `--prepare-payload-lookahead` option on `lighthouse`.
 * The builder has been tested on an AWS EC2 instance of `t3.xlarge` variety with a `512Gb` disk.
 * You can control the logging level of `reth` and `mev` with the `RUST_LOG` environment variable.
-  For example, to silence the `reth` logs, you can run `mev` like `RUST_LOG=mev=info mev --network sepolia build config.toml`
+  For example, to silence the `reth` logs, you can run `mev` like `RUST_LOG=mev=info mev build config.toml`

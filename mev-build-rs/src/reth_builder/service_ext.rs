@@ -39,8 +39,13 @@ impl ServiceExt {
         let network = &self.network;
         let network_name = format!("{0}", network);
 
-        let mut params =
-            vec!["".into(), "--chain".into(), network_name.to_string(), "--http".into()];
+        let mut params = vec![
+            "".into(),
+            "--chain".into(),
+            network_name.to_string(),
+            "--full".into(),
+            "--http".into(),
+        ];
         if let Some(path) = self.config.jwt_secret_path.as_ref() {
             params.push("--authrpc.jwtsecret".into());
             params.push(path.clone());
