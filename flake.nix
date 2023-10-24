@@ -3,13 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     crane = {
       url = "github:ipetkov/crane";
@@ -18,20 +14,27 @@
   };
 
   outputs = { self, flake-utils, nixpkgs, rust-overlay, crane }:
-    flake-utils.lib.eachDefaultSystem
-      (system:
+    let
+      overlays = [ (import rust-overlay) ];
+      mev-rs = system:
         let
-          overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs { inherit system overlays; };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-          mev = pkgs.callPackage ./nix/mev.nix { inherit pkgs; crane = craneLib; };
         in
-        {
-          devShells.default = import ./shell.nix { inherit pkgs; };
-          overlays.default = _: _: {
-            inherit mev;
-          };
-          packages.mev = mev;
-        });
+        pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
+    in
+    {
+      nixosModules.mev-rs = import ./nix/module.nix { inherit mev-rs; };
+      nixosModules.default = self.nixosModules.mev-rs;
+
+      packages.x86_64-darwin.mev-rs = mev-rs "x86_64-darwin";
+      packages.x86_64-darwin.default = self.packages.x86_64-darwin.mev-rs;
+
+      packages.aarch64-darwin.mev-rs = mev-rs "aarch64-darwin";
+      packages.aarch64-darwin.default = self.packages.aarch64-darwin.mev-rs;
+
+      packages.x86_64-linux.mev-rs = mev-rs "x86_64-linux";
+      packages.x86_64-linux.default = self.packages.x86_64-linux.mev-rs;
+    };
 }

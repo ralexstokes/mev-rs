@@ -5,7 +5,7 @@ mkShell {
     openssl
   ] ++ lib.optionals pkgs.stdenv.isDarwin [
     libiconv
-    darwin.apple_sdk.frameworks.Network
+    darwin.apple_sdk.frameworks.CFNetwork
   ] ++ [
     just
     mdbook
