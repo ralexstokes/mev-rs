@@ -16,9 +16,10 @@
   outputs = { self, flake-utils, nixpkgs, rust-overlay, crane }:
     let
       overlays = [ (import rust-overlay) ];
+      pkgs-for-system = system: import nixpkgs { inherit system overlays; };
       mev-rs = system:
         let
-          pkgs = import nixpkgs { inherit system overlays; };
+          pkgs = pkgs-for-system system;
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
         in
@@ -36,5 +37,9 @@
 
       packages.x86_64-linux.mev-rs = mev-rs "x86_64-linux";
       packages.x86_64-linux.default = self.packages.x86_64-linux.mev-rs;
+
+      devShells.x86_64-darwin.default = import ./shell.nix { pkgs = pkgs-for-system "x86_64-darwin"; };
+      devShells.aarch64-darwin.default = import ./shell.nix { pkgs = pkgs-for-system "aarch64-darwin"; };
+      devShells.x86_64-linux.default = import ./shell.nix { pkgs = pkgs-for-system "x86_64-linux"; };
     };
 }
