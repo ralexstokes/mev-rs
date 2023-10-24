@@ -3,13 +3,9 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
+      inputs.nixpkgs.follows = "nixpkgs";
     };
     crane = {
       url = "github:ipetkov/crane";
@@ -18,23 +14,31 @@
   };
 
   outputs = { self, flake-utils, nixpkgs, rust-overlay, crane }:
-    {
-      overlays.default = final: prev: {
-        inherit (self.packages.${final.system}) mev-rs;
-      };
-      nixosModules.default = import ./nix/module.nix;
-    } //
-    flake-utils.lib.eachDefaultSystem
-      (system:
+    let
+      overlays = [ (import rust-overlay) ];
+      mev-rs = system:
         let
-          overlays = [ (import rust-overlay) ];
           pkgs = import nixpkgs { inherit system overlays; };
           rustToolchain = pkgs.pkgsBuildHost.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
           craneLib = (crane.mkLib pkgs).overrideToolchain rustToolchain;
-          mev-rs = pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
         in
-        {
-          packages = { inherit mev-rs; };
-          devShells.default = import ./shell.nix { inherit pkgs; };
-        });
+        pkgs.callPackage ./nix/mev-rs.nix { inherit pkgs; crane = craneLib; };
+    in
+    {
+      nixosModules.mev-rs = import ./nix/module.nix;
+      nixosModules.default = self.nixosModules.mev-rs;
+
+      overlays.default = _:_: {
+        inherit mev-rs;
+      };
+
+      packages.x86_64-darwin.mev-rs = mev-rs "x86_64-darwin";
+      packages.x86_64-darwin.default = self.packages.x86_64-darwin.mev-rs;
+
+      packages.aarch64-darwin.mev-rs = mev-rs "aarch64-darwin";
+      packages.aarch64-darwin.default = self.packages.aarch64-darwin.mev-rs;
+
+      packages.x86_64-linux.mev-rs = mev-rs "x86_64-linux";
+      packages.x86_64-linux.default = self.packages.x86_64-linux.mev-rs;
+    };
 }
