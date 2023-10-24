@@ -28,6 +28,11 @@ in
   };
 
   config = {
+    network.firewall = lib.mkIf (cfg.enable == "build") {
+      allowedTCPPorts = [ 30303 ];
+      allowedUDPPorts = [ 30303 ];
+    };
+
     environment.systemPackages = [
       mev-rs
     ];
