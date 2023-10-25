@@ -1,5 +1,4 @@
 use crate::cmd::config::Config;
-use anyhow::{anyhow, Result};
 use clap::{Args, Subcommand};
 use mev_relay_rs::Service;
 use tracing::info;
@@ -20,7 +19,7 @@ pub enum Commands {
 }
 
 impl Command {
-    pub async fn execute(self) -> Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
         let (config_file, _mock) = if let Some(subcommand) = self.command.as_ref() {
             match subcommand {
                 Commands::Mock { config_file } => (config_file, true),
@@ -38,7 +37,7 @@ impl Command {
             let service = Service::from(network, config).spawn().await?;
             Ok(service.await?)
         } else {
-            Err(anyhow!("missing relay config from file provided"))
+            Err(eyre::eyre!("missing relay config from file provided"))
         }
     }
 }

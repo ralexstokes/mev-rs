@@ -27,6 +27,8 @@ reth-revm = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "5dd5555c5c7d8e43420e273e7005b8af63a847a5" }
 revm = "3.5.0"
 
+eyre = "0.6.8"
+
 [patch.crates-io]
 # We patch `revm-primitives` so that all generated files go into the expected place ("OUT_DIR") which
 # works well with rust `nix` builders and does not work well otherwise.

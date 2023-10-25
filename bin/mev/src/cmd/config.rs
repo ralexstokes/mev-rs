@@ -1,6 +1,6 @@
-use anyhow::{Context, Result};
 use clap::Args;
 use ethereum_consensus::networks::Network;
+use eyre::WrapErr;
 #[cfg(feature = "boost")]
 use mev_boost_rs::Config as BoostConfig;
 #[cfg(feature = "build")]
@@ -24,13 +24,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_toml_file<P: AsRef<Path> + fmt::Display + Clone>(path: P) -> Result<Config> {
+    pub fn from_toml_file<P: AsRef<Path> + fmt::Display + Clone>(path: P) -> eyre::Result<Config> {
         tracing::info!("loading config from `{path}`...");
 
         let config_data = std::fs::read_to_string(path.as_ref())
-            .with_context(|| format!("could not read config from `{path}`"))?;
+            .wrap_err_with(|| format!("could not read config from `{path}`"))?;
 
-        toml::from_str(&config_data).context("could not parse TOML")
+        toml::from_str(&config_data).wrap_err("could not parse TOML")
     }
 }
 
@@ -42,7 +42,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn execute(self) -> Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
         let config_file = self.config_file;
 
         let config = Config::from_toml_file(config_file)?;

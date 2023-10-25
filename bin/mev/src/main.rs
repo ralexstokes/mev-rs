@@ -1,6 +1,5 @@
 mod cmd;
 
-use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::future::Future;
 use tokio::signal;
@@ -33,7 +32,7 @@ fn setup_logging() {
         .init();
 }
 
-async fn run_task_until_signal(task: impl Future<Output = Result<()>>) -> Result<()> {
+async fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> eyre::Result<()> {
     tokio::select! {
         task = task => task,
         _ = signal::ctrl_c() => {
@@ -44,7 +43,7 @@ async fn run_task_until_signal(task: impl Future<Output = Result<()>>) -> Result
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
 
     setup_logging();

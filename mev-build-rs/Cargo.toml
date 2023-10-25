@@ -34,5 +34,5 @@ reth-revm = { workspace = true }
 reth = { workspace = true }
 
 ethers = "2.0"
-eyre = "0.6.8"
+eyre = { workspace = true }
 clap = { version = "4.1.4", features = ["derive", "env"] }

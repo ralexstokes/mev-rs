@@ -1,5 +1,4 @@
 use crate::cmd::config::Config;
-use anyhow::{anyhow, Result};
 use clap::Args;
 use mev_boost_rs::Service;
 use tracing::info;
@@ -12,7 +11,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn execute(self) -> Result<()> {
+    pub async fn execute(self) -> eyre::Result<()> {
         let config_file = &self.config_file;
 
         let config = Config::from_toml_file(config_file)?;
@@ -23,7 +22,7 @@ impl Command {
         if let Some(config) = config.boost {
             Ok(Service::from(network, config).spawn()?.await?)
         } else {
-            Err(anyhow!("missing boost config from file provided"))
+            Err(eyre::eyre!("missing boost config from file provided"))
         }
     }
 }
