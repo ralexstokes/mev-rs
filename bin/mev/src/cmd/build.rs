@@ -1,5 +1,4 @@
 use crate::cmd::config::Config;
-use anyhow::{anyhow, Result};
 use clap::Args;
 use mev_build_rs::reth_builder::Service;
 use tracing::info;
@@ -12,7 +11,7 @@ pub struct Command {
 }
 
 impl Command {
-    pub async fn execute(&self) -> Result<()> {
+    pub async fn execute(&self) -> eyre::Result<()> {
         let config_file = &self.config_file;
 
         let config = Config::from_toml_file(config_file)?;
@@ -24,7 +23,7 @@ impl Command {
             Service::from(network, config).spawn().await;
             Ok(())
         } else {
-            Err(anyhow!("missing build config from file provided"))
+            Err(eyre::eyre!("missing build config from file provided"))
         }
     }
 }
