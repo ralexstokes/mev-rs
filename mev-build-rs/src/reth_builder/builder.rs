@@ -280,7 +280,7 @@ impl<Pool, Client> Builder<Pool, Client> {
 
         let context = &build.context;
 
-        let (signed_submission, builder_payment) =
+        let (mut signed_submission, builder_payment) =
             build.prepare_bid(&self.secret_key, &self.public_key, &self.context)?;
 
         // TODO: make calls concurrently
@@ -291,7 +291,7 @@ impl<Pool, Client> Builder<Pool, Client> {
             let block_hash = &signed_submission.message.block_hash;
             let value = &signed_submission.message.value;
             tracing::info!(%id, %relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
-            match relay.submit_bid(&signed_submission).await {
+            match relay.submit_bid(&mut signed_submission).await {
                 Ok(_) => tracing::info!(%id, %relay, "successfully submitted bid"),
                 Err(err) => {
                     tracing::warn!(%err, %id, %relay, "error submitting bid");

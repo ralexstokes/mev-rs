@@ -80,7 +80,7 @@ impl BlindedBlockRelayer for Relay {
         self.relayer.get_proposal_schedule().await
     }
 
-    async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
+    async fn submit_bid(&self, signed_submission: &mut SignedBidSubmission) -> Result<(), Error> {
         self.relayer.submit_bid(signed_submission).await
     }
 }
