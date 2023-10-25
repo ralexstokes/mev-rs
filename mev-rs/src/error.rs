@@ -20,9 +20,9 @@ pub enum Error {
     MissingProposer(Slot),
     #[error("could not register with any relay")]
     CouldNotRegister,
-    #[error("no preferences found for validator with public key {0}")]
+    #[error("no preferences found for validator with public key {0:?}")]
     MissingPreferences(BlsPublicKey),
-    #[error("no payload returned for opened bid with block hash {0}")]
+    #[error("no payload returned for opened bid with block hash {0:?}")]
     MissingPayload(Hash32),
     #[error("payload gas limit does not match the proposer's preference")]
     InvalidGasLimit,
@@ -32,18 +32,18 @@ pub enum Error {
     UnknownBlock,
     #[error("payload request does not match any outstanding bid")]
     UnknownBid,
-    #[error("validator {0} does not have {1} fee recipient")]
+    #[error("validator {0:?} does not have {1:?} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
-    #[error("validator with public key {0} is not currently registered")]
+    #[error("validator with public key {0:?} is not currently registered")]
     ValidatorNotRegistered(BlsPublicKey),
-    #[error(transparent)]
-    Consensus(#[from] ConsensusError),
-    #[error(transparent)]
-    Api(#[from] ApiError),
     #[error(transparent)]
     ValidatorRegistry(#[from] crate::validator_registry::Error),
     #[error(transparent)]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
+    #[error(transparent)]
+    Consensus(#[from] ConsensusError),
+    #[error(transparent)]
+    Api(#[from] ApiError),
 }
 
 #[cfg(feature = "api")]
