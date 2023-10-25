@@ -4409,6 +4409,7 @@ dependencies = [
  "hyper",
  "parking_lot 0.12.1",
  "rand 0.8.5",
+ "rayon",
  "serde",
  "serde_json",
  "thiserror",
