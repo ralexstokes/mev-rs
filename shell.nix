@@ -8,6 +8,7 @@ mkShell {
     darwin.apple_sdk.frameworks.CFNetwork
     darwin.apple_sdk.frameworks.SystemConfiguration
   ] ++ [
+    cargo-udeps
     just
     mdbook
   ];
