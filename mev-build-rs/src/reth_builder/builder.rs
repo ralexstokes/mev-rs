@@ -275,7 +275,11 @@ impl<Pool, Client> Builder<Pool, Client> {
         self.state.lock().unwrap().cancels.remove(id);
     }
 
-    pub async fn submit_bid(&self, id: &BuildIdentifier) -> Result<(), Error> {
+    pub async fn submit_bid(
+        &self,
+        id: &BuildIdentifier,
+        with_cancellations: bool,
+    ) -> Result<(), Error> {
         let build = self.build_for(id).ok_or_else(|| Error::MissingBuild(id.clone()))?;
 
         let context = &build.context;
@@ -291,7 +295,7 @@ impl<Pool, Client> Builder<Pool, Client> {
             let block_hash = &signed_submission.message.block_hash;
             let value = &signed_submission.message.value;
             tracing::info!(id = %id, relay = ?relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
-            match relay.submit_bid(&signed_submission).await {
+            match relay.submit_bid(&signed_submission, with_cancellations).await {
                 Ok(_) => tracing::info!(%id, ?relay, "successfully submitted bid"),
                 Err(err) => {
                     tracing::warn!(%err, %id,?relay, "error submitting bid");

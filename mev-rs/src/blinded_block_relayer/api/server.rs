@@ -4,7 +4,7 @@ use crate::{
     types::{ProposerSchedule, SignedBidSubmission},
 };
 use axum::{
-    extract::{Json, State},
+    extract::{Json, Query, State},
     routing::{get, post, IntoMakeService},
     Router,
 };
@@ -24,10 +24,12 @@ async fn handle_get_proposal_schedule<R: BlindedBlockRelayer>(
 
 async fn handle_submit_bid<R: BlindedBlockRelayer>(
     State(relayer): State<R>,
+    Query(with_cancellations): Query<String>,
     Json(signed_bid_submission): Json<SignedBidSubmission>,
 ) -> Result<(), Error> {
     tracing::info!("handling bid submission");
-    relayer.submit_bid(&signed_bid_submission).await
+    let with_cancellations = with_cancellations == "1";
+    relayer.submit_bid(&signed_bid_submission, with_cancellations).await
 }
 
 pub struct Server<R: BlindedBlockRelayer> {
