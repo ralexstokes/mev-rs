@@ -15,8 +15,11 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    #[cfg(feature = "boost")]
     Boost(cmd::boost::Command),
+    #[cfg(feature = "build")]
     Build(cmd::build::Command),
+    #[cfg(feature = "relay")]
     Relay(cmd::relay::Command),
     Config(cmd::config::Command),
 }
@@ -47,8 +50,11 @@ async fn main() -> Result<()> {
     setup_logging();
 
     match cli.command {
+        #[cfg(feature = "boost")]
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute()).await,
+        #[cfg(feature = "build")]
         Commands::Build(cmd) => run_task_until_signal(cmd.execute()).await,
+        #[cfg(feature = "relay")]
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute()).await,
         Commands::Config(cmd) => run_task_until_signal(cmd.execute()).await,
     }
