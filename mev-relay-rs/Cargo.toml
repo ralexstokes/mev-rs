@@ -23,4 +23,3 @@ ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
 
 mev-rs = { path = "../mev-rs" }
-mev-build-rs = { path = "../mev-build-rs" }

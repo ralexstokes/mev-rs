@@ -1,9 +1,11 @@
-{ pkgs, crane }:
+{ pkgs, crane, features ? "" }:
 with pkgs;
 let
+  feature-set = if features != "" then "--no-default-features --features ${features}" else "";
   commonArgs = {
     pname = "mev-rs";
     src = crane.cleanCargoSource (crane.path ../.);
+    cargoExtraArgs = "--locked ${feature-set}";
     buildInputs = lib.optionals pkgs.stdenv.isLinux [
       openssl
     ] ++ lib.optionals pkgs.stdenv.isDarwin [
