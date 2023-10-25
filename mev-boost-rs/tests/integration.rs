@@ -76,7 +76,7 @@ async fn test_end_to_end() {
     let genesis_validators_root = Root::try_from([23u8; 32].as_ref()).unwrap();
 
     let network = Network::Sepolia;
-    let context = Context::try_from(&network).unwrap();
+    let context = Context::try_from(network.clone()).unwrap();
 
     // NOTE: non-default secret key required. otherwise public key is point at infinity and
     // signature verification will fail.

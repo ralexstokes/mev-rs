@@ -71,7 +71,7 @@ impl Service {
             }
         }
 
-        let context = Context::try_from(&network)?;
+        let context = Context::try_from(network)?;
         let relays = relays.into_iter().map(Relay::from);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);

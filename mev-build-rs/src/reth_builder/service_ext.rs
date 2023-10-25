@@ -75,8 +75,7 @@ impl RethNodeCommandConfig for ServiceExt {
         Reth: RethNodeComponents,
     {
         let build_config = self.config.clone();
-        let network = &self.network;
-        let context = Arc::new(Context::try_from(network)?);
+        let context = Arc::new(Context::try_from(self.network.clone())?);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)

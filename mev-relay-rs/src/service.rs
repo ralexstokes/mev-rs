@@ -57,7 +57,7 @@ impl Service {
     pub async fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, beacon_node, network, secret_key } = self;
 
-        let context = Context::try_from(&network)?;
+        let context = Context::try_from(network)?;
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)
