@@ -3,13 +3,20 @@ pkg:
 let
   cfg = config.services.mev-rs;
 
-  mev-rs = pkg.mev-rs pkgs.system;
+  component = cfg.enable;
+  # ensure the intended component is part of the feature set
+  features = if lib.strings.hasInfix component cfg.features then cfg.features else lib.strings.removePrefix "," "${cfg.features},${component}";
+
+  mev-rs = pkg.mev-rs {
+    inherit features;
+    system = pkgs.system;
+  };
 
   name = "mev-${cfg.enable}-rs";
 
   cmd = ''
     ${mev-rs}/bin/mev \
-    ${cfg.enable} \
+    ${component} \
     ${cfg.config-file}
   '';
 in
@@ -25,10 +32,17 @@ in
         path to a config file suitable for the `mev-rs` toolkit
       '';
     };
+    features = lib.mkOption {
+      type = lib.types.str;
+      default = cfg.enable;
+      description = ''
+        feature set (comma-separated) to enable for `cargo` build
+      '';
+    };
   };
 
   config = {
-    networking.firewall = lib.mkIf (cfg.enable == "build") {
+    networking.firewall = lib.mkIf (component == "build") {
       allowedTCPPorts = [ 30303 ];
       allowedUDPPorts = [ 30303 ];
     };
