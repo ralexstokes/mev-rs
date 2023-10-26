@@ -10,8 +10,6 @@ use thiserror::Error;
 pub enum Error {
     #[error("bid public key {bid} does not match relay public key {relay}")]
     BidPublicKeyMismatch { bid: BlsPublicKey, relay: BlsPublicKey },
-    #[error("no bid prepared for request {0}")]
-    NoBidPrepared(Box<AuctionRequest>),
     #[error("no valid bids returned for proposal")]
     NoBids,
     #[error("could not find relay with outstanding bid to accept")]
@@ -32,6 +30,9 @@ pub enum Error {
     InvalidExecutionPayloadInBlock,
     #[error("validator {0:?} does not have {1:?} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
+
+    #[error("no bid prepared for request {0}")]
+    NoBidPrepared(AuctionRequest),
 
     #[error("missing auction for {0}")]
     MissingAuction(AuctionRequest),
