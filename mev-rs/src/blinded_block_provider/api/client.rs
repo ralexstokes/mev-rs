@@ -1,6 +1,6 @@
 use crate::{
     types::{
-        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
     Error,
@@ -40,16 +40,16 @@ impl Client {
 
     pub async fn fetch_best_bid(
         &self,
-        bid_request: &BidRequest,
+        auction_request: &AuctionRequest,
     ) -> Result<SignedBuilderBid, Error> {
         let target = format!(
             "/eth/v1/builder/header/{}/{:?}/{:?}",
-            bid_request.slot, bid_request.parent_hash, bid_request.public_key
+            auction_request.slot, auction_request.parent_hash, auction_request.public_key
         );
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(Box::new(bid_request.clone())))
+            return Err(Error::NoBidPrepared(Box::new(auction_request.clone())))
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =

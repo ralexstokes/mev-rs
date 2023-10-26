@@ -1,4 +1,4 @@
-use crate::types::BidRequest;
+use crate::types::AuctionRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, ExecutionAddress, Hash32, Slot, ValidatorIndex},
@@ -11,7 +11,7 @@ pub enum Error {
     #[error("bid public key {bid} does not match relay public key {relay}")]
     BidPublicKeyMismatch { bid: BlsPublicKey, relay: BlsPublicKey },
     #[error("no bid prepared for request {0}")]
-    NoBidPrepared(Box<BidRequest>),
+    NoBidPrepared(Box<AuctionRequest>),
     #[error("no valid bids returned for proposal")]
     NoBids,
     #[error("could not find relay with outstanding bid to accept")]
@@ -33,20 +33,24 @@ pub enum Error {
     #[error("validator {0:?} does not have {1:?} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
 
-    #[error("missing payload for {0}")]
-    MissingBid(BidRequest),
+    #[error("missing auction for {0}")]
+    MissingAuction(AuctionRequest),
+    #[error("signed blinded beacon block is invalid or equivocated")]
+    InvalidSignedBlindedBeaconBlock,
     #[error("validator with public key {0:?} is not currently registered")]
     ValidatorNotRegistered(BlsPublicKey),
     #[error("validator with index {0} is not currently registered")]
     ValidatorIndexNotRegistered(ValidatorIndex),
     #[error("builder with public key {0:?} is not currently registered")]
     BuilderNotRegistered(BlsPublicKey),
+
     #[error(transparent)]
     ValidatorRegistry(#[from] crate::validator_registry::Error),
     #[error(transparent)]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
     #[error("validator registration errors: {0:?}")]
     RegistrationErrors(Vec<crate::validator_registry::Error>),
+
     #[error(transparent)]
     Consensus(#[from] ConsensusError),
     #[error(transparent)]

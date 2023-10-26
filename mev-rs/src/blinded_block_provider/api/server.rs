@@ -2,7 +2,7 @@ use crate::{
     blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
-        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
 };
@@ -36,10 +36,10 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
 
 async fn handle_fetch_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
-    Path(bid_request): Path<BidRequest>,
+    Path(auction_request): Path<AuctionRequest>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
-    let signed_bid = builder.fetch_best_bid(&bid_request).await?;
-    trace!(%bid_request, %signed_bid, "returning bid");
+    let signed_bid = builder.fetch_best_bid(&auction_request).await?;
+    trace!(%auction_request, %signed_bid, "returning bid");
     let version = signed_bid.version();
     let response = VersionedValue { version, data: signed_bid, meta: Default::default() };
     Ok(Json(response))

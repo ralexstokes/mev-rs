@@ -18,7 +18,7 @@ use mev_boost_rs::{Config, Service};
 use mev_rs::{
     blinded_block_provider::{Client as RelayClient, Server as RelayServer},
     signing::sign_builder_message,
-    types::{BidRequest, SignedBlindedBeaconBlock},
+    types::{AuctionRequest, SignedBlindedBeaconBlock},
 };
 use rand::seq::SliceRandom;
 use std::{
@@ -145,7 +145,7 @@ async fn propose_block(
     };
     let parent_hash = Hash32::try_from([shuffling_index as u8; 32].as_ref()).unwrap();
 
-    let request = BidRequest {
+    let request = AuctionRequest {
         slot: current_slot,
         parent_hash: parent_hash.clone(),
         public_key: proposer.validator.public_key.clone(),
