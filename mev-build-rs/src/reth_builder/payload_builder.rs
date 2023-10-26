@@ -24,7 +24,7 @@ use reth_revm::{
     state_change::post_block_withdrawals_balance_increments,
 };
 use revm::{
-    db::WrapDatabaseRef,
+    db::{states::bundle_state::BundleRetention, WrapDatabaseRef},
     primitives::{EVMError, Env, InvalidTransaction, ResultAndState},
     Database, DatabaseCommit, State,
 };
@@ -108,18 +108,18 @@ fn assemble_payload_with_payments(
         return Ok(BuildOutcome::Cancelled)
     }
 
-    let bundle_state = context.bundle_state;
-    let transactions_root = proofs::calculate_transaction_root(&context.executed_txs);
+    context.db.merge_transitions(BundleRetention::PlainState);
 
-    let state_root = client.latest()?.state_root(&bundle_state.clone())?;
-    let receipts = bundle_state.receipts_by_block(block_number).to_vec();
     let bundle = BundleStateWithReceipts::new(
         context.db.take_bundle(),
-        Receipts::from_vec(vec![receipts]),
+        Receipts::from_vec(vec![context.receipts]),
         block_number,
     );
-    let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
-    let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
+    let receipts_root = bundle.receipts_root_slow(block_number).expect("number is in range");
+    let logs_bloom = bundle.block_logs_bloom(block_number).expect("number is in range");
+    let state_root = client.latest()?.state_root(&bundle)?;
+
+    let transactions_root = proofs::calculate_transaction_root(&context.executed_txs);
 
     let header = Header {
         parent_hash: context.build.parent_hash,
@@ -166,7 +166,7 @@ fn construct_payment_tx(
     let reth_sender = Address::from(sender.to_fixed_bytes());
     let signer_account = context.db.load_cache_account(reth_sender)?;
     let nonce = signer_account.account_info().expect("account exists").nonce;
-    let chain_id = context.build.chain_spec.genesis().config.chain_id;
+    let chain_id = context.build.chain_spec.chain().id();
 
     let fee_recipient = H160::from_slice(context.build.proposer_fee_recipient.as_ref());
     let value = ethers_U256::from_big_endian(&context.total_payment.to_be_bytes::<32>());
@@ -198,7 +198,7 @@ struct ExecutionContext<'a> {
     build: &'a BuildContext,
     cancel: &'a Cancelled,
     db: revm::State<WrapDatabaseRef<StateProviderDatabase<Box<dyn StateProvider + 'a>>>>,
-    bundle_state: BundleStateWithReceipts,
+    receipts: Vec<Option<Receipt>>,
     cumulative_gas_used: u64,
     total_fees: U256,
     executed_txs: Vec<TransactionSigned>,
@@ -224,19 +224,14 @@ impl<'a> ExecutionContext<'a> {
         cancel: &'a Cancelled,
         provider: &'a P,
     ) -> Result<Self, Error> {
-        let state = provider.state_by_block_hash(context.parent_hash)?;
-        let mut db =
-            revm::State::builder().with_database_ref(StateProviderDatabase::new(state)).build();
-        let bundle_state = BundleStateWithReceipts::new(
-            db.take_bundle(),
-            Receipts::default(),
-            u64::from_le_bytes(context.block_env.number.to_le_bytes()),
-        );
+        let state_provider = provider.state_by_block_hash(context.parent_hash)?;
+        let state = StateProviderDatabase::new(state_provider);
+        let db = State::builder().with_database_ref(state).with_bundle_update().build();
         Ok(ExecutionContext {
             build: context,
             cancel,
             db,
-            bundle_state,
+            receipts: Default::default(),
             cumulative_gas_used: 0,
             total_fees: U256::ZERO,
             executed_txs: Default::default(),
@@ -268,18 +263,18 @@ impl<'a> ExecutionContext<'a> {
 
         let ResultAndState { result, state } = evm.transact()?;
 
-        let block_number = self.build.number();
         self.db.commit(state);
 
         let gas_used = result.gas_used();
         self.cumulative_gas_used += gas_used;
+
         let receipt = Receipt {
             tx_type: tx.tx_type(),
             success: result.is_success(),
             cumulative_gas_used: self.cumulative_gas_used,
             logs: result.logs().into_iter().map(into_reth_log).collect(),
         };
-        self.bundle_state.receipts_by_block(block_number).to_vec().push(Some(receipt));
+        self.receipts.push(Some(receipt));
 
         let base_fee = self.build.base_fee();
         let fee = tx.effective_tip_per_gas(base_fee).expect("fee is valid; execution succeeded");
@@ -320,6 +315,7 @@ pub fn build_payload<
         return Ok(BuildOutcome::Cancelled)
     }
 
+    // NOTE: assume payment transaction always succeeds
     context.extend_transaction(payment_tx)?;
 
     if context.is_cancelled() {
