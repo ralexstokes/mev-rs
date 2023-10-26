@@ -2,22 +2,27 @@ use async_trait::async_trait;
 use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{
     builder::ValidatorRegistration,
-    capella::mainnet as capella,
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Root, Slot, U256},
+    primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
     state_transition::Context,
 };
 use mev_rs::{
     signing::{compute_consensus_signing_root, sign_builder_message, verify_signature},
     types::{
-        BidRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
-        SignedBuilderBid, SignedValidatorRegistration,
+        BidRequest, BidTrace, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
+        ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
     },
-    BlindedBlockProvider, Error, ValidatorRegistry,
+    BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, ValidatorRegistry,
 };
 use parking_lot::Mutex;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::Deref,
+    sync::Arc,
+};
+use tracing::error;
 
 // `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
 // once they have been fetched from builders -- currently in response to an incoming request from a
@@ -25,6 +30,17 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 // `1` allows for latency at the slot boundary while still enabling a successful proposal.
 // TODO likely drop this feature...
 const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+
+fn to_header(execution_payload: &mut ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
+    let header = match execution_payload {
+        ExecutionPayload::Bellatrix(payload) => {
+            ExecutionPayloadHeader::Bellatrix(payload.try_into()?)
+        }
+        ExecutionPayload::Capella(payload) => ExecutionPayloadHeader::Capella(payload.try_into()?),
+        ExecutionPayload::Deneb(payload) => ExecutionPayloadHeader::Deneb(payload.try_into()?),
+    };
+    Ok(header)
+}
 
 fn validate_bid_request(_bid_request: &BidRequest) -> Result<(), Error> {
     // TODO validations
@@ -72,7 +88,7 @@ fn validate_signed_block(
     let payload_header = body.execution_payload_header();
     let block_hash = payload_header.block_hash();
     if block_hash != local_block_hash {
-        return Err(Error::UnknownBlock)
+        return Err(Error::InvalidExecutionPayloadInBlock)
     }
 
     // OPTIONAL:
@@ -104,13 +120,22 @@ pub struct Inner {
     public_key: BlsPublicKey,
     genesis_validators_root: Root,
     validator_registry: ValidatorRegistry,
-    context: Arc<Context>,
+    proposer_scheduler: ProposerScheduler,
+    builder_registry: HashSet<BlsPublicKey>,
+    context: Context,
     state: Mutex<State>,
+}
+
+#[derive(Debug)]
+struct BidContext {
+    signed_builder_bid: SignedBuilderBid,
+    execution_payload: ExecutionPayload,
+    value: U256,
 }
 
 #[derive(Debug, Default)]
 struct State {
-    execution_payloads: HashMap<BidRequest, ExecutionPayload>,
+    bids: HashMap<BidRequest, BidContext>,
 }
 
 impl Relay {
@@ -118,40 +143,88 @@ impl Relay {
         genesis_validators_root: Root,
         beacon_node: Client,
         secret_key: SecretKey,
-        context: Arc<Context>,
+        accepted_builders: Vec<BlsPublicKey>,
+        context: Context,
     ) -> Self {
         let public_key = secret_key.public_key();
-        let validator_registry = ValidatorRegistry::new(beacon_node);
+        let slots_per_epoch = context.slots_per_epoch;
+        let validator_registry = ValidatorRegistry::new(beacon_node.clone(), slots_per_epoch);
+        let proposer_scheduler = ProposerScheduler::new(beacon_node, slots_per_epoch);
         let inner = Inner {
             secret_key,
             public_key,
             genesis_validators_root,
             validator_registry,
+            proposer_scheduler,
+            builder_registry: HashSet::from_iter(accepted_builders),
             context,
             state: Default::default(),
         };
         Self(Arc::new(inner))
     }
 
-    async fn load_full_validator_set(&self) {
-        if let Err(err) = self.validator_registry.load().await {
-            tracing::error!("could not load validator set from provided beacon node; please check config and restart: {err}");
+    pub async fn on_epoch(&self, epoch: Epoch) {
+        if let Err(err) = self.validator_registry.on_epoch(epoch).await {
+            error!(%err, "could not load validator set from provided beacon node");
+        }
+        if let Err(err) = self.proposer_scheduler.on_epoch(epoch, &self.validator_registry).await {
+            error!(%err, "could not load proposer duties");
         }
     }
 
-    pub async fn initialize(&self) {
-        self.load_full_validator_set().await;
-    }
-
-    pub async fn on_slot(&self, slot: Slot, next_epoch: bool) {
-        if next_epoch {
-            // TODO grab validators more efficiently
-            self.load_full_validator_set().await;
-        }
+    pub async fn on_slot(&self, slot: Slot) {
         let mut state = self.state.lock();
-        state
-            .execution_payloads
-            .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+        state.bids.retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+    }
+
+    fn validate_allowed_builder(&self, builder_public_key: &BlsPublicKey) -> Result<(), Error> {
+        if self.builder_registry.contains(builder_public_key) {
+            Ok(())
+        } else {
+            Err(Error::BuilderNotRegistered(builder_public_key.clone()))
+        }
+    }
+
+    fn validate_bid_request(&self, bid_request: &BidRequest) -> Result<(), Error> {
+        validate_bid_request(bid_request)
+    }
+
+    fn validate_builder_submission(
+        &self,
+        _bid_trace: &BidTrace,
+        _execution_payload: &ExecutionPayload,
+    ) -> Result<(), Error> {
+        // TODO:
+        // verify payload matches proposer prefs (and proposer is registered)
+        // validate_execution_payload(execution_payload, value, preferences)
+        // verify bid trace block hash matches execution_payload block hash
+        Ok(())
+    }
+
+    fn insert_bid_if_greater(
+        &self,
+        bid_request: BidRequest,
+        mut execution_payload: ExecutionPayload,
+        value: U256,
+    ) -> Result<(), Error> {
+        {
+            let state = self.state.lock();
+            if let Some(bid) = state.bids.get(&bid_request) {
+                if bid.value > value {
+                    return Ok(())
+                }
+            }
+        }
+        let header = to_header(&mut execution_payload)?;
+        let mut bid =
+            BuilderBid { header, value: value.clone(), public_key: self.public_key.clone() };
+        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
+        let signed_builder_bid = SignedBuilderBid { message: bid, signature };
+
+        let bid_context = BidContext { signed_builder_bid, execution_payload, value };
+        let mut state = self.state.lock();
+        state.bids.insert(bid_request, bid_context);
+        Ok(())
     }
 }
 
@@ -162,41 +235,20 @@ impl BlindedBlockProvider for Relay {
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let current_time = get_current_unix_time_in_nanos().try_into().expect("fits in type");
-        self.validator_registry.validate_registrations(
-            registrations,
-            current_time,
-            &self.context,
-        )?;
-        Ok(())
+        self.validator_registry
+            .process_registrations(registrations, current_time, &self.context)
+            .map_err(Error::RegistrationErrors)
     }
 
     async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
-        validate_bid_request(bid_request)?;
+        self.validate_bid_request(bid_request)?;
 
-        let public_key = &bid_request.public_key;
-        let preferences = self
-            .validator_registry
-            .get_preferences(public_key)
-            .ok_or_else(|| Error::MissingPreferences(public_key.clone()))?;
-
-        let value = U256::default();
-        let header = {
-            let mut payload = ExecutionPayload::Capella(Default::default());
-            let mut state = self.state.lock();
-
-            validate_execution_payload(&payload, &value, &preferences)?;
-
-            let inner = payload.capella_mut().unwrap();
-            let inner_header = capella::ExecutionPayloadHeader::try_from(inner)?;
-            let header = ExecutionPayloadHeader::Capella(inner_header);
-
-            state.execution_payloads.insert(bid_request.clone(), payload);
-            header
-        };
-
-        let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
-        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
-        Ok(SignedBuilderBid { message: bid, signature })
+        let state = self.state.lock();
+        let bid_context = state
+            .bids
+            .get(bid_request)
+            .ok_or_else(|| Error::NoBidPrepared(Box::new(bid_request.clone())))?;
+        Ok(bid_context.signed_builder_bid.clone())
     }
 
     async fn open_bid(
@@ -209,15 +261,21 @@ impl BlindedBlockProvider for Relay {
         let payload_header = body.execution_payload_header();
         let parent_hash = payload_header.parent_hash().clone();
         let proposer_index = block.proposer_index();
-        let public_key =
-            self.validator_registry.get_public_key(proposer_index).map_err(Error::from)?;
+        let public_key = self
+            .validator_registry
+            .get_public_key(proposer_index)
+            .ok_or(Error::ValidatorIndexNotRegistered(proposer_index))?;
         let bid_request = BidRequest { slot, parent_hash, public_key };
 
-        let payload = {
-            let mut state = self.state.lock();
-            state.execution_payloads.remove(&bid_request).ok_or(Error::UnknownBid)?
-        };
+        self.validate_bid_request(&bid_request)?;
 
+        let mut state = self.state.lock();
+        let bid_context = state
+            .bids
+            .remove(&bid_request)
+            .ok_or_else(|| Error::MissingBid(bid_request.clone()))?;
+
+        let payload = bid_context.execution_payload;
         validate_signed_block(
             signed_block,
             &bid_request.public_key,
@@ -226,6 +284,43 @@ impl BlindedBlockProvider for Relay {
             &self.context,
         )?;
 
+        // TODO: any other validations required here?
+
         Ok(payload)
+    }
+}
+
+#[async_trait]
+impl BlindedBlockRelayer for Relay {
+    async fn get_proposal_schedule(&self) -> Result<Vec<ProposerSchedule>, Error> {
+        self.proposer_scheduler.get_proposal_schedule().map_err(Into::into)
+    }
+
+    async fn submit_bid(&self, signed_submission: &mut SignedBidSubmission) -> Result<(), Error> {
+        let (bid_request, value) = {
+            let bid_trace = &signed_submission.message;
+            let builder_public_key = &bid_trace.builder_public_key;
+            self.validate_allowed_builder(builder_public_key)?;
+
+            let bid_request = BidRequest {
+                slot: bid_trace.slot,
+                parent_hash: bid_trace.parent_hash.clone(),
+                public_key: bid_trace.proposer_public_key.clone(),
+            };
+            self.validate_bid_request(&bid_request)?;
+
+            self.validate_builder_submission(bid_trace, &signed_submission.execution_payload)?;
+            (bid_request, bid_trace.value.clone())
+        };
+
+        signed_submission.verify_signature(&self.context)?;
+
+        let execution_payload = signed_submission.execution_payload.clone();
+        // NOTE: this does _not_ respect cancellations
+        // TODO: move to regime where we track best bid by builder
+        // and also move logic to cursor best bid for auction off this API
+        self.insert_bid_if_greater(bid_request, execution_payload, value)?;
+
+        Ok(())
     }
 }

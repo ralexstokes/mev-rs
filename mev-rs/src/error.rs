@@ -1,7 +1,7 @@
 use crate::types::BidRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
-    primitives::{BlsPublicKey, ExecutionAddress, Hash32, Slot},
+    primitives::{BlsPublicKey, ExecutionAddress, Hash32, Slot, ValidatorIndex},
     Error as ConsensusError,
 };
 use thiserror::Error;
@@ -20,26 +20,33 @@ pub enum Error {
     MissingProposer(Slot),
     #[error("could not register with any relay")]
     CouldNotRegister,
-    #[error("no preferences found for validator with public key {0:?}")]
-    MissingPreferences(BlsPublicKey),
+    // #[error("no preferences found for validator with public key {0:?}")]
+    // MissingPreferences(BlsPublicKey),
     #[error("no payload returned for opened bid with block hash {0:?}")]
     MissingPayload(Hash32),
     #[error("payload gas limit does not match the proposer's preference")]
     InvalidGasLimit,
     #[error("data for an unexpected fork was provided")]
     InvalidFork,
-    #[error("block does not match the provided header")]
-    UnknownBlock,
-    #[error("payload request does not match any outstanding bid")]
-    UnknownBid,
+    #[error("execution payload does not match the provided header")]
+    InvalidExecutionPayloadInBlock,
     #[error("validator {0:?} does not have {1:?} fee recipient")]
     UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
+
+    #[error("missing payload for {0}")]
+    MissingBid(BidRequest),
     #[error("validator with public key {0:?} is not currently registered")]
     ValidatorNotRegistered(BlsPublicKey),
+    #[error("validator with index {0} is not currently registered")]
+    ValidatorIndexNotRegistered(ValidatorIndex),
+    #[error("builder with public key {0:?} is not currently registered")]
+    BuilderNotRegistered(BlsPublicKey),
     #[error(transparent)]
     ValidatorRegistry(#[from] crate::validator_registry::Error),
     #[error(transparent)]
     ProposerScheduler(#[from] crate::proposer_scheduler::Error),
+    #[error("validator registration errors: {0:?}")]
+    RegistrationErrors(Vec<crate::validator_registry::Error>),
     #[error(transparent)]
     Consensus(#[from] ConsensusError),
     #[error(transparent)]
