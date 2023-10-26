@@ -199,7 +199,7 @@ impl<Pool, Client> Builder<Pool, Client> {
                 registered_relays.push(relay);
             }
         }
-        tracing::info!(?slots, relay, "processed proposer schedule");
+        tracing::info!(?slots, %relay, "processed proposer schedule");
     }
 
     async fn on_epoch(&self, _epoch: Epoch) {
@@ -290,11 +290,11 @@ impl<Pool, Client> Builder<Pool, Client> {
             let parent_hash = &signed_submission.message.parent_hash;
             let block_hash = &signed_submission.message.block_hash;
             let value = &signed_submission.message.value;
-            tracing::info!(id = %id, relay = ?relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
+            tracing::info!(%id, %relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
             match relay.submit_bid(&signed_submission).await {
-                Ok(_) => tracing::info!(%id, ?relay, "successfully submitted bid"),
+                Ok(_) => tracing::info!(%id, %relay, "successfully submitted bid"),
                 Err(err) => {
-                    tracing::warn!(%err, %id,?relay, "error submitting bid");
+                    tracing::warn!(%err, %id, %relay, "error submitting bid");
                 }
             }
         }
@@ -411,7 +411,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes))
         }
 
-        tracing::info!(relays=?relays, slot, %build_identifier, attr_id = %payload_attributes.id, parent = %parent_hash, timestamp = %payload_attributes.timestamp, "constructing new build");
+        tracing::info!(slot, ?relays, %build_identifier, "constructing new build");
 
         let context = self.construct_build_context(
             slot,

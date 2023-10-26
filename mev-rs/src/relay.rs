@@ -45,16 +45,13 @@ pub struct Relay {
 
 impl fmt::Debug for Relay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Relay")
-            .field("public_key", &self.public_key)
-            .field("endpoint", &self.endpoint)
-            .finish()
+        f.write_str(self.endpoint.as_str())
     }
 }
 
 impl fmt::Display for Relay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.endpoint.as_str())
+        write!(f, "{self:?}")
     }
 }
 
