@@ -22,15 +22,23 @@ pub enum Error {
     // MissingPreferences(BlsPublicKey),
     #[error("no payload returned for opened bid with block hash {0:?}")]
     MissingPayload(Hash32),
-    #[error("payload gas limit does not match the proposer's preference")]
-    InvalidGasLimit,
     #[error("data for an unexpected fork was provided")]
     InvalidFork,
+
     #[error("execution payload does not match the provided header")]
     InvalidExecutionPayloadInBlock,
-    #[error("validator {0:?} does not have {1:?} fee recipient")]
-    UnknownFeeRecipient(BlsPublicKey, ExecutionAddress),
-
+    #[error("validator {0:?} does not have registered fee recipient {1:?}")]
+    InvalidFeeRecipient(BlsPublicKey, ExecutionAddress),
+    #[error("validator {0:?} does not have (adjusted) registered gas limit {1}")]
+    InvalidGasLimitForProposer(BlsPublicKey, u64),
+    #[error("bid trace declares gas limit of {0:?} but execution payload has {1:?}")]
+    InvalidGasLimit(u64, u64),
+    #[error("bid trace declares gas usage of {0} but execution payload uses {1}")]
+    InvalidGasUsed(u64, u64),
+    #[error("bid trace declares parent hash of {0:?} but execution payload has {1:?}")]
+    InvalidParentHash(Hash32, Hash32),
+    #[error("bid trace declares block hash of {0:?} but execution payload has {1:?}")]
+    InvalidBlockHash(Hash32, Hash32),
     #[error("no bid prepared for request {0}")]
     NoBidPrepared(AuctionRequest),
 
