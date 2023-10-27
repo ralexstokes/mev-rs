@@ -109,6 +109,8 @@ impl ValidatorRegistry {
         Ok(())
     }
 
+    // Return the BLS public key for the validator's `index`, reflecting the index
+    // built from the last consensus update
     pub fn get_public_key(&self, index: ValidatorIndex) -> Option<BlsPublicKey> {
         let state = self.state.read();
         state.pubkeys_by_index.get(&index).cloned()
@@ -119,6 +121,8 @@ impl ValidatorRegistry {
     //     state.validators.get(public_key).map(|v| v.index)
     // }
 
+    // Return the signed validator registration for the given `public_key` if we have processed such
+    // a registration. If missing, return `None`.
     pub fn get_signed_registration(
         &self,
         public_key: &BlsPublicKey,

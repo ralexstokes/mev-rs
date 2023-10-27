@@ -1,5 +1,5 @@
 use crate::relay::Relay;
-use beacon_api_client::mainnet::Client;
+use beacon_api_client::{mainnet::Client, PayloadAttributesTopic};
 use ethereum_consensus::{
     crypto::SecretKey,
     networks::{self, Network},
@@ -11,6 +11,7 @@ use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
+use tracing::{error, warn};
 use url::Url;
 
 #[derive(Deserialize, Debug)]
@@ -67,18 +68,36 @@ impl Service {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)
         });
-        let genesis_details = beacon_node.get_genesis_details().await?;
-        let genesis_validators_root = genesis_details.genesis_validators_root;
-        let relay = Relay::new(
-            genesis_validators_root,
-            beacon_node,
-            secret_key,
-            accepted_builders,
-            context,
-        );
+        let relay = Relay::new(beacon_node.clone(), secret_key, accepted_builders, context);
 
         let block_provider = relay.clone();
         let server = BlindedBlockProviderServer::new(host, port, block_provider).spawn();
+
+        let relay_clone = relay.clone();
+        let consensus = tokio::spawn(async move {
+            let relay = relay_clone;
+
+            let mut stream = match beacon_node.get_events::<PayloadAttributesTopic>().await {
+                Ok(events) => events,
+                Err(err) => {
+                    error!(%err, "could not open payload attributes stream");
+                    return
+                }
+            };
+
+            while let Some(event) = stream.next().await {
+                match event {
+                    Ok(event) => {
+                        if let Err(err) = relay.on_payload_attributes(event.data) {
+                            warn!(%err, "could not process payload attributes");
+                        }
+                    }
+                    Err(err) => {
+                        warn!(%err, "error reading payload attributes stream");
+                    }
+                }
+            }
+        });
 
         let relay = tokio::spawn(async move {
             let slots = clock.stream_slots();
@@ -97,7 +116,7 @@ impl Service {
             }
         });
 
-        Ok(ServiceHandle { relay, server })
+        Ok(ServiceHandle { relay, server, consensus })
     }
 }
 
@@ -110,6 +129,8 @@ pub struct ServiceHandle {
     relay: JoinHandle<()>,
     #[pin]
     server: JoinHandle<()>,
+    #[pin]
+    consensus: JoinHandle<()>,
 }
 
 impl Future for ServiceHandle {
@@ -120,6 +141,10 @@ impl Future for ServiceHandle {
         let relay = this.relay.poll(cx);
         if relay.is_ready() {
             return relay
+        }
+        let consensus = this.consensus.poll(cx);
+        if consensus.is_ready() {
+            return consensus
         }
         this.server.poll(cx)
     }

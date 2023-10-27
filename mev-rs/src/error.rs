@@ -25,6 +25,8 @@ pub enum Error {
     #[error("data for an unexpected fork was provided")]
     InvalidFork,
 
+    #[error("received auction request for {provided} but expecting request at {expected}")]
+    InvalidAuctionRequest { expected: AuctionRequest, provided: AuctionRequest },
     #[error("execution payload does not match the provided header")]
     InvalidExecutionPayloadInBlock,
     #[error("validator {0:?} does not have registered fee recipient {1:?}")]
@@ -48,8 +50,8 @@ pub enum Error {
     InvalidSignedBlindedBeaconBlock,
     #[error("validator with public key {0:?} is not currently registered")]
     ValidatorNotRegistered(BlsPublicKey),
-    #[error("validator with index {0} is not currently registered")]
-    ValidatorIndexNotRegistered(ValidatorIndex),
+    #[error("validator with index {0} was not found in consensus")]
+    UnknownValidatorIndex(ValidatorIndex),
     #[error("builder with public key {0:?} is not currently registered")]
     BuilderNotRegistered(BlsPublicKey),
 

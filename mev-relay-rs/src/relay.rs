@@ -1,9 +1,11 @@
 use async_trait::async_trait;
-use beacon_api_client::{mainnet::Client as ApiClient, BroadcastValidation};
+use beacon_api_client::{
+    mainnet::Client as ApiClient, BroadcastValidation, PayloadAttributesEvent,
+};
 use ethereum_consensus::{
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
+    primitives::{BlsPublicKey, Epoch, Slot, U256},
     ssz::prelude::Merkleized,
     state_transition::Context,
     types::mainnet::ExecutionPayloadHeaderRef,
@@ -24,16 +26,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use tracing::{error, warn};
-
-type PayloadAttributes = ();
-
-// `PROPOSAL_TOLERANCE_DELAY` controls how aggresively the relay drops "old" execution payloads
-// once they have been fetched from builders -- currently in response to an incoming request from a
-// proposer. Setting this to anything other than `0` incentivizes late proposals and setting it to
-// `1` allows for latency at the slot boundary while still enabling a successful proposal.
-// TODO likely drop this feature...
-const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+use tracing::{debug, error, info, warn};
 
 fn to_header(execution_payload: &mut ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
     let header = match execution_payload {
@@ -76,69 +69,6 @@ fn validate_header_equality(
     Ok(())
 }
 
-// fn validate_auction_request(_auction_request: &AuctionRequest) -> Result<(), Error> {
-//     // TODO validations
-
-//     // verify slot is timely
-
-//     // verify parent_hash is on a chain tip
-
-//     // verify public_key is one of the possible proposers
-
-//     Ok(())
-// }
-
-// fn validate_execution_payload(
-//     execution_payload: &ExecutionPayload,
-//     _value: &U256,
-//     preferences: &ValidatorRegistration,
-// ) -> Result<(), Error> {
-//     // TODO validations
-
-//     // TODO allow for "adjustment cap" per the protocol rules
-//     // towards the proposer's preference
-//     if execution_payload.gas_limit() != preferences.gas_limit {
-//         return Err(Error::InvalidGasLimit)
-//     }
-
-//     // verify payload is valid
-
-//     // verify payload sends `value` to proposer
-
-//     Ok(())
-// }
-
-// fn validate_signed_block(
-//     signed_block: &mut SignedBlindedBeaconBlock,
-//     public_key: &BlsPublicKey,
-//     local_payload: &ExecutionPayload,
-//     genesis_validators_root: &Root,
-//     context: &Context,
-// ) -> Result<(), Error> {
-//     // let local_block_hash = local_payload.block_hash();
-//     // let mut block = signed_block.message_mut();
-
-//     // let body = block.body();
-//     // let payload_header = body.execution_payload_header();
-//     // let block_hash = payload_header.block_hash();
-//     // if block_hash != local_block_hash {
-//     //     return Err(Error::InvalidExecutionPayloadInBlock)
-//     // }
-
-//     // // OPTIONAL:
-//     // // -- verify w/ consensus?
-//     // // verify slot is timely
-//     // // verify proposer_index is correct
-//     // // verify parent_root matches
-
-//     // let slot = block.slot();
-//     // let signing_root =
-//     //     compute_consensus_signing_root(&mut block, slot, genesis_validators_root, context)?;
-//     // let signature = signed_block.signature();
-//     // verify_signature(public_key, signing_root.as_ref(), signature).map_err(Into::into)
-//     Ok(())
-// }
-
 #[derive(Clone)]
 pub struct Relay(Arc<Inner>);
 
@@ -153,7 +83,6 @@ impl Deref for Relay {
 pub struct Inner {
     secret_key: SecretKey,
     public_key: BlsPublicKey,
-    genesis_validators_root: Root,
     validator_registry: ValidatorRegistry,
     proposer_scheduler: ProposerScheduler,
     builder_registry: HashSet<BlsPublicKey>,
@@ -171,12 +100,12 @@ struct AuctionContext {
 
 #[derive(Debug, Default)]
 struct State {
+    head: AuctionRequest,
     auctions: HashMap<AuctionRequest, Arc<AuctionContext>>,
 }
 
 impl Relay {
     pub fn new(
-        genesis_validators_root: Root,
         beacon_node: ApiClient,
         secret_key: SecretKey,
         accepted_builders: Vec<BlsPublicKey>,
@@ -189,7 +118,6 @@ impl Relay {
         let inner = Inner {
             secret_key,
             public_key,
-            genesis_validators_root,
             validator_registry,
             proposer_scheduler,
             builder_registry: HashSet::from_iter(accepted_builders),
@@ -201,6 +129,8 @@ impl Relay {
     }
 
     pub async fn on_epoch(&self, epoch: Epoch) {
+        info!(epoch, "processing");
+
         if let Err(err) = self.validator_registry.on_epoch(epoch).await {
             error!(%err, "could not load validator set from provided beacon node");
         }
@@ -210,20 +140,27 @@ impl Relay {
     }
 
     pub async fn on_slot(&self, slot: Slot) {
+        info!(slot, "processing");
+
         let mut state = self.state.lock();
-        // TODO: sync /w "head slot update"
-        state
-            .auctions
-            .retain(|auction_request, _| auction_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+        let target_slot = state.head.slot.min(slot);
+        debug!(target_slot, "dropping old auctions");
+        state.auctions.retain(|auction_request, _| auction_request.slot >= target_slot);
     }
 
-    pub async fn on_payload_attributes(&self, payload_attributes: PayloadAttributes) {
-        // TODO
-        // store slot as "head slot"
-        // store parent block hash
-        // get pubkey for index and store as "current bid request"
-
-        // save associated payload attributes
+    // TODO: build tip context and support reorgs...
+    pub fn on_payload_attributes(&self, event: PayloadAttributesEvent) -> Result<(), Error> {
+        let proposer_public_key = self
+            .validator_registry
+            .get_public_key(event.proposer_index)
+            .ok_or_else(|| Error::UnknownValidatorIndex(event.proposer_index))?;
+        let mut state = self.state.lock();
+        state.head = AuctionRequest {
+            slot: event.proposal_slot,
+            parent_hash: event.parent_block_hash,
+            public_key: proposer_public_key,
+        };
+        Ok(())
     }
 
     fn get_auction_context(&self, auction_request: &AuctionRequest) -> Option<Arc<AuctionContext>> {
@@ -240,9 +177,15 @@ impl Relay {
     }
 
     fn validate_auction_request(&self, auction_request: &AuctionRequest) -> Result<(), Error> {
-        // TODO: matches current bid request?
-        // validate_auction_request(auction_request)
-        Ok(())
+        let state = self.state.lock();
+        if &state.head == auction_request {
+            Ok(())
+        } else {
+            Err(Error::InvalidAuctionRequest {
+                provided: auction_request.clone(),
+                expected: state.head.clone(),
+            })
+        }
     }
 
     // NOTE: best route is likely through `execution-apis`
@@ -372,7 +315,7 @@ impl BlindedBlockProvider for Relay {
             let public_key = self
                 .validator_registry
                 .get_public_key(proposer_index)
-                .ok_or(Error::ValidatorIndexNotRegistered(proposer_index))?;
+                .ok_or(Error::UnknownValidatorIndex(proposer_index))?;
             AuctionRequest { slot, parent_hash, public_key }
         };
 
