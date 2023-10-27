@@ -18,7 +18,8 @@ use mev_rs::{
         ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-    BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, ValidatorRegistry,
+    BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, RelayError,
+    ValidatorRegistry,
 };
 use parking_lot::Mutex;
 use std::{
@@ -42,27 +43,27 @@ fn to_header(execution_payload: &mut ExecutionPayload) -> Result<ExecutionPayloa
 fn validate_header_equality(
     local_header: &ExecutionPayloadHeader,
     provided_header: ExecutionPayloadHeaderRef<'_>,
-) -> Result<(), Error> {
+) -> Result<(), RelayError> {
     match local_header {
         ExecutionPayloadHeader::Bellatrix(local_header) => {
             let provided_header =
-                provided_header.bellatrix().ok_or(Error::InvalidExecutionPayloadInBlock)?;
+                provided_header.bellatrix().ok_or(RelayError::InvalidExecutionPayloadInBlock)?;
             if local_header != provided_header {
-                return Err(Error::InvalidExecutionPayloadInBlock);
+                return Err(RelayError::InvalidExecutionPayloadInBlock);
             }
         }
         ExecutionPayloadHeader::Capella(local_header) => {
             let provided_header =
-                provided_header.capella().ok_or(Error::InvalidExecutionPayloadInBlock)?;
+                provided_header.capella().ok_or(RelayError::InvalidExecutionPayloadInBlock)?;
             if local_header != provided_header {
-                return Err(Error::InvalidExecutionPayloadInBlock);
+                return Err(RelayError::InvalidExecutionPayloadInBlock);
             }
         }
         ExecutionPayloadHeader::Deneb(local_header) => {
             let provided_header =
-                provided_header.deneb().ok_or(Error::InvalidExecutionPayloadInBlock)?;
+                provided_header.deneb().ok_or(RelayError::InvalidExecutionPayloadInBlock)?;
             if local_header != provided_header {
-                return Err(Error::InvalidExecutionPayloadInBlock);
+                return Err(RelayError::InvalidExecutionPayloadInBlock);
             }
         }
     }
@@ -150,10 +151,10 @@ impl Relay {
 
     // TODO: build tip context and support reorgs...
     pub fn on_payload_attributes(&self, event: PayloadAttributesEvent) -> Result<(), Error> {
-        let proposer_public_key = self
-            .validator_registry
-            .get_public_key(event.proposer_index)
-            .ok_or_else(|| Error::UnknownValidatorIndex(event.proposer_index))?;
+        let proposer_public_key =
+            self.validator_registry.get_public_key(event.proposer_index).ok_or_else::<Error, _>(
+                || RelayError::UnknownValidatorIndex(event.proposer_index).into(),
+            )?;
         let mut state = self.state.lock();
         state.head = AuctionRequest {
             slot: event.proposal_slot,
@@ -172,16 +173,16 @@ impl Relay {
         if self.builder_registry.contains(builder_public_key) {
             Ok(())
         } else {
-            Err(Error::BuilderNotRegistered(builder_public_key.clone()))
+            Err(RelayError::BuilderNotRegistered(builder_public_key.clone()).into())
         }
     }
 
-    fn validate_auction_request(&self, auction_request: &AuctionRequest) -> Result<(), Error> {
+    fn validate_auction_request(&self, auction_request: &AuctionRequest) -> Result<(), RelayError> {
         let state = self.state.lock();
         if &state.head == auction_request {
             Ok(())
         } else {
-            Err(Error::InvalidAuctionRequest {
+            Err(RelayError::InvalidAuctionRequest {
                 provided: auction_request.clone(),
                 expected: state.head.clone(),
             })
@@ -202,16 +203,16 @@ impl Relay {
         &self,
         bid_trace: &BidTrace,
         execution_payload: &ExecutionPayload,
-    ) -> Result<(), Error> {
+    ) -> Result<(), RelayError> {
         let proposer_public_key = &bid_trace.proposer_public_key;
         let signed_registration = self
             .validator_registry
             .get_signed_registration(proposer_public_key)
-            .ok_or_else(|| Error::ValidatorNotRegistered(proposer_public_key.clone()))?;
+            .ok_or_else(|| RelayError::ValidatorNotRegistered(proposer_public_key.clone()))?;
 
         if bid_trace.proposer_fee_recipient != signed_registration.message.fee_recipient {
             let fee_recipient = &signed_registration.message.fee_recipient;
-            return Err(Error::InvalidFeeRecipient(
+            return Err(RelayError::InvalidFeeRecipient(
                 proposer_public_key.clone(),
                 fee_recipient.clone(),
             ))
@@ -228,22 +229,25 @@ impl Relay {
         // }
 
         if bid_trace.gas_limit != execution_payload.gas_limit() {
-            return Err(Error::InvalidGasLimit(bid_trace.gas_limit, execution_payload.gas_limit()))
+            return Err(RelayError::InvalidGasLimit(
+                bid_trace.gas_limit,
+                execution_payload.gas_limit(),
+            ))
         }
 
         if bid_trace.gas_used != execution_payload.gas_used() {
-            return Err(Error::InvalidGasUsed(bid_trace.gas_used, execution_payload.gas_used()))
+            return Err(RelayError::InvalidGasUsed(bid_trace.gas_used, execution_payload.gas_used()))
         }
 
         if &bid_trace.parent_hash != execution_payload.parent_hash() {
-            return Err(Error::InvalidParentHash(
+            return Err(RelayError::InvalidParentHash(
                 bid_trace.parent_hash.clone(),
                 execution_payload.parent_hash().clone(),
             ))
         }
 
         if &bid_trace.block_hash != execution_payload.block_hash() {
-            return Err(Error::InvalidBlockHash(
+            return Err(RelayError::InvalidBlockHash(
                 bid_trace.block_hash.clone(),
                 execution_payload.block_hash().clone(),
             ))
@@ -315,7 +319,7 @@ impl BlindedBlockProvider for Relay {
             let public_key = self
                 .validator_registry
                 .get_public_key(proposer_index)
-                .ok_or(Error::UnknownValidatorIndex(proposer_index))?;
+                .ok_or(RelayError::UnknownValidatorIndex(proposer_index))?;
             AuctionRequest { slot, parent_hash, public_key }
         };
 
@@ -323,7 +327,7 @@ impl BlindedBlockProvider for Relay {
 
         let auction_context = self
             .get_auction_context(&auction_request)
-            .ok_or_else(|| Error::MissingAuction(auction_request.clone()))?;
+            .ok_or_else(|| RelayError::MissingAuction(auction_request.clone()))?;
 
         {
             let block = signed_block.message();
@@ -332,7 +336,7 @@ impl BlindedBlockProvider for Relay {
             let local_header = &auction_context.signed_builder_bid.message.header;
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(Error::InvalidSignedBlindedBeaconBlock)
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
             }
         }
 
@@ -347,7 +351,7 @@ impl BlindedBlockProvider for Relay {
             let block_root =
                 signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
             warn!(%err, %auction_request, %block_root, "block failed beacon node validation");
-            Err(Error::InvalidSignedBlindedBeaconBlock)
+            Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
         } else {
             let local_payload = &auction_context.execution_payload;
             Ok(local_payload.clone())

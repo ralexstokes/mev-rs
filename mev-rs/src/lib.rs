@@ -14,7 +14,7 @@ pub use blinded_block_provider::BlindedBlockProvider;
 pub use blinded_block_relayer::BlindedBlockRelayer;
 
 pub use block_validation::*;
-pub use error::Error;
+pub use error::*;
 pub use proposer_scheduler::ProposerScheduler;
 pub use relay::{Relay, RelayEndpoint};
 pub use validator_registry::ValidatorRegistry;

@@ -10,7 +10,7 @@ use mev_rs::{
         AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-    BlindedBlockProvider, Error,
+    BlindedBlockProvider, BoostError, Error,
 };
 use parking_lot::Mutex;
 use rand::prelude::*;
@@ -41,10 +41,11 @@ fn validate_bid(
 ) -> Result<(), Error> {
     let bid_public_key = &bid.message.public_key;
     if bid_public_key != public_key {
-        return Err(Error::BidPublicKeyMismatch {
+        return Err(BoostError::BidPublicKeyMismatch {
             bid: bid_public_key.clone(),
             relay: public_key.clone(),
-        })
+        }
+        .into())
     }
     Ok(bid.verify_signature(context)?)
 }
@@ -139,7 +140,7 @@ impl BlindedBlockProvider for RelayMux {
         }
 
         if num_failures == self.relays.len() {
-            Err(Error::CouldNotRegister)
+            Err(BoostError::CouldNotRegister.into())
         } else {
             let mut state = self.state.lock();
             state.current_epoch_registration_count += registrations.len();
@@ -189,7 +190,7 @@ impl BlindedBlockProvider for RelayMux {
             .await;
 
         if bids.is_empty() {
-            return Err(Error::NoBids)
+            return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
         // TODO: change `value` so it does the copy internally
@@ -239,7 +240,11 @@ impl BlindedBlockProvider for RelayMux {
         let (auction_request, relays) = {
             let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
-            let relays = state.outstanding_bids.remove(&key).ok_or(Error::MissingOpenBid)?;
+            // TODO: do not `remove` so this endpoint can be retried
+            let relays = state
+                .outstanding_bids
+                .remove(&key)
+                .ok_or_else::<Error, _>(|| BoostError::MissingOpenBid.into())?;
             (key, relays)
         };
 
@@ -274,7 +279,7 @@ impl BlindedBlockProvider for RelayMux {
             }
         }
 
-        Err(Error::MissingPayload(expected_block_hash.clone()))
+        Err(BoostError::MissingPayload(expected_block_hash.clone()).into())
     }
 }
 
