@@ -14,6 +14,10 @@ use tokio::task::{JoinError, JoinHandle};
 use tracing::{error, warn};
 use url::Url;
 
+use reth::cli::Cli;
+use crate::reth_cli_ext::ValidationCliExt;
+use clap::Parser;
+
 #[derive(Deserialize, Debug)]
 pub struct Config {
     pub host: Ipv4Addr,
@@ -98,6 +102,8 @@ impl Service {
                 }
             }
         });
+
+        Cli::<ValidationCliExt>::parse().run().unwrap();
 
         let relay = tokio::spawn(async move {
             let slots = clock.stream_slots();
