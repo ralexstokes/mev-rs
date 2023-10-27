@@ -1,5 +1,6 @@
 pub mod blinded_block_provider;
 pub mod blinded_block_relayer;
+pub mod block_validation;
 mod error;
 mod proposer_scheduler;
 pub mod relay;
@@ -12,6 +13,7 @@ mod validator_registry;
 pub use blinded_block_provider::BlindedBlockProvider;
 pub use blinded_block_relayer::BlindedBlockRelayer;
 
+pub use block_validation::*;
 pub use error::Error;
 pub use proposer_scheduler::ProposerScheduler;
 pub use relay::{Relay, RelayEndpoint};
