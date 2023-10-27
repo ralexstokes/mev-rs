@@ -4,7 +4,7 @@ pub(crate) use ethereum_consensus::serde::as_str;
 mod tests {
     use ethereum_consensus::{primitives::U256, types::mainnet::ExecutionPayloadHeader};
 
-    use crate::types::{BidRequest, BuilderBid, SignedBuilderBid};
+    use crate::types::{AuctionRequest, BuilderBid, SignedBuilderBid};
 
     #[test]
     fn test_fmt() {
@@ -19,8 +19,8 @@ mod tests {
 
         dbg!(&signed_bid);
         println!("{signed_bid}");
-        let bid_request = BidRequest::default();
-        dbg!(&bid_request);
-        println!("{bid_request}");
+        let auction_request = AuctionRequest::default();
+        dbg!(&auction_request);
+        println!("{auction_request}");
     }
 }

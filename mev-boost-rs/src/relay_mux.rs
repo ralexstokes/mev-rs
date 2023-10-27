@@ -7,10 +7,10 @@ use futures::{stream, StreamExt};
 use mev_rs::{
     relay::Relay,
     types::{
-        BidRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-    BlindedBlockProvider, Error,
+    BlindedBlockProvider, BoostError, Error,
 };
 use parking_lot::Mutex;
 use rand::prelude::*;
@@ -23,12 +23,15 @@ const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
-fn bid_key_from(signed_block: &SignedBlindedBeaconBlock, public_key: &BlsPublicKey) -> BidRequest {
+fn bid_key_from(
+    signed_block: &SignedBlindedBeaconBlock,
+    public_key: &BlsPublicKey,
+) -> AuctionRequest {
     let slot = signed_block.message().slot();
     let parent_hash =
         signed_block.message().body().execution_payload_header().parent_hash().clone();
 
-    BidRequest { slot, parent_hash, public_key: public_key.clone() }
+    AuctionRequest { slot, parent_hash, public_key: public_key.clone() }
 }
 
 fn validate_bid(
@@ -38,10 +41,11 @@ fn validate_bid(
 ) -> Result<(), Error> {
     let bid_public_key = &bid.message.public_key;
     if bid_public_key != public_key {
-        return Err(Error::BidPublicKeyMismatch {
+        return Err(BoostError::BidPublicKeyMismatch {
             bid: bid_public_key.clone(),
             relay: public_key.clone(),
-        })
+        }
+        .into())
     }
     Ok(bid.verify_signature(context)?)
 }
@@ -82,7 +86,7 @@ pub struct Inner {
 #[derive(Debug, Default)]
 struct State {
     // map from bid requests to index of `Relay` in collection
-    outstanding_bids: HashMap<BidRequest, Vec<Arc<Relay>>>,
+    outstanding_bids: HashMap<AuctionRequest, Vec<Arc<Relay>>>,
     current_epoch_registration_count: usize,
     latest_pubkey: BlsPublicKey,
 }
@@ -98,7 +102,7 @@ impl RelayMux {
         let mut state = self.state.lock();
         state
             .outstanding_bids
-            .retain(|bid_request, _| bid_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+            .retain(|auction_request, _| auction_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
     }
 
     pub fn on_epoch(&self, epoch: Epoch) {
@@ -136,7 +140,7 @@ impl BlindedBlockProvider for RelayMux {
         }
 
         if num_failures == self.relays.len() {
-            Err(Error::CouldNotRegister)
+            Err(BoostError::CouldNotRegister.into())
         } else {
             let mut state = self.state.lock();
             state.current_epoch_registration_count += registrations.len();
@@ -144,12 +148,15 @@ impl BlindedBlockProvider for RelayMux {
         }
     }
 
-    async fn fetch_best_bid(&self, bid_request: &BidRequest) -> Result<SignedBuilderBid, Error> {
+    async fn fetch_best_bid(
+        &self,
+        auction_request: &AuctionRequest,
+    ) -> Result<SignedBuilderBid, Error> {
         let bids = stream::iter(self.relays.iter().cloned())
             .map(|relay| async {
                 let response = tokio::time::timeout(
                     Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
-                    relay.fetch_best_bid(bid_request),
+                    relay.fetch_best_bid(auction_request),
                 )
                 .await;
             (relay, response)
@@ -165,8 +172,8 @@ impl BlindedBlockProvider for RelayMux {
                             Some((relay, bid))
                         }
                     }
-                    Ok(Err(Error::NoBidPrepared(bid_request))) => {
-                        debug!(%bid_request, %relay, "relay did not have a bid prepared");
+                    Ok(Err(Error::NoBidPrepared(auction_request))) => {
+                        debug!(%auction_request, %relay, "relay did not have a bid prepared");
                         None
                     }
                     Ok(Err(err)) => {
@@ -183,7 +190,7 @@ impl BlindedBlockProvider for RelayMux {
             .await;
 
         if bids.is_empty() {
-            return Err(Error::NoBids)
+            return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
         // TODO: change `value` so it does the copy internally
@@ -213,14 +220,14 @@ impl BlindedBlockProvider for RelayMux {
             .map(|relay| format!("{relay}"))
             .reduce(|desc, next| format!("{desc}, {next}"))
             .expect("at least one relay");
-        info!(%bid_request, %best_bid, relays=relays_desc, "acquired best bid");
+        info!(%auction_request, %best_bid, relays=relays_desc, "acquired best bid");
 
         {
             let mut state = self.state.lock();
             // assume the next request to open a bid corresponds to the current request
             // TODO consider if the relay mux should have more knowledge about the proposal
-            state.latest_pubkey = bid_request.public_key.clone();
-            state.outstanding_bids.insert(bid_request.clone(), best_relays);
+            state.latest_pubkey = auction_request.public_key.clone();
+            state.outstanding_bids.insert(auction_request.clone(), best_relays);
         }
 
         Ok(best_bid.clone())
@@ -230,10 +237,14 @@ impl BlindedBlockProvider for RelayMux {
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
     ) -> Result<ExecutionPayload, Error> {
-        let (bid_request, relays) = {
+        let (auction_request, relays) = {
             let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
-            let relays = state.outstanding_bids.remove(&key).ok_or(Error::MissingOpenBid)?;
+            // TODO: do not `remove` so this endpoint can be retried
+            let relays = state
+                .outstanding_bids
+                .remove(&key)
+                .ok_or_else::<Error, _>(|| BoostError::MissingOpenBid.into())?;
             (key, relays)
         };
 
@@ -256,7 +267,7 @@ impl BlindedBlockProvider for RelayMux {
                 Ok(payload) => {
                     let block_hash = payload.block_hash();
                     if block_hash == expected_block_hash {
-                        info!(%bid_request, %block_hash, %relay, "acquired payload");
+                        info!(%auction_request, %block_hash, %relay, "acquired payload");
                         return Ok(payload)
                     } else {
                         warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
@@ -268,7 +279,7 @@ impl BlindedBlockProvider for RelayMux {
             }
         }
 
-        Err(Error::MissingPayload(expected_block_hash.clone()))
+        Err(BoostError::MissingPayload(expected_block_hash.clone()).into())
     }
 }
 

@@ -24,10 +24,10 @@ async fn handle_get_proposal_schedule<R: BlindedBlockRelayer>(
 
 async fn handle_submit_bid<R: BlindedBlockRelayer>(
     State(relayer): State<R>,
-    Json(signed_bid_submission): Json<SignedBidSubmission>,
+    Json(mut signed_bid_submission): Json<SignedBidSubmission>,
 ) -> Result<(), Error> {
     tracing::info!("handling bid submission");
-    relayer.submit_bid(&signed_bid_submission).await
+    relayer.submit_bid(&mut signed_bid_submission).await
 }
 
 pub struct Server<R: BlindedBlockRelayer> {

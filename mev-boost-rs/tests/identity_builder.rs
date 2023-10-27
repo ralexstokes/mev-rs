@@ -11,8 +11,8 @@ use mev_rs::{
     blinded_block_provider::BlindedBlockProvider,
     signing::sign_builder_message,
     types::{
-        BidRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
-        SignedBuilderBid,
+        AuctionRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
+        SignedBlindedBeaconBlock, SignedBuilderBid,
     },
     Error,
 };
@@ -55,7 +55,7 @@ impl BlindedBlockProvider for IdentityBuilder {
 
     async fn fetch_best_bid(
         &self,
-        BidRequest { slot, parent_hash, public_key }: &BidRequest,
+        AuctionRequest { slot, parent_hash, public_key }: &AuctionRequest,
     ) -> Result<SignedBuilderBid, Error> {
         let capella_fork_slot = self.context.capella_fork_epoch * self.context.slots_per_epoch;
         let state = self.registrations.lock().unwrap();

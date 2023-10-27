@@ -1,5 +1,5 @@
 use beacon_api_client::{mainnet::Client, BlockId};
-use mev_rs::{types::BidRequest, BlindedBlockRelayer, Relay, RelayEndpoint};
+use mev_rs::{types::AuctionRequest, BlindedBlockRelayer, Relay, RelayEndpoint};
 use url::Url;
 
 #[tokio::main]
@@ -19,8 +19,9 @@ async fn main() {
     for schedule in schedules {
         if schedule.slot == slot {
             let public_key = schedule.entry.message.public_key;
-            let bid_request = BidRequest { slot, parent_hash: parent_hash.clone(), public_key };
-            let signed_bid = relay.fetch_best_bid(&bid_request).await.unwrap();
+            let auction_request =
+                AuctionRequest { slot, parent_hash: parent_hash.clone(), public_key };
+            let signed_bid = relay.fetch_best_bid(&auction_request).await.unwrap();
             let signed_bid_str = serde_json::to_string_pretty(&signed_bid).unwrap();
             println!("{signed_bid_str}");
         }

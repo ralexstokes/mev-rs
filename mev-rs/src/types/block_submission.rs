@@ -1,7 +1,12 @@
-use crate::types::ExecutionPayload;
+use crate::{
+    signing::{compute_builder_signing_root, verify_signature},
+    types::ExecutionPayload,
+};
 use ethereum_consensus::{
     primitives::{BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Slot, U256},
     ssz::prelude::*,
+    state_transition::Context,
+    Error,
 };
 
 #[derive(Debug, Default, Clone, SimpleSerialize)]
@@ -29,4 +34,12 @@ pub struct SignedBidSubmission {
     pub message: BidTrace,
     pub execution_payload: ExecutionPayload,
     pub signature: BlsSignature,
+}
+
+impl SignedBidSubmission {
+    pub fn verify_signature(&mut self, context: &Context) -> Result<(), Error> {
+        let signing_root = compute_builder_signing_root(&mut self.message, context)?;
+        let public_key = &self.message.builder_public_key;
+        verify_signature(public_key, signing_root.as_ref(), &self.signature)
+    }
 }
