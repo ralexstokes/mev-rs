@@ -14,7 +14,6 @@ async-trait = "0.1.53"
 pin-project = "1.0.12"
 rand = "0.8.5"
 
-url = { version = "2.2.2", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0.30"
 parking_lot = "0.12.1"
@@ -27,6 +26,7 @@ mev-rs = { path = "../mev-rs" }
 [dev-dependencies]
 rand = "0.8.5"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = { version = "2.2.2", default-features = false }
 serde_json = "1.0.81"
 mev-build-rs = { path = "../mev-build-rs" }
 mev-relay-rs = { path = "../mev-relay-rs" }

@@ -6,14 +6,13 @@ use ethereum_consensus::{
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
-    relay::{Relay, RelayEndpoint},
+    relay::{parse_relay_endpoints, Relay, RelayEndpoint},
     Error,
 };
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use tracing::{error, info, warn};
-use url::Url;
+use tracing::{error, info};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -26,21 +25,6 @@ impl Default for Config {
     fn default() -> Self {
         Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
     }
-}
-
-fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
-    let mut relays = vec![];
-
-    for relay_url in relay_urls {
-        match relay_url.parse::<Url>() {
-            Ok(url) => match RelayEndpoint::try_from(url) {
-                Ok(relay) => relays.push(relay),
-                Err(err) => warn!(%err, %relay_url, "error parsing relay from URL"),
-            },
-            Err(err) => warn!(%err, %relay_url, "error parsing relay URL from config"),
-        }
-    }
-    relays
 }
 
 pub struct Service {

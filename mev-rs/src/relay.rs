@@ -10,6 +10,7 @@ use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
 use std::{fmt, ops::Deref};
+use tracing::{error, warn};
 use url::Url;
 
 #[derive(Clone, Debug)]
@@ -33,6 +34,24 @@ impl fmt::Display for RelayEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.write_str(self.url.as_str())
     }
+}
+
+pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
+    let mut relays = vec![];
+
+    for relay_url in relay_urls {
+        match relay_url.parse::<Url>() {
+            Ok(url) => match RelayEndpoint::try_from(url) {
+                Ok(relay) => relays.push(relay),
+                Err(err) => warn!(%err, %relay_url, "error parsing relay from URL"),
+            },
+            Err(err) => warn!(%err, %relay_url, "error parsing relay URL from config"),
+        }
+    }
+    if relays.is_empty() {
+        error!("no relays could be loaded from the configuration; please fix and restart");
+    }
+    relays
 }
 
 #[derive(Clone)]
