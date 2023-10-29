@@ -23,9 +23,9 @@ mev-build-rs = { path = "../../mev-build-rs", optional = true }
 mev-rs = { path = "../../mev-rs" }
 
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8.2"
 
 clap = { version = "4.1.4", features = ["derive", "env"] }
 eyre = { workspace = true }
 
 ethereum-consensus = { workspace = true }
+reth = { workspace = true, optional = true }

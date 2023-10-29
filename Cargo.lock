@@ -4396,7 +4396,6 @@ dependencies = [
  "mev-rs",
  "serde",
  "tokio",
- "toml 0.8.2",
  "tracing",
  "tracing-subscriber",
 ]
@@ -4489,6 +4488,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "tokio",
+ "toml 0.8.2",
  "tracing",
  "url",
 ]

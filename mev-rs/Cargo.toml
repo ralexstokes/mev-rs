@@ -25,6 +25,7 @@ parking_lot = "0.12.1"
 url = { version = "2.2.2", default-features = false }
 
 serde_json = { version = "1.0.92", optional = true }
+toml = "0.8.2"
 
 rayon = "1.8.0"
 

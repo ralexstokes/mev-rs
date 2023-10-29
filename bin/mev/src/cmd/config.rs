@@ -7,6 +7,7 @@ use mev_boost_rs::Config as BoostConfig;
 use mev_build_rs::reth_builder::Config as BuildConfig;
 #[cfg(feature = "relay")]
 use mev_relay_rs::Config as RelayConfig;
+use mev_rs::config::from_toml_file;
 use serde::Deserialize;
 use std::{fmt, path::Path};
 use tracing::info;
@@ -24,13 +25,10 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_toml_file<P: AsRef<Path> + fmt::Display + Clone>(path: P) -> eyre::Result<Config> {
+    pub fn from_toml_file<P: AsRef<Path> + fmt::Display>(path: P) -> eyre::Result<Config> {
         tracing::info!("loading config from `{path}`...");
 
-        let config_data = std::fs::read_to_string(path.as_ref())
-            .wrap_err_with(|| format!("could not read config from `{path}`"))?;
-
-        toml::from_str(&config_data).wrap_err("could not parse TOML")
+        from_toml_file::<_, Self>(path.as_ref()).wrap_err("could not parse TOML")
     }
 }
 
