@@ -79,7 +79,10 @@ use axum::response::{IntoResponse, Response};
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let message = self.to_string();
-        let code = StatusCode::BAD_REQUEST;
+        let code = match self {
+            Self::NoBidPrepared(..) => StatusCode::NO_CONTENT,
+            _ => StatusCode::BAD_REQUEST,
+        };
         (code, Json(beacon_api_client::ApiError::ErrorMessage { code, message })).into_response()
     }
 }

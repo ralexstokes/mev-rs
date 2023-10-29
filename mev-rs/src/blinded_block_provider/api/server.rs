@@ -2,7 +2,8 @@ use crate::{
     blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedValidatorRegistration,
+        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
     },
 };
 use axum::{
@@ -36,17 +37,12 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
 async fn handle_fetch_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Path(auction_request): Path<AuctionRequest>,
-) -> (StatusCode, String) {
-    let signed_bid = match builder.fetch_best_bid(&auction_request).await {
-        Ok(signed_bid) => signed_bid,
-        Err(Error::NoBidPrepared(..)) => return (StatusCode::NO_CONTENT, Default::default()),
-        Err(err) => return (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
-    };
+) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
+    let signed_bid = builder.fetch_best_bid(&auction_request).await?;
     trace!(%auction_request, %signed_bid, "returning bid");
     let version = signed_bid.version();
     let response = VersionedValue { version, data: signed_bid, meta: Default::default() };
-    let response_json = serde_json::to_string(&response).unwrap();
-    (StatusCode::OK, response_json)
+    Ok(Json(response))
 }
 
 async fn handle_open_bid<B: BlindedBlockProvider>(
