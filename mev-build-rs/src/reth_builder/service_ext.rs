@@ -1,63 +1,36 @@
-use crate::reth_builder::{service::Service, Config, DeadlineBidder};
-use clap::{Args, Parser};
+use crate::reth_builder::{service::Service, Config as BuildConfig, DeadlineBidder};
+use clap::Args;
 use ethereum_consensus::{
     networks::{self, Network},
     state_transition::Context,
 };
+use mev_rs::config::from_toml_file;
 use reth::{
     cli::{
         components::RethNodeComponents,
         config::PayloadBuilderConfig,
         ext::{RethCliExt, RethNodeCommandConfig},
     },
-    node::NodeCommand,
-    runner::CliContext,
-    tasks::{TaskManager, TaskSpawner},
+    tasks::TaskSpawner,
 };
 use reth_payload_builder::{PayloadBuilderHandle, PayloadBuilderService};
 use std::{sync::Arc, time::Duration};
-use tracing::warn;
+use tracing::info;
 
 #[derive(Debug, Args)]
 pub struct ServiceExt {
+    #[clap(env, long = "mev-builder-config", default_value = "config.toml")]
+    config_file: String,
     #[clap(skip)]
-    network: Network,
-    #[clap(skip)]
-    config: Config,
+    config: Option<Config>,
 }
 
-impl ServiceExt {
-    pub fn from(network: Network, config: Config) -> Self {
-        Self { network, config }
-    }
-
-    pub async fn spawn(self) {
-        let task_manager = TaskManager::new(tokio::runtime::Handle::current());
-        let task_executor = task_manager.executor();
-        let ctx = CliContext { task_executor };
-
-        let network = &self.network;
-        let network_name = format!("{0}", network);
-
-        let mut params = vec![
-            "".into(),
-            "--chain".into(),
-            network_name.to_string(),
-            "--full".into(),
-            "--http".into(),
-        ];
-        if let Some(path) = self.config.jwt_secret_path.as_ref() {
-            params.push("--authrpc.jwtsecret".into());
-            params.push(path.clone());
-        }
-
-        let mut node = NodeCommand::<ServiceExt>::parse_from(params);
-        // NOTE: shim to pass in config
-        node.ext = self;
-        if let Err(err) = node.execute(ctx).await {
-            warn!("{err:?}");
-        }
-    }
+// NOTE: this is duplicated here to avoid circular import b/t `mev` bin and `mev-rs` crate
+#[derive(Debug, serde::Deserialize)]
+struct Config {
+    pub network: Network,
+    #[serde(rename = "builder")]
+    pub build: BuildConfig,
 }
 
 impl RethCliExt for ServiceExt {
@@ -65,6 +38,20 @@ impl RethCliExt for ServiceExt {
 }
 
 impl RethNodeCommandConfig for ServiceExt {
+    fn on_components_initialized<Reth: RethNodeComponents>(
+        &mut self,
+        _components: &Reth,
+    ) -> eyre::Result<()> {
+        let config_file = &self.config_file;
+
+        let config = from_toml_file::<_, Config>(config_file)?;
+        let network = &config.network;
+        info!("configured for `{network}`");
+
+        self.config = Some(config);
+        Ok(())
+    }
+
     fn spawn_payload_builder_service<Conf, Reth>(
         &mut self,
         _conf: &Conf,
@@ -74,12 +61,13 @@ impl RethNodeCommandConfig for ServiceExt {
         Conf: PayloadBuilderConfig,
         Reth: RethNodeComponents,
     {
-        let build_config = self.config.clone();
-        let context = Arc::new(Context::try_from(self.network.clone())?);
+        let config = self.config.as_ref().expect("already loaded config");
+        let context = Arc::new(Context::try_from(config.network.clone())?);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)
         });
+        let build_config = &config.build;
         let deadline = Duration::from_millis(build_config.bidding_deadline_ms);
         let bidder = Arc::new(DeadlineBidder::new(clock.clone(), deadline));
         let (service, builder) = Service::from(

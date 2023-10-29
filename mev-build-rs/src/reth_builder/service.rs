@@ -23,7 +23,7 @@ const DEFAULT_BID_PERCENT: f64 = 0.9;
 pub struct Config {
     pub secret_key: SecretKey,
     pub relays: Vec<String>,
-    pub extra_data: String,
+    pub extra_data: Bytes,
     pub execution_mnemonic: String,
     // amount in milliseconds
     pub bidding_deadline_ms: u64,
@@ -31,7 +31,6 @@ pub struct Config {
     pub bid_percent: Option<f64>,
     // amount to add from the builder's wallet as a subsidy to the auction bid
     pub subsidy_gwei: Option<u64>,
-    pub jwt_secret_path: Option<String>,
 }
 
 pub struct Service<Pool, Client, Bidder> {
@@ -67,7 +66,7 @@ impl<
     > Service<Pool, Client, B>
 {
     pub fn from(
-        config: Config,
+        config: &Config,
         context: Arc<Context>,
         clock: Clock<SystemTimeProvider>,
         pool: Pool,
@@ -75,7 +74,7 @@ impl<
         bidder: Arc<B>,
         chain_spec: Arc<ChainSpec>,
     ) -> Result<(Self, Builder<Pool, Client>), Error> {
-        let secret_key = config.secret_key;
+        let secret_key = &config.secret_key;
         let relays = parse_relays(&config.relays);
 
         let mut derivation_index = 0;
@@ -94,14 +93,14 @@ impl<
         let builder_wallet = wallet.with_chain_id(chain_spec.chain.id());
 
         let builder = Builder::new(
-            secret_key,
+            secret_key.clone(),
             context.clone(),
             clock.clone(),
             relays,
             pool,
             client,
             chain_spec,
-            Bytes::from(config.extra_data),
+            config.extra_data.clone(),
             builder_wallet,
             config.bid_percent.unwrap_or(DEFAULT_BID_PERCENT),
             config.subsidy_gwei.unwrap_or_default(),

@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 [features]
 default = ["boost", "build", "relay"]
 boost = ["mev-boost-rs"]
-build = ["mev-build-rs"]
+build = ["mev-build-rs", "reth"]
 relay = ["mev-relay-rs"]
 
 [dependencies]

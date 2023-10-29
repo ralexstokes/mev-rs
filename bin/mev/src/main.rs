@@ -33,6 +33,8 @@ fn setup_logging() {
 }
 
 async fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> eyre::Result<()> {
+    setup_logging();
+
     tokio::select! {
         task = task => task,
         _ = signal::ctrl_c() => {
@@ -46,13 +48,11 @@ async fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> 
 async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
 
-    setup_logging();
-
     match cli.command {
         #[cfg(feature = "boost")]
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute()).await,
         #[cfg(feature = "build")]
-        Commands::Build(cmd) => run_task_until_signal(cmd.execute()).await,
+        Commands::Build(cmd) => tokio::task::block_in_place(|| cmd.run()),
         #[cfg(feature = "relay")]
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute()).await,
         Commands::Config(cmd) => run_task_until_signal(cmd.execute()).await,

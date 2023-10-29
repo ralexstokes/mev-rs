@@ -14,4 +14,4 @@ mod types;
 
 pub use bidder::DeadlineBidder;
 pub use service::Config;
-pub use service_ext::ServiceExt as Service;
+pub use service_ext::ServiceExt;

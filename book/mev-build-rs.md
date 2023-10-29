@@ -49,7 +49,6 @@ Fields you should change:
   This wallet will be used to author payment transactions to the proposer and also is used as the source of funds for any subsidy value you wish to add to the block.
   You can select a particular index (following BIP-39) by terminating the seed phrase with a `:N` and integer index `N`. Otherwise the builder will just use the first index from the key tree.
 * `subsidy_gwei`: set this value to 0 if your execution layer address has no ETH in it; otherwise, the blocks will be invalid.
-* `jwt_secret_path`: this path points to the JWT secret file created previously and is specific to your deployment.
 
 ### Launch
 
@@ -62,8 +61,10 @@ the tip of the chain, the CL and EL nodes will sync. To expedite syncing times, 
 
 1. Run `mev` with config file `config.toml`:
   ```sh
-  mev build config.toml
+  mev build node --mev-builder-config config.toml --authrpc.jwtsecret $JWT_SECRET_FILE_PATH
   ```
+
+> NOTE: `mev build` exposes the same CLI interface as stock `reth`, so refer to that command's help for further settings you may be interested in.
 
 2. Run `lighthouse`:
   ```sh
