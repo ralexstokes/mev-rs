@@ -22,11 +22,11 @@ use tracing::{error, info, trace};
 /// Type alias for the configured axum server
 pub type BlockProviderServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
 
-async fn handle_status_check() -> impl IntoResponse {
+pub(crate) async fn handle_status_check() -> impl IntoResponse {
     StatusCode::OK
 }
 
-async fn handle_validator_registration<B: BlindedBlockProvider>(
+pub(crate) async fn handle_validator_registration<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
 ) -> Result<(), Error> {
@@ -34,7 +34,7 @@ async fn handle_validator_registration<B: BlindedBlockProvider>(
     builder.register_validators(&mut registrations).await.map_err(From::from)
 }
 
-async fn handle_fetch_bid<B: BlindedBlockProvider>(
+pub(crate) async fn handle_fetch_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Path(auction_request): Path<AuctionRequest>,
 ) -> Result<Json<VersionedValue<SignedBuilderBid>>, Error> {
@@ -45,7 +45,7 @@ async fn handle_fetch_bid<B: BlindedBlockProvider>(
     Ok(Json(response))
 }
 
-async fn handle_open_bid<B: BlindedBlockProvider>(
+pub(crate) async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(mut block): Json<SignedBlindedBeaconBlock>,
 ) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
