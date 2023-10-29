@@ -20,8 +20,8 @@ pub enum BoostError {
 
 #[derive(Debug, Error)]
 pub enum RelayError {
-    #[error("received auction request for {provided} but expecting request at {expected}")]
-    InvalidAuctionRequest { expected: AuctionRequest, provided: AuctionRequest },
+    #[error("received auction request for {0} but no open auction was found")]
+    InvalidAuctionRequest(AuctionRequest),
     #[error("execution payload does not match the provided header")]
     InvalidExecutionPayloadInBlock,
     #[error("validator {0:?} does not have registered fee recipient {1:?}")]
@@ -79,7 +79,10 @@ use axum::response::{IntoResponse, Response};
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         let message = self.to_string();
-        let code = StatusCode::BAD_REQUEST;
+        let code = match self {
+            Self::NoBidPrepared(..) => StatusCode::NO_CONTENT,
+            _ => StatusCode::BAD_REQUEST,
+        };
         (code, Json(beacon_api_client::ApiError::ErrorMessage { code, message })).into_response()
     }
 }

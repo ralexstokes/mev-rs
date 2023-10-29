@@ -17,7 +17,7 @@ impl Command {
         let config = Config::from_toml_file(config_file)?;
 
         let network = config.network;
-        info!("configured for {network}");
+        info!("configured for `{network}`");
 
         if let Some(config) = config.build {
             Service::from(network, config).spawn().await;

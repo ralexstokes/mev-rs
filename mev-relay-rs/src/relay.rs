@@ -29,6 +29,9 @@ use std::{
 };
 use tracing::{debug, error, info, warn};
 
+// Sets the lifetime of an auction with respect to its proposal slot.
+const AUCTION_LIFETIME_SLOTS: Slot = 1;
+
 fn to_header(execution_payload: &mut ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
     let header = match execution_payload {
         ExecutionPayload::Bellatrix(payload) => {
@@ -101,7 +104,7 @@ struct AuctionContext {
 
 #[derive(Debug, Default)]
 struct State {
-    head: AuctionRequest,
+    open_auctions: HashSet<AuctionRequest>,
     auctions: HashMap<AuctionRequest, Arc<AuctionContext>>,
 }
 
@@ -143,10 +146,11 @@ impl Relay {
     pub async fn on_slot(&self, slot: Slot) {
         info!(slot, "processing");
 
+        let retain_slot = slot - AUCTION_LIFETIME_SLOTS;
+        debug!(retain_slot, "dropping old auctions");
         let mut state = self.state.lock();
-        let target_slot = state.head.slot.min(slot);
-        debug!(target_slot, "dropping old auctions");
-        state.auctions.retain(|auction_request, _| auction_request.slot >= target_slot);
+        state.open_auctions.retain(|auction_request| auction_request.slot >= retain_slot);
+        state.auctions.retain(|auction_request, _| auction_request.slot >= retain_slot);
     }
 
     // TODO: build tip context and support reorgs...
@@ -155,12 +159,13 @@ impl Relay {
             self.validator_registry.get_public_key(event.proposer_index).ok_or_else::<Error, _>(
                 || RelayError::UnknownValidatorIndex(event.proposer_index).into(),
             )?;
-        let mut state = self.state.lock();
-        state.head = AuctionRequest {
+        let auction_request = AuctionRequest {
             slot: event.proposal_slot,
             parent_hash: event.parent_block_hash,
             public_key: proposer_public_key,
         };
+        let mut state = self.state.lock();
+        state.open_auctions.insert(auction_request);
         Ok(())
     }
 
@@ -179,13 +184,12 @@ impl Relay {
 
     fn validate_auction_request(&self, auction_request: &AuctionRequest) -> Result<(), RelayError> {
         let state = self.state.lock();
-        if &state.head == auction_request {
+        if state.open_auctions.contains(auction_request) {
             Ok(())
         } else {
-            Err(RelayError::InvalidAuctionRequest {
-                provided: auction_request.clone(),
-                expected: state.head.clone(),
-            })
+            let err = RelayError::InvalidAuctionRequest(auction_request.clone());
+            warn!(%err);
+            Err(err)
         }
     }
 

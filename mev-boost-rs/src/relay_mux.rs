@@ -99,6 +99,7 @@ impl RelayMux {
     }
 
     pub fn on_slot(&self, slot: Slot) {
+        debug!(slot, "processing");
         let mut state = self.state.lock();
         state
             .outstanding_bids
@@ -106,6 +107,7 @@ impl RelayMux {
     }
 
     pub fn on_epoch(&self, epoch: Epoch) {
+        debug!(epoch, "processing");
         let count = {
             let mut state = self.state.lock();
             let count = state.current_epoch_registration_count;
@@ -190,6 +192,7 @@ impl BlindedBlockProvider for RelayMux {
             .await;
 
         if bids.is_empty() {
+            info!(%auction_request, "no relays had bids prepared");
             return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
