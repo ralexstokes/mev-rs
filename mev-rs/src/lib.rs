@@ -1,6 +1,7 @@
 pub mod blinded_block_provider;
 pub mod blinded_block_relayer;
 pub mod block_validation;
+pub mod config;
 mod error;
 mod proposer_scheduler;
 pub mod relay;

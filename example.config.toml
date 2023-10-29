@@ -26,7 +26,7 @@ relays = [
     "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net",
 ]
 # extra data to write into built execution payload
-extra_data = "hello world"
+extra_data = "0x68656C6C6F20776F726C640A" # "hello world"
 # wallet seed for builder to author payment transactions
 execution_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 # number of milliseconds to submit bids ahead of the target slot
@@ -36,5 +36,3 @@ bid_percent = 0.9
 # amount to add to the bid on top of the payload's revenue,
 # currently sourced from the builder's wallet authoring the payment transaction
 subsidy_gwei = 100000000 # 0.1 eth
-# path for the Engine API credentials shared between consensus and execution clients
-jwt_secret_path = "/secrets/jwt.hex"
