@@ -15,6 +15,7 @@ use parking_lot::RwLock;
 use rayon::prelude::*;
 use std::{cmp::Ordering, collections::HashMap};
 use thiserror::Error;
+use tracing::trace;
 
 #[derive(Debug, Error)]
 pub enum Error {
@@ -182,6 +183,7 @@ impl ValidatorRegistry {
         verify_signature(public_key, signing_root.as_ref(), &registration.signature)?;
 
         let update = if matches!(registration_status, ValidatorRegistrationStatus::New) {
+            trace!(%public_key, "processed new registration");
             Some(registration)
         } else {
             None
@@ -207,6 +209,10 @@ impl ValidatorRegistry {
             }
         }
 
-        Err(errs.into_iter().map(|err| err.expect_err("validation failed")).collect())
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            Err(errs.into_iter().map(|err| err.expect_err("validation failed")).collect())
+        }
     }
 }
