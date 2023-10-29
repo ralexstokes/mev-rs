@@ -20,8 +20,8 @@ pub enum BoostError {
 
 #[derive(Debug, Error)]
 pub enum RelayError {
-    #[error("received auction request for {provided} but expecting request at {expected}")]
-    InvalidAuctionRequest { expected: AuctionRequest, provided: AuctionRequest },
+    #[error("received auction request for {0} but no open auction was found")]
+    InvalidAuctionRequest(AuctionRequest),
     #[error("execution payload does not match the provided header")]
     InvalidExecutionPayloadInBlock,
     #[error("validator {0:?} does not have registered fee recipient {1:?}")]
