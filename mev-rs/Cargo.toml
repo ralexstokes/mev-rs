@@ -9,7 +9,7 @@ license = "MIT OR Apache-2.0"
 [features]
 default = ["serde", "builder-api", "relay-api"]
 builder-api = ["api"]
-relay-api = ["api"]
+relay-api = ["api", "builder-api"]
 api = ["tokio", "axum", "hyper", "beacon-api-client", "tracing", "serde_json"]
 
 [dependencies]

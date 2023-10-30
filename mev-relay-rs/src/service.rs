@@ -7,7 +7,7 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use futures::StreamExt;
-use mev_rs::{blinded_block_provider::Server as BlindedBlockProviderServer, Error};
+use mev_rs::{blinded_block_relayer::Server as BlindedBlockRelayerServer, Error};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -70,8 +70,8 @@ impl Service {
         });
         let relay = Relay::new(beacon_node.clone(), secret_key, accepted_builders, context);
 
-        let block_provider = relay.clone();
-        let server = BlindedBlockProviderServer::new(host, port, block_provider).spawn();
+        let relay_for_api = relay.clone();
+        let server = BlindedBlockRelayerServer::new(host, port, relay_for_api).spawn();
 
         let relay_clone = relay.clone();
         let consensus = tokio::spawn(async move {

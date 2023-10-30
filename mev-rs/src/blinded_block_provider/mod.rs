@@ -1,5 +1,5 @@
 #[cfg(feature = "builder-api")]
-mod api;
+pub(crate) mod api;
 
 #[cfg(feature = "builder-api")]
 pub use {api::client::Client, api::server::Server};

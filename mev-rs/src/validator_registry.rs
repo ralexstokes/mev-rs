@@ -13,7 +13,10 @@ use ethereum_consensus::{
 };
 use parking_lot::RwLock;
 use rayon::prelude::*;
-use std::{cmp::Ordering, collections::HashMap};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+};
 use thiserror::Error;
 use tracing::trace;
 
@@ -191,28 +194,28 @@ impl ValidatorRegistry {
         Ok(update)
     }
 
+    // Returns set of public keys for updated (including new) registrations successfully processed
+    // and any errors encountered while processing.
     pub fn process_registrations(
         &self,
         registrations: &mut [SignedValidatorRegistration],
         current_timestamp: u64,
         context: &Context,
-    ) -> Result<(), Vec<Error>> {
+    ) -> (HashSet<BlsPublicKey>, Vec<Error>) {
         let (updates, errs): (Vec<_>, Vec<_>) = registrations
             .par_iter_mut()
             .map(|registration| self.process_registration(registration, current_timestamp, context))
             .partition(|result| result.is_ok());
         let mut state = self.state.write();
+        let mut updated_keys = HashSet::new();
         for update in updates {
             if let Some(signed_registration) = update.expect("validated successfully") {
                 let public_key = signed_registration.message.public_key.clone();
+                updated_keys.insert(public_key.clone());
                 state.validator_preferences.insert(public_key, signed_registration.clone());
             }
         }
 
-        if errs.is_empty() {
-            Ok(())
-        } else {
-            Err(errs.into_iter().map(|err| err.expect_err("validation failed")).collect())
-        }
+        (updated_keys, errs.into_iter().map(|err| err.expect_err("validation failed")).collect())
     }
 }

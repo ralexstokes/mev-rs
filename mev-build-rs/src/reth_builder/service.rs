@@ -10,12 +10,12 @@ use ethereum_consensus::{
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::StreamExt;
-use mev_rs::{Error, Relay, RelayEndpoint};
+use mev_rs::{relay::parse_relay_endpoints, Error, Relay};
 use reth_primitives::{Bytes, ChainSpec};
 use serde::Deserialize;
 use std::{future::Future, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use url::Url;
+use tracing::{error, info};
 
 const DEFAULT_BID_PERCENT: f64 = 0.9;
 
@@ -39,26 +39,6 @@ pub struct Service<Pool, Client, Bidder> {
     bidder: Arc<Bidder>,
 }
 
-fn parse_relays(urls: &[String]) -> Vec<Relay> {
-    let mut relays = vec![];
-    for url in urls {
-        match url.parse::<Url>() {
-            Ok(endpoint) => match RelayEndpoint::try_from(endpoint) {
-                Ok(endpoint) => {
-                    let relay = Relay::from(endpoint);
-                    relays.push(relay);
-                }
-                Err(err) => tracing::warn!("could not parse relay from endpoint: {err}"),
-            },
-            Err(err) => tracing::warn!("could not parse relay URL: {err}"),
-        }
-    }
-    if relays.is_empty() {
-        tracing::error!("no relays could be loaded from the configuration; please fix and restart");
-    }
-    relays
-}
-
 impl<
         Pool: reth_transaction_pool::TransactionPool + 'static,
         Client: reth_provider::StateProviderFactory + reth_provider::BlockReaderIdExt + Clone + 'static,
@@ -75,7 +55,20 @@ impl<
         chain_spec: Arc<ChainSpec>,
     ) -> Result<(Self, Builder<Pool, Client>), Error> {
         let secret_key = &config.secret_key;
-        let relays = parse_relays(&config.relays);
+        let relays = parse_relay_endpoints(&config.relays)
+            .into_iter()
+            .map(Relay::from)
+            .collect::<Vec<Relay>>();
+
+        if relays.is_empty() {
+            error!("no valid relays provided; please restart with correct configuration");
+        } else {
+            let count = relays.len();
+            info!("configured with {count} relay(s)");
+            for relay in &relays {
+                info!(%relay, "configured with relay");
+            }
+        }
 
         let mut derivation_index = 0;
         let phrase = if let Some((phrase, index_str)) = config.execution_mnemonic.split_once(':') {

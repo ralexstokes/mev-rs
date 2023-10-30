@@ -56,7 +56,10 @@ jobs:
           fetch-depth: 0
 
       - name: Install toolchain
-        uses: dtolnay/rust-toolchain@nightly
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2023-10-29
+
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
@@ -71,7 +74,7 @@ jobs:
         run: mdbook build
 
       - name: Build docs
-        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --all --no-deps
+        run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly-2023-10-29 doc --all --no-deps
 
       - name: Move docs to book folder
         run: |
