@@ -17,7 +17,7 @@ use axum::{
 use hyper::server::conn::AddrIncoming;
 use std::net::{Ipv4Addr, SocketAddr};
 use tokio::task::JoinHandle;
-use tracing::{error, info};
+use tracing::{error, info, trace};
 
 /// Type alias for the configured axum server
 pub type BlockrelayServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
@@ -25,7 +25,7 @@ pub type BlockrelayServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
 async fn handle_get_proposal_schedule<R: BlindedBlockRelayer>(
     State(relay): State<R>,
 ) -> Result<Json<Vec<ProposerSchedule>>, Error> {
-    info!("serving proposal schedule for current and next epoch");
+    trace!("serving proposal schedule for current and next epoch");
     Ok(Json(relay.get_proposal_schedule().await?))
 }
 
@@ -33,7 +33,7 @@ async fn handle_submit_bid<R: BlindedBlockRelayer>(
     State(relay): State<R>,
     Json(mut signed_bid_submission): Json<SignedBidSubmission>,
 ) -> Result<(), Error> {
-    info!("handling bid submission");
+    trace!("handling bid submission");
     relay.submit_bid(&mut signed_bid_submission).await
 }
 
