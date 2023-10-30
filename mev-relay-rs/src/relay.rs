@@ -473,7 +473,9 @@ impl BlindedBlockProvider for Relay {
         let auction_context = self
             .get_auction_context(auction_request)
             .ok_or_else(|| Error::NoBidPrepared(auction_request.clone()))?;
-        Ok(auction_context.signed_builder_bid.clone())
+        let signed_builder_bid = &auction_context.signed_builder_bid;
+        info!(%auction_request, %signed_builder_bid, "serving bid");
+        Ok(signed_builder_bid.clone())
     }
 
     async fn open_bid(
@@ -514,6 +516,8 @@ impl BlindedBlockProvider for Relay {
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
                 let version = signed_block.version();
+                let block_root =
+                    signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
                 if let Err(err) = self
                     .beacon_node
                     .post_signed_beacon_block_v2(
@@ -523,14 +527,12 @@ impl BlindedBlockProvider for Relay {
                     )
                     .await
                 {
-                    let block_root = signed_block
-                        .message_mut()
-                        .hash_tree_root()
-                        .map_err(ConsensusError::from)?;
                     warn!(%err, %auction_request, %block_root, "block failed beacon node validation");
                     Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
                 } else {
                     let local_payload = &auction_context.execution_payload;
+                    let block_hash = local_payload.block_hash();
+                    info!(%auction_request, %block_root, %block_hash, "returning local payload");
                     Ok(local_payload.clone())
                 }
             }
