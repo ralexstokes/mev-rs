@@ -27,7 +27,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, trace, warn};
 
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;
@@ -104,6 +104,11 @@ struct AuctionContext {
 
 #[derive(Debug, Default)]
 struct State {
+    // contains validator public keys that have been updated since we last refreshed
+    // the proposer scheduler
+    outstanding_validator_updates: HashSet<BlsPublicKey>,
+
+    // auction state
     open_auctions: HashSet<AuctionRequest>,
     auctions: HashMap<AuctionRequest, Arc<AuctionContext>>,
 }
@@ -136,18 +141,42 @@ impl Relay {
         info!(epoch, "processing");
 
         if let Err(err) = self.validator_registry.on_epoch(epoch).await {
-            error!(%err, "could not load validator set from provided beacon node");
+            error!(%err, epoch, "could not update validator registry");
         }
+        self.refresh_proposer_schedule(epoch).await;
+    }
+
+    async fn refresh_proposer_schedule(&self, epoch: Epoch) {
         if let Err(err) = self.proposer_scheduler.on_epoch(epoch, &self.validator_registry).await {
-            error!(%err, "could not load proposer duties");
+            error!(%err, epoch, "could not refresh proposer schedule");
+        }
+        if let Ok(schedule) = self.proposer_scheduler.get_proposal_schedule() {
+            let proposal_slots = schedule
+                .into_iter()
+                .map(|schedule| (schedule.slot, schedule.validator_index))
+                .collect::<Vec<_>>();
+            info!(?proposal_slots, "proposer schedule refreshed");
         }
     }
 
     pub async fn on_slot(&self, slot: Slot) {
         info!(slot, "processing");
 
+        // TODO: no reason to wait for slot boundary,
+        // but likely want some more sophisticated channel machinery to dispatch updates
+        let keys_to_refresh = {
+            let mut state = self.state.lock();
+            HashSet::<BlsPublicKey>::from_iter(state.outstanding_validator_updates.drain())
+        };
+        if !keys_to_refresh.is_empty() {
+            // TODO: can be more precise with which proposers to update
+            // for now, just refresh them all...
+            let epoch = slot / self.context.slots_per_epoch;
+            self.refresh_proposer_schedule(epoch).await;
+        }
+
         let retain_slot = slot - AUCTION_LIFETIME_SLOTS;
-        debug!(retain_slot, "dropping old auctions");
+        trace!(retain_slot, "dropping old auctions");
         let mut state = self.state.lock();
         state.open_auctions.retain(|auction_request| auction_request.slot >= retain_slot);
         state.auctions.retain(|auction_request, _| auction_request.slot >= retain_slot);
@@ -292,9 +321,27 @@ impl BlindedBlockProvider for Relay {
         registrations: &mut [SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let current_time = get_current_unix_time_in_nanos().try_into().expect("fits in type");
-        self.validator_registry
-            .process_registrations(registrations, current_time, &self.context)
-            .map_err(Error::RegistrationErrors)
+        let (updated_keys, errs) = self.validator_registry.process_registrations(
+            registrations,
+            current_time,
+            &self.context,
+        );
+
+        let updated_key_count = updated_keys.len();
+        info!(
+            updates = updated_key_count,
+            registrations = registrations.len(),
+            "processed validator registrations"
+        );
+        let mut state = self.state.lock();
+        state.outstanding_validator_updates.extend(updated_keys);
+
+        if errs.is_empty() {
+            Ok(())
+        } else {
+            warn!(?errs, "error processing some registrations");
+            Err(Error::RegistrationErrors(errs))
+        }
     }
 
     async fn fetch_best_bid(
