@@ -2,7 +2,7 @@ use crate::types::AuctionRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
     primitives::{BlsPublicKey, ExecutionAddress, Hash32, ValidatorIndex},
-    Error as ConsensusError,
+    Error as ConsensusError, Fork,
 };
 use thiserror::Error;
 
@@ -50,6 +50,8 @@ pub enum RelayError {
 
 #[derive(Debug, Error)]
 pub enum Error {
+    #[error("expecting data from {expected} but provided {provided}")]
+    InvalidFork { expected: Fork, provided: Fork },
     #[error("no bid prepared for request {0}")]
     NoBidPrepared(AuctionRequest),
     #[error(transparent)]

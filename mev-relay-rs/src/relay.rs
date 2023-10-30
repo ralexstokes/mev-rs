@@ -3,13 +3,16 @@ use beacon_api_client::{
     mainnet::Client as ApiClient, BroadcastValidation, PayloadAttributesEvent,
 };
 use ethereum_consensus::{
+    bellatrix::mainnet as bellatrix,
+    capella::mainnet as capella,
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
+    deneb::mainnet as deneb,
     primitives::{BlsPublicKey, Epoch, Slot, U256},
     ssz::prelude::Merkleized,
     state_transition::Context,
-    types::mainnet::ExecutionPayloadHeaderRef,
-    Error as ConsensusError,
+    types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
+    Error as ConsensusError, Fork,
 };
 use mev_rs::{
     signing::sign_builder_message,
@@ -27,7 +30,7 @@ use std::{
     ops::Deref,
     sync::Arc,
 };
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;
@@ -73,6 +76,113 @@ fn validate_header_equality(
     Ok(())
 }
 
+fn unblind_block(
+    signed_blinded_beacon_block: &SignedBlindedBeaconBlock,
+    execution_payload: &ExecutionPayload,
+) -> Result<SignedBeaconBlock, Error> {
+    match signed_blinded_beacon_block {
+        SignedBlindedBeaconBlock::Bellatrix(blinded_block) => {
+            let signature = blinded_block.signature.clone();
+            let block = &blinded_block.message;
+            let body = &block.body;
+            let execution_payload = execution_payload.bellatrix().ok_or(Error::InvalidFork {
+                expected: Fork::Bellatrix,
+                provided: execution_payload.version(),
+            })?;
+
+            let inner = bellatrix::SignedBeaconBlock {
+                message: bellatrix::BeaconBlock {
+                    slot: block.slot,
+                    proposer_index: block.proposer_index,
+                    parent_root: block.parent_root,
+                    state_root: block.state_root,
+                    body: bellatrix::BeaconBlockBody {
+                        randao_reveal: body.randao_reveal.clone(),
+                        eth1_data: body.eth1_data.clone(),
+                        graffiti: body.graffiti.clone(),
+                        proposer_slashings: body.proposer_slashings.clone(),
+                        attester_slashings: body.attester_slashings.clone(),
+                        attestations: body.attestations.clone(),
+                        deposits: body.deposits.clone(),
+                        voluntary_exits: body.voluntary_exits.clone(),
+                        sync_aggregate: body.sync_aggregate.clone(),
+                        execution_payload: execution_payload.clone(),
+                    },
+                },
+                signature,
+            };
+            Ok(SignedBeaconBlock::Bellatrix(inner))
+        }
+        SignedBlindedBeaconBlock::Capella(blinded_block) => {
+            let signature = blinded_block.signature.clone();
+            let block = &blinded_block.message;
+            let body = &block.body;
+            let execution_payload = execution_payload.capella().ok_or(Error::InvalidFork {
+                expected: Fork::Capella,
+                provided: execution_payload.version(),
+            })?;
+
+            let inner = capella::SignedBeaconBlock {
+                message: capella::BeaconBlock {
+                    slot: block.slot,
+                    proposer_index: block.proposer_index,
+                    parent_root: block.parent_root,
+                    state_root: block.state_root,
+                    body: capella::BeaconBlockBody {
+                        randao_reveal: body.randao_reveal.clone(),
+                        eth1_data: body.eth1_data.clone(),
+                        graffiti: body.graffiti.clone(),
+                        proposer_slashings: body.proposer_slashings.clone(),
+                        attester_slashings: body.attester_slashings.clone(),
+                        attestations: body.attestations.clone(),
+                        deposits: body.deposits.clone(),
+                        voluntary_exits: body.voluntary_exits.clone(),
+                        sync_aggregate: body.sync_aggregate.clone(),
+                        execution_payload: execution_payload.clone(),
+                        bls_to_execution_changes: body.bls_to_execution_changes.clone(),
+                    },
+                },
+                signature,
+            };
+            Ok(SignedBeaconBlock::Capella(inner))
+        }
+        SignedBlindedBeaconBlock::Deneb(blinded_block) => {
+            let signature = blinded_block.signature.clone();
+            let block = &blinded_block.message;
+            let body = &block.body;
+            let execution_payload = execution_payload.deneb().ok_or(Error::InvalidFork {
+                expected: Fork::Deneb,
+                provided: execution_payload.version(),
+            })?;
+
+            let inner = deneb::SignedBeaconBlock {
+                message: deneb::BeaconBlock {
+                    slot: block.slot,
+                    proposer_index: block.proposer_index,
+                    parent_root: block.parent_root,
+                    state_root: block.state_root,
+                    body: deneb::BeaconBlockBody {
+                        randao_reveal: body.randao_reveal.clone(),
+                        eth1_data: body.eth1_data.clone(),
+                        graffiti: body.graffiti.clone(),
+                        proposer_slashings: body.proposer_slashings.clone(),
+                        attester_slashings: body.attester_slashings.clone(),
+                        attestations: body.attestations.clone(),
+                        deposits: body.deposits.clone(),
+                        voluntary_exits: body.voluntary_exits.clone(),
+                        sync_aggregate: body.sync_aggregate.clone(),
+                        execution_payload: execution_payload.clone(),
+                        bls_to_execution_changes: body.bls_to_execution_changes.clone(),
+                        blob_kzg_commitments: body.blob_kzg_commitments.clone(),
+                    },
+                },
+                signature,
+            };
+            Ok(SignedBeaconBlock::Deneb(inner))
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Relay(Arc<Inner>);
 
@@ -97,6 +207,7 @@ pub struct Inner {
 
 #[derive(Debug)]
 struct AuctionContext {
+    builder_public_key: BlsPublicKey,
     signed_builder_bid: SignedBuilderBid,
     execution_payload: ExecutionPayload,
     value: U256,
@@ -134,6 +245,7 @@ impl Relay {
             context,
             state: Default::default(),
         };
+        info!(public_key = %inner.public_key, "relay initialized");
         Self(Arc::new(inner))
     }
 
@@ -294,9 +406,11 @@ impl Relay {
         auction_request: AuctionRequest,
         mut execution_payload: ExecutionPayload,
         value: U256,
+        builder_public_key: BlsPublicKey,
     ) -> Result<(), Error> {
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value > value {
+                info!(%auction_request, %builder_public_key, "block submission was not greater in value; ignoring");
                 return Ok(())
             }
         }
@@ -306,8 +420,14 @@ impl Relay {
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 
-        let auction_context =
-            Arc::new(AuctionContext { signed_builder_bid, execution_payload, value });
+        let block_hash = execution_payload.block_hash().clone();
+        let auction_context = Arc::new(AuctionContext {
+            builder_public_key,
+            signed_builder_bid,
+            execution_payload,
+            value,
+        });
+        info!(%auction_request, builder_public_key = %auction_context.builder_public_key, %block_hash, "inserting new bid");
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
         Ok(())
@@ -391,21 +511,33 @@ impl BlindedBlockProvider for Relay {
             }
         }
 
-        if let Err(err) = self
-            .beacon_node
-            .post_signed_blinded_beacon_block_v2(
-                signed_block,
-                Some(BroadcastValidation::ConsensusAndEquivocation),
-            )
-            .await
-        {
-            let block_root =
-                signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
-            warn!(%err, %auction_request, %block_root, "block failed beacon node validation");
-            Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
-        } else {
-            let local_payload = &auction_context.execution_payload;
-            Ok(local_payload.clone())
+        match unblind_block(signed_block, &auction_context.execution_payload) {
+            Ok(mut signed_block) => {
+                let version = signed_block.version();
+                if let Err(err) = self
+                    .beacon_node
+                    .post_signed_beacon_block_v2(
+                        &signed_block,
+                        version,
+                        Some(BroadcastValidation::ConsensusAndEquivocation),
+                    )
+                    .await
+                {
+                    let block_root = signed_block
+                        .message_mut()
+                        .hash_tree_root()
+                        .map_err(ConsensusError::from)?;
+                    warn!(%err, %auction_request, %block_root, "block failed beacon node validation");
+                    Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
+                } else {
+                    let local_payload = &auction_context.execution_payload;
+                    Ok(local_payload.clone())
+                }
+            }
+            Err(err) => {
+                warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
+            }
         }
     }
 }
@@ -417,7 +549,7 @@ impl BlindedBlockRelayer for Relay {
     }
 
     async fn submit_bid(&self, signed_submission: &mut SignedBidSubmission) -> Result<(), Error> {
-        let (auction_request, value) = {
+        let (auction_request, value, builder_public_key) = {
             let bid_trace = &signed_submission.message;
             let builder_public_key = &bid_trace.builder_public_key;
             self.validate_allowed_builder(builder_public_key)?;
@@ -433,7 +565,8 @@ impl BlindedBlockRelayer for Relay {
                 bid_trace,
                 &signed_submission.execution_payload,
             )?;
-            (auction_request, bid_trace.value.clone())
+            debug!(%auction_request, "validated builder submission");
+            (auction_request, bid_trace.value.clone(), bid_trace.builder_public_key.clone())
         };
 
         signed_submission.verify_signature(&self.context)?;
@@ -442,7 +575,7 @@ impl BlindedBlockRelayer for Relay {
         // NOTE: this does _not_ respect cancellations
         // TODO: move to regime where we track best bid by builder
         // and also move logic to cursor best bid for auction off this API
-        self.insert_bid_if_greater(auction_request, execution_payload, value)?;
+        self.insert_bid_if_greater(auction_request, execution_payload, value, builder_public_key)?;
 
         Ok(())
     }
