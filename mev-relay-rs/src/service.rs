@@ -1,4 +1,5 @@
 use crate::relay::Relay;
+use backoff::ExponentialBackoff;
 use beacon_api_client::{mainnet::Client, PayloadAttributesTopic};
 use ethereum_consensus::{
     crypto::SecretKey,
@@ -77,25 +78,39 @@ impl Service {
         let consensus = tokio::spawn(async move {
             let relay = relay_clone;
 
-            let mut stream = match beacon_node.get_events::<PayloadAttributesTopic>().await {
-                Ok(events) => events,
-                Err(err) => {
-                    error!(%err, "could not open payload attributes stream");
-                    return
-                }
-            };
+            let result = backoff::future::retry::<(), (), _, _, _>(
+                ExponentialBackoff::default(),
+                || async {
+                    let retry = backoff::Error::transient(());
+                    let mut stream = match beacon_node.get_events::<PayloadAttributesTopic>().await
+                    {
+                        Ok(stream) => stream,
+                        Err(err) => {
+                            error!(%err, "could not open payload attributes stream");
+                            return Err(retry)
+                        }
+                    };
 
-            while let Some(event) = stream.next().await {
-                match event {
-                    Ok(event) => {
-                        if let Err(err) = relay.on_payload_attributes(event.data) {
-                            warn!(%err, "could not process payload attributes");
+                    while let Some(event) = stream.next().await {
+                        match event {
+                            Ok(event) => {
+                                if let Err(err) = relay.on_payload_attributes(event.data) {
+                                    warn!(%err, "could not process payload attributes");
+                                    continue
+                                }
+                            }
+                            Err(err) => {
+                                warn!(%err, "error reading payload attributes stream");
+                                return Err(retry)
+                            }
                         }
                     }
-                    Err(err) => {
-                        warn!(%err, "error reading payload attributes stream");
-                    }
-                }
+                    Err(retry)
+                },
+            )
+            .await;
+            if result.is_err() {
+                error!("failed to read from event stream");
             }
         });
 
