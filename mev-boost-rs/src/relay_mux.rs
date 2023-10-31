@@ -144,6 +144,8 @@ impl BlindedBlockProvider for RelayMux {
         if num_failures == self.relays.len() {
             Err(BoostError::CouldNotRegister.into())
         } else {
+            let count = registrations.len();
+            info!(count, "sent validator registrations");
             let mut state = self.state.lock();
             state.current_epoch_registration_count += registrations.len();
             Ok(())
