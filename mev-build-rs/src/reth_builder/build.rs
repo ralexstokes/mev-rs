@@ -1,7 +1,6 @@
 use crate::reth_builder::{
     error::Error,
     reth_compat::{to_bytes32, to_execution_payload, to_u256},
-    types::RelayIndex,
 };
 use ethereum_consensus::{
     crypto::{hash, SecretKey},
@@ -13,6 +12,7 @@ use ethers::signers::LocalWallet;
 use mev_rs::{
     signing::sign_builder_message,
     types::{BidTrace, SignedBidSubmission},
+    Relay,
 };
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, B256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
@@ -54,7 +54,7 @@ pub struct BuildContext {
     pub proposer_fee_recipient: ExecutionAddress,
     pub prev_randao: B256,
     pub withdrawals: Vec<Withdrawal>,
-    pub relays: Vec<RelayIndex>,
+    pub relays: Vec<Arc<Relay>>,
     pub chain_spec: Arc<ChainSpec>,
     pub block_env: BlockEnv,
     pub cfg_env: CfgEnv,

@@ -57,8 +57,8 @@ impl<
         let secret_key = &config.secret_key;
         let relays = parse_relay_endpoints(&config.relays)
             .into_iter()
-            .map(Relay::from)
-            .collect::<Vec<Relay>>();
+            .map(|endpoint| Arc::new(Relay::from(endpoint)))
+            .collect::<Vec<_>>();
 
         if relays.is_empty() {
             error!("no valid relays provided; please restart with correct configuration");
@@ -187,19 +187,20 @@ impl<
                     .expect("after genesis");
                 tracing::trace!(id = %attrs.payload_id(), slot, "got attrs from CL");
                 match builder.process_payload_attributes(attrs) {
-                    Ok(PayloadAttributesProcessingOutcome::NewBuild(build_identifier)) => {
-                        let builder = builder.clone();
-                        let id = build_identifier.clone();
-                        tokio::task::spawn_blocking(move || {
-                            tokio::runtime::Handle::current().block_on(Box::pin(async move {
+                    Ok(PayloadAttributesProcessingOutcome::NewBuilds(new_builds)) => {
+                        for id in new_builds {
+                            let builder = builder.clone();
+                            tokio::task::spawn_blocking(move || {
+                                tokio::runtime::Handle::current().block_on(Box::pin(async move {
                                 if let Err(err) = builder.start_build(&id).await {
                                     tracing::warn!(id = %id, err = ?err, "failed to start build");
                                 }
                             }));
-                        });
+                            });
+                        }
                     }
                     Ok(PayloadAttributesProcessingOutcome::Duplicate(_)) => continue,
-                    Err(BuilderError::NoRegisteredValidatorsForSlot(_)) => continue,
+                    Err(BuilderError::NoProposals(_)) => continue,
                     Err(err) => {
                         tracing::warn!(err = ?err, "could not process payload attributes");
                     }

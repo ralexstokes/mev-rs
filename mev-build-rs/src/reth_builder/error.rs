@@ -7,8 +7,8 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("no validators registered for slot {0}")]
-    NoRegisteredValidatorsForSlot(Slot),
+    #[error("not aware of any proposals for slot {0}")]
+    NoProposals(Slot),
     #[error("missing a build request with identifier {0}")]
     MissingBuild(BuildIdentifier),
     #[error("missing parent block {0}")]
