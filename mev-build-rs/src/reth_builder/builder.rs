@@ -1,23 +1,21 @@
 use crate::reth_builder::{
-    build::*, cancelled::Cancelled, error::Error, payload_builder::*, types::*,
+    auction_schedule::AuctionSchedule, build::*, cancelled::Cancelled, error::Error,
+    payload_builder::*,
 };
 use ethereum_consensus::{
     clock::SystemClock,
     crypto::SecretKey,
-    primitives::{BlsPublicKey, Epoch, Slot},
+    primitives::{BlsPublicKey, Epoch, ExecutionAddress, Slot},
     state_transition::Context,
 };
 use ethers::signers::{LocalWallet, Signer};
-use mev_rs::{
-    blinded_block_relayer::BlindedBlockRelayer, compute_preferred_gas_limit,
-    types::ProposerSchedule, Relay,
-};
+use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, compute_preferred_gas_limit, Relay};
 use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256};
 use reth_provider::{BlockReaderIdExt, BlockSource, StateProviderFactory};
 use reth_transaction_pool::TransactionPool;
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{HashMap, HashSet},
     ops::Deref,
     sync::{Arc, Mutex},
     time::Duration,
@@ -53,6 +51,7 @@ pub struct Inner<Pool, Client> {
     clock: SystemClock,
 
     relays: Vec<Arc<Relay>>,
+    auction_schedule: AuctionSchedule,
 
     pool: Pool,
     client: Client,
@@ -71,9 +70,6 @@ pub struct Inner<Pool, Client> {
 struct State {
     payload_attributes_rx: Option<mpsc::Receiver<PayloadBuilderAttributes>>,
     builds_rx: Option<mpsc::Receiver<BuildIdentifier>>,
-    // TODO: merge in `ProposerScheduler` here?
-    proposer_schedule:
-        BTreeMap<Slot, HashMap<BlsPublicKey, HashMap<ValidatorPreferences, Vec<Arc<Relay>>>>>,
     builds: HashMap<BuildIdentifier, Arc<Build>>,
     // TODO: rework cancellation discipline here...
     cancels: HashMap<BuildIdentifier, Cancelled>,
@@ -103,7 +99,6 @@ impl<Pool, Client> Builder<Pool, Client> {
         let state = State {
             payload_attributes_rx: Some(attrs_rx),
             builds_rx: Some(builds_rx),
-            proposer_schedule: Default::default(),
             builds: Default::default(),
             cancels: Default::default(),
         };
@@ -114,6 +109,7 @@ impl<Pool, Client> Builder<Pool, Client> {
             context,
             clock,
             relays,
+            auction_schedule: Default::default(),
             pool,
             client,
             chain_spec,
@@ -127,42 +123,22 @@ impl<Pool, Client> Builder<Pool, Client> {
         }))
     }
 
-    fn process_validator_schedule_for_relay(
-        &self,
-        relay: Arc<Relay>,
-        schedule: &[ProposerSchedule],
-    ) {
-        // NOTE: we are trusting the data we get from a relay here;
-        // this could conceivably be verified...
-        let mut slots = Vec::with_capacity(schedule.len());
-        let mut state = self.state.lock().unwrap();
-        for duty in schedule {
-            slots.push(duty.slot);
-            let slot = state.proposer_schedule.entry(duty.slot).or_default();
-            let registration = &duty.entry;
-            let public_key = registration.message.public_key.clone();
-            let preferences_by_slot = slot.entry(public_key).or_default();
-            let preferences = registration.into();
-            let registered_relays = preferences_by_slot.entry(preferences).or_default();
-            if !registered_relays.contains(&relay) {
-                // NOTE: given the API returns two epochs at a time, we can end up duplicating our
-                // data so let's only add the relay if it is not already here
-                registered_relays.push(relay.clone());
-            }
-        }
-        tracing::info!(?slots, %relay, "processed proposer schedule");
-    }
-
-    async fn on_epoch(&self, _epoch: Epoch) {
+    async fn on_epoch(&self, epoch: Epoch) {
         // TODO: concurrent fetch
-        for relay in self.relays.iter().cloned() {
+        // TODO: batch updates to auction schedule
+        for relay in self.relays.iter() {
             match relay.get_proposal_schedule().await {
-                Ok(schedule) => self.process_validator_schedule_for_relay(relay, &schedule),
+                Ok(schedule) => {
+                    let slots = self.auction_schedule.process(relay.clone(), &schedule);
+                    tracing::info!(epoch, ?slots, %relay, "processed proposer schedule");
+                }
                 Err(err) => {
                     tracing::warn!(err = %err, "error fetching proposer schedule from relay")
                 }
             }
         }
+        let slot = epoch * self.context.slots_per_epoch;
+        self.auction_schedule.clear(slot);
     }
 
     pub async fn initialize(&self, current_epoch: Epoch) {
@@ -184,12 +160,9 @@ impl<Pool, Client> Builder<Pool, Client> {
         }
 
         let mut state = self.state.lock().unwrap();
-        if let Some((earliest_slot, _)) = state.proposer_schedule.first_key_value() {
-            for entry in *earliest_slot..slot {
-                state.proposer_schedule.remove(&entry);
-            }
-        }
         state.builds.retain(|_, build| build.context.slot >= slot);
+        let live_builds = state.builds.keys().cloned().collect::<HashSet<_>>();
+        state.cancels.retain(|id, _| live_builds.contains(id));
     }
 
     pub fn stream_payload_attributes(
@@ -254,20 +227,23 @@ impl<Pool, Client> Builder<Pool, Client> {
 }
 
 pub enum PayloadAttributesProcessingOutcome {
-    NewBuild(BuildIdentifier),
+    NewBuilds(Vec<BuildIdentifier>),
     Duplicate(PayloadBuilderAttributes),
 }
 
 impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Builder<Pool, Client> {
+    // TODO: clean up argument set
+    #[allow(clippy::too_many_arguments)]
     // NOTE: this is held inside a lock currently, minimize work here
     fn construct_build_context(
         &self,
         slot: Slot,
         parent_hash: B256,
         proposer: &BlsPublicKey,
-        payload_attributes: PayloadBuilderAttributes,
-        validator_preferences: &ValidatorPreferences,
-        relays: &[Arc<Relay>],
+        payload_attributes: &PayloadBuilderAttributes,
+        proposer_fee_recipient: ExecutionAddress,
+        preferred_gas_limit: u64,
+        relays: HashSet<Arc<Relay>>,
     ) -> Result<BuildContext, Error> {
         let parent_block = if parent_hash.is_zero() {
             // use latest block if parent is zero: genesis block
@@ -289,8 +265,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
         let (cfg_env, mut block_env) =
             payload_attributes.cfg_and_block_env(&self.chain_spec, &parent_block);
 
-        let gas_limit =
-            compute_preferred_gas_limit(validator_preferences.gas_limit, parent_block.gas_limit);
+        let gas_limit = compute_preferred_gas_limit(preferred_gas_limit, parent_block.gas_limit);
         block_env.gas_limit = U256::from(gas_limit);
 
         // TODO: configurable "fee collection strategy"
@@ -304,10 +279,10 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             parent_hash,
             proposer: proposer.clone(),
             timestamp: payload_attributes.timestamp,
-            proposer_fee_recipient: validator_preferences.fee_recipient.clone(),
+            proposer_fee_recipient,
             prev_randao: payload_attributes.prev_randao,
-            withdrawals: payload_attributes.withdrawals,
-            relays: relays.into(),
+            withdrawals: payload_attributes.withdrawals.clone(),
+            relays: relays.into_iter().collect(),
             chain_spec: self.chain_spec.clone(),
             block_env,
             cfg_env,
@@ -321,10 +296,8 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
         Ok(context)
     }
 
-    // Determine if a new build build should be created for the given context
-    // fixed by `slot` and `payload_attributes`.
-    // If a new build should be created, then do so and return the unique identifier
-    // to the caller. If no new build should be created, `None` is returned.
+    // Determine if a new build should be created for the given context fixed by `slot` and
+    // `payload_attributes`. Outcome is returned to reflect any updates.
     pub fn process_payload_attributes(
         &self,
         payload_attributes: PayloadBuilderAttributes,
@@ -333,59 +306,48 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             .clock
             .slot_at_time(Duration::from_secs(payload_attributes.timestamp).as_nanos())
             .expect("past genesis");
-        let mut state = self.state.lock().unwrap();
-        let eligible_proposals = state
-            .proposer_schedule
-            .get(&slot)
-            .ok_or_else(|| Error::NoRegisteredValidatorsForSlot(slot))?;
-
-        // TODO: should defer to our own view of consensus:
-        // currently, if there is more than one element in `eligible_proposals`
-        // then there are multiple views across our relay set...
-        // let's simplify the return type here by picking the "majority view"...
-        let (proposer, preferences) = eligible_proposals
-            .iter()
-            .max_by(|(_, relay_set_a), (_, relay_set_b)| relay_set_a.len().cmp(&relay_set_b.len()))
-            .ok_or_else(|| Error::NoRegisteredValidatorsForSlot(slot))?;
-        // TODO: think about handling divergent relay views
-        // similarly, let's just service the "majority" relays for now...
-        let (validator_preferences, relays) = preferences
-            .iter()
-            .max_by(|(_, relay_set_a), (_, relay_set_b)| relay_set_a.len().cmp(&relay_set_b.len()))
-            .ok_or_else(|| Error::NoRegisteredValidatorsForSlot(slot))?;
+        let proposals =
+            self.auction_schedule.take_proposal(slot).ok_or_else(|| Error::NoProposals(slot))?;
 
         let parent_hash = payload_attributes.parent;
-        let build_identifier = compute_build_id(slot, parent_hash, proposer);
+        let mut state = self.state.lock().expect("can lock");
+        let mut new_builds = vec![];
+        for (proposer, relays) in proposals {
+            let build_identifier = compute_build_id(slot, parent_hash, &proposer.public_key);
 
-        if state.builds.contains_key(&build_identifier) {
-            return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes))
+            if state.builds.contains_key(&build_identifier) {
+                return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes))
+            }
+
+            tracing::info!(slot, ?relays, %build_identifier, "constructing new build");
+
+            let context = self.construct_build_context(
+                slot,
+                parent_hash,
+                &proposer.public_key,
+                &payload_attributes,
+                proposer.fee_recipient,
+                proposer.gas_limit,
+                relays,
+            )?;
+
+            let build = Arc::new(Build::new(context));
+
+            // TODO: encapsulate these details
+            let current_value = build.value();
+            let cancel = Cancelled::default();
+            if let Ok(BuildOutcome::BetterOrEqual(payload_with_payments)) =
+                build_payload(&build.context, current_value, &self.client, &self.pool, &cancel)
+            {
+                let mut state = build.state.lock().unwrap();
+                state.payload_with_payments = payload_with_payments;
+            }
+            state.builds.insert(build_identifier.clone(), build);
+            state.cancels.insert(build_identifier.clone(), cancel);
+            new_builds.push(build_identifier);
         }
 
-        tracing::info!(slot, ?relays, %build_identifier, "constructing new build");
-
-        let context = self.construct_build_context(
-            slot,
-            parent_hash,
-            proposer,
-            payload_attributes,
-            validator_preferences,
-            relays,
-        )?;
-
-        let build = Arc::new(Build::new(context));
-
-        // TODO: encapsulate these details
-        let current_value = build.value();
-        let cancel = Cancelled::default();
-        if let Ok(BuildOutcome::BetterOrEqual(payload_with_payments)) =
-            build_payload(&build.context, current_value, &self.client, &self.pool, &cancel)
-        {
-            let mut state = build.state.lock().unwrap();
-            state.payload_with_payments = payload_with_payments;
-        }
-        state.builds.insert(build_identifier.clone(), build);
-        state.cancels.insert(build_identifier.clone(), cancel);
-        Ok(PayloadAttributesProcessingOutcome::NewBuild(build_identifier))
+        Ok(PayloadAttributesProcessingOutcome::NewBuilds(new_builds))
     }
 
     // Drives the build referenced by `id`. Inside a context where blocking is ok.
