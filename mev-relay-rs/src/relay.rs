@@ -548,7 +548,10 @@ impl BlindedBlockProvider for Relay {
 #[async_trait]
 impl BlindedBlockRelayer for Relay {
     async fn get_proposal_schedule(&self) -> Result<Vec<ProposerSchedule>, Error> {
-        self.proposer_scheduler.get_proposal_schedule().map_err(Into::into)
+        let schedule = self.proposer_scheduler.get_proposal_schedule()?;
+        let slots = schedule.iter().map(|schedule| schedule.slot).collect::<Vec<_>>();
+        debug!(?slots, "sending schedule");
+        Ok(schedule)
     }
 
     async fn submit_bid(&self, signed_submission: &mut SignedBidSubmission) -> Result<(), Error> {
