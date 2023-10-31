@@ -296,6 +296,7 @@ impl Relay {
 
     // TODO: build tip context and support reorgs...
     pub fn on_payload_attributes(&self, event: PayloadAttributesEvent) -> Result<(), Error> {
+        trace!(?event, "processing payload attributes");
         let proposer_public_key =
             self.validator_registry.get_public_key(event.proposer_index).ok_or_else::<Error, _>(
                 || RelayError::UnknownValidatorIndex(event.proposer_index).into(),
