@@ -52,7 +52,7 @@ pub struct Inner<Pool, Client> {
     context: Arc<Context>,
     clock: SystemClock,
 
-    relays: Vec<Relay>,
+    relays: Vec<Arc<Relay>>,
 
     pool: Pool,
     client: Client,
@@ -73,7 +73,7 @@ struct State {
     builds_rx: Option<mpsc::Receiver<BuildIdentifier>>,
     // TODO: merge in `ProposerScheduler` here?
     proposer_schedule:
-        BTreeMap<Slot, HashMap<BlsPublicKey, HashMap<ValidatorPreferences, Vec<RelayIndex>>>>,
+        BTreeMap<Slot, HashMap<BlsPublicKey, HashMap<ValidatorPreferences, Vec<Arc<Relay>>>>>,
     builds: HashMap<BuildIdentifier, Arc<Build>>,
     // TODO: rework cancellation discipline here...
     cancels: HashMap<BuildIdentifier, Cancelled>,
@@ -86,7 +86,7 @@ impl<Pool, Client> Builder<Pool, Client> {
         secret_key: SecretKey,
         context: Arc<Context>,
         clock: SystemClock,
-        relays: Vec<Relay>,
+        relays: Vec<Arc<Relay>>,
         pool: Pool,
         client: Client,
         chain_spec: Arc<ChainSpec>,
@@ -129,7 +129,7 @@ impl<Pool, Client> Builder<Pool, Client> {
 
     fn process_validator_schedule_for_relay(
         &self,
-        relay: RelayIndex,
+        relay: Arc<Relay>,
         schedule: &[ProposerSchedule],
     ) {
         // NOTE: we are trusting the data we get from a relay here;
@@ -147,7 +147,7 @@ impl<Pool, Client> Builder<Pool, Client> {
             if !registered_relays.contains(&relay) {
                 // NOTE: given the API returns two epochs at a time, we can end up duplicating our
                 // data so let's only add the relay if it is not already here
-                registered_relays.push(relay);
+                registered_relays.push(relay.clone());
             }
         }
         tracing::info!(?slots, %relay, "processed proposer schedule");
@@ -155,9 +155,9 @@ impl<Pool, Client> Builder<Pool, Client> {
 
     async fn on_epoch(&self, _epoch: Epoch) {
         // TODO: concurrent fetch
-        for (index, relay) in self.relays.iter().enumerate() {
+        for relay in self.relays.iter().cloned() {
             match relay.get_proposal_schedule().await {
-                Ok(schedule) => self.process_validator_schedule_for_relay(index, &schedule),
+                Ok(schedule) => self.process_validator_schedule_for_relay(relay, &schedule),
                 Err(err) => {
                     tracing::warn!(err = %err, "error fetching proposer schedule from relay")
                 }
@@ -235,8 +235,7 @@ impl<Pool, Client> Builder<Pool, Client> {
             build.prepare_bid(&self.secret_key, &self.public_key, &self.context)?;
 
         // TODO: make calls concurrently
-        for index in &context.relays {
-            let relay = &self.relays[*index];
+        for relay in context.relays.iter() {
             let slot = signed_submission.message.slot;
             let parent_hash = &signed_submission.message.parent_hash;
             let block_hash = &signed_submission.message.block_hash;
@@ -268,7 +267,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
         proposer: &BlsPublicKey,
         payload_attributes: PayloadBuilderAttributes,
         validator_preferences: &ValidatorPreferences,
-        relays: &[RelayIndex],
+        relays: &[Arc<Relay>],
     ) -> Result<BuildContext, Error> {
         let parent_block = if parent_hash.is_zero() {
             // use latest block if parent is zero: genesis block

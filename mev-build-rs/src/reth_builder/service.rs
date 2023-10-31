@@ -57,8 +57,8 @@ impl<
         let secret_key = &config.secret_key;
         let relays = parse_relay_endpoints(&config.relays)
             .into_iter()
-            .map(Relay::from)
-            .collect::<Vec<Relay>>();
+            .map(|endpoint| Arc::new(Relay::from(endpoint)))
+            .collect::<Vec<_>>();
 
         if relays.is_empty() {
             error!("no valid relays provided; please restart with correct configuration");

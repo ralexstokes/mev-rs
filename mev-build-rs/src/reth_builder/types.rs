@@ -1,7 +1,5 @@
 use ethereum_consensus::{builder::SignedValidatorRegistration, primitives::ExecutionAddress};
 
-pub type RelayIndex = usize;
-
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub struct ValidatorPreferences {
     pub fee_recipient: ExecutionAddress,

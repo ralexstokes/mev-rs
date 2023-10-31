@@ -9,7 +9,7 @@ use beacon_api_client::Client as BeaconClient;
 use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
-use std::{fmt, ops::Deref};
+use std::{cmp, fmt, hash, ops::Deref};
 use tracing::{error, warn};
 use url::Url;
 
@@ -61,6 +61,20 @@ pub struct Relay {
     pub public_key: BlsPublicKey,
     pub endpoint: Url,
 }
+
+impl hash::Hash for Relay {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.public_key.hash(state);
+    }
+}
+
+impl cmp::PartialEq for Relay {
+    fn eq(&self, other: &Self) -> bool {
+        self.public_key == other.public_key
+    }
+}
+
+impl cmp::Eq for Relay {}
 
 impl fmt::Debug for Relay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
