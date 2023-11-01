@@ -1,4 +1,4 @@
-network = "holesky"
+network = "sepolia"
 
 [boost]
 host = "0.0.0.0"
