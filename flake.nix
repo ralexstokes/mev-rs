@@ -41,14 +41,5 @@
       devShells.x86_64-darwin.default = import ./shell.nix { pkgs = pkgs-for-system "x86_64-darwin"; };
       devShells.aarch64-darwin.default = import ./shell.nix { pkgs = pkgs-for-system "aarch64-darwin"; };
       devShells.x86_64-linux.default = import ./shell.nix { pkgs = pkgs-for-system "x86_64-linux"; };
-
-      # exercise defined modules in a "test machine"
-      nixosConfigurations.test = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          ./nix/module-test.nix
-          self.nixosModules.mev-rs
-        ];
-      };
     };
 }

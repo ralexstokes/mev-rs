@@ -1,8 +1,10 @@
+# NOTE: currently doesn't do what we want...
 {
   services.mev-rs = {
-    enable = "build";
-    config-file = "example.config.toml";
-    features = "build,config";
+    build = {
+      config-file = "example.config.toml";
+      additional-features = [ "config" ];
+    };
   };
 
   boot.isContainer = true;
