@@ -1,83 +1,193 @@
 pkg:
 { config, lib, pkgs, ... }:
 let
-  mev-rs-with-features = features: pkg.mev-rs {
+  cfg = config.services.mev-rs;
+
+  mev-rs-for-features = { features ? "" }: pkg.mev-rs {
     inherit features;
-    system = pkgs.system;
+    inherit (pkgs) system;
+  };
+  any-components-enabled = cfg.boost.enable || cfg.relay.enable || cfg.build.enable;
+
+  build-cmd = mev-rs: cfg: ''
+    ${mev-rs}/bin/mev build \
+    node \
+    --chain ${cfg.network} \
+    --full \
+    --http \
+    --authrpc.jwtsecret ${cfg.jwt-secret} \
+    --mev-builder-config ${cfg.config-file} \
+  '';
+in
+{
+  options.services.mev-rs = with lib; with types; {
+    config-file = mkOption {
+      type = str;
+      description = ''
+        path to a config file suitable for the `mev-rs` toolkit
+      '';
+    };
+    additional-features = mkOption {
+      type = listOf str;
+      default = [ ];
+      description = ''
+        additional Cargo features to include
+      '';
+    };
+    systemd-after-service = mkOption {
+      type = str;
+      default = "vc.service";
+      description = ''
+        the systemd unit will be configured to launch after the name of the service provided here
+      '';
+    };
+    boost = {
+      enable = mkEnableOption "enable `mev-boost-rs`";
+      config-file = mkOption {
+        type = str;
+        default = cfg.config-file;
+        description = ''
+          override the `mev-rs` config for this component
+        '';
+      };
+      features = mkOption {
+        type = str;
+        default = strings.concatStringsSep "," ([ "boost" ] ++ cfg.additional-features);
+        description = ''
+          feature set (comma-separated) to enable for `cargo` build
+        '';
+      };
+    };
+    relay = {
+      enable = mkEnableOption "enable `mev-relay-rs`";
+      config-file = mkOption {
+        type = str;
+        default = cfg.config-file;
+        description = ''
+          override the `mev-rs` config for this component
+        '';
+      };
+      port = mkOption {
+        type = port;
+        default = 28545;
+        description = "port to expose for the API server";
+      };
+      features = mkOption {
+        type = str;
+        default = strings.concatStringsSep "," ([ "relay" ] ++ cfg.additional-features);
+        description = ''
+          feature set (comma-separated) to enable for `cargo` build
+        '';
+      };
+    };
+    build = {
+      enable = mkEnableOption "enable `mev-build-rs`";
+      config-file = mkOption {
+        type = str;
+        default = cfg.config-file;
+        description = ''
+          override the `mev-rs` config for this component
+        '';
+      };
+      jwt-secret = mkOption {
+        type = str;
+        description = ''
+          path to the JWT secret used for the Engine API
+        '';
+      };
+      network = mkOption {
+        type = str;
+        description = ''
+          ethereum network the builder targets
+        '';
+      };
+      features = mkOption {
+        type = str;
+        default = strings.concatStringsSep "," ([ "build" ] ++ cfg.additional-features);
+        description = ''
+          feature set (comma-separated) to enable for `cargo` build
+        '';
+      };
+    };
   };
 
-  mev-rs-submodule = for-component: { config, ... }: with lib; with types;
-    let
-      features = strings.concatStringsSep "," [ for-component ] ++ config.additional-features;
-      mev-rs = mev-rs-with-features features;
-      name = "mev-${for-component}-rs";
-      cmd = ''
-        ${mev-rs}/bin/mev \
-        ${for-component} \
-        ${config.config-file}
-      '';
-    in
-    {
-      options = {
-        component = mkOption {
-          type = enum [ "boost" "relay" "build" ];
-          default = for-component;
-        };
-        config-file = mkOption {
-          type = str;
-          description = ''
-            path to a config file suitable for the `mev-rs` toolkit
-          '';
-        };
-        additional-features = mkOption {
-          type = listOf str;
-          description = ''
-            additional Cargo features to include alongside those required for the `component`
-          '';
-        };
-        after-systemd-service = mkOption {
-          type = str;
-          default = "vc.service";
-          description = ''
-            the name of a systemd service to wait activation of before activating this unit
-          '';
-        };
-      };
-      config = {
-        environment.systemPackages = [
-          mev-rs
-        ];
-        networking.firewall = lib.mkIf (for-component == "build") {
-          allowedTCPPorts = [ 30303 ];
-          allowedUDPPorts = [ 30303 ];
-        };
+  config = with lib; {
+    networking.firewall = mkMerge [
+      (mkIf cfg.build.enable { allowedTCPPorts = [ 30303 ]; allowedUDPPorts = [ 30303 ]; })
+      (mkIf cfg.relay.enable { allowedTCPPorts = [ cfg.relay.port ]; })
+    ];
 
-        systemd.services."${name}" = {
+    environment.systemPackages =
+      let
+        mev-rs = mev-rs-for-features { };
+      in
+      mkIf any-components-enabled [
+        mev-rs
+      ];
+
+    systemd.services = {
+      mev-boost-rs =
+        let
+          component = "boost";
+          name = "mev-${component}-rs";
+          mev-rs = mev-rs-for-features { features = cfg.boost.features; };
+          cmd = ''
+            ${mev-rs}/bin/mev \
+            ${component} \
+            ${cfg.boost.config-file}
+          '';
+        in
+        mkIf cfg.boost.enable {
           description = name;
           wantedBy = [ "multi-user.target" ];
-          after = [ config.after-systemd-service ];
+          after = [ cfg.systemd-after-service ];
           serviceConfig = {
             ExecStart = cmd;
             Restart = "on-failure";
             RestartSec = "10s";
-            SyslogIdentifier = for-component;
+            SyslogIdentifier = "boost";
           };
         };
-      };
+      mev-relay-rs =
+        let
+          component = "relay";
+          name = "mev-${component}-rs";
+          mev-rs = mev-rs-for-features { features = cfg.relay.features; };
+          cmd = ''
+            ${mev-rs}/bin/mev \
+            ${component} \
+            ${cfg.relay.config-file}
+          '';
+        in
+        mkIf cfg.relay.enable {
+          description = name;
+          wantedBy = [ "multi-user.target" ];
+          after = [ cfg.systemd-after-service ];
+          serviceConfig = {
+            ExecStart = cmd;
+            Restart = "on-failure";
+            RestartSec = "10s";
+            SyslogIdentifier = "relay";
+          };
+        };
+      mev-build-rs =
+        let
+          component = "build";
+          name = "mev-${component}-rs";
+          mev-rs = mev-rs-for-features { features = cfg.build.features; };
+          cmd = build-cmd mev-rs cfg.build;
+        in
+        mkIf cfg.build.enable {
+          description = name;
+          wantedBy = [ "multi-user.target" ];
+          after = [ cfg.systemd-after-service ];
+          serviceConfig = {
+            ExecStart = cmd;
+            Restart = "on-failure";
+            RestartSec = "10s";
+            SyslogIdentifier = "builder";
+          };
+        };
     };
-in
-{
-  options.services.mev-rs = with lib; with types; mkOption {
-    type = listOf (submodule {
-      options.boost = mkOption {
-        type = attrsOf (submodule mev-rs-submodule "boost");
-      };
-      options.relay = mkOption {
-        type = attrsOf (submodule mev-rs-submodule "relay");
-      };
-      options.build = mkOption {
-        type = attrsOf (submodule mev-rs-submodule "build");
-      };
-    });
   };
 }
