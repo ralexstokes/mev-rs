@@ -1,9 +1,14 @@
-# NOTE: currently doesn't do what we want...
 {
   services.mev-rs = {
+    config-file = "example.config.toml";
+    additional-features = [ "config" ];
     build = {
-      config-file = "example.config.toml";
-      additional-features = [ "config" ];
+      enable = true;
+      jwt-secret = "some-path";
+      network = "sepolia";
+    };
+    relay = {
+      enable = true;
     };
   };
 
