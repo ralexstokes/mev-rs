@@ -10,7 +10,7 @@ use ethereum_consensus::{
 };
 use std::fmt;
 
-#[derive(Debug, Clone, Merkleized)]
+#[derive(Debug, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BuilderBid {
     pub header: ExecutionPayloadHeader,
@@ -30,7 +30,7 @@ impl BuilderBid {
     }
 }
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, SimpleSerialize, serde::Serialize, serde::Deserialize)]
 pub struct SignedBuilderBid {
     pub message: BuilderBid,
     pub signature: BlsSignature,
