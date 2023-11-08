@@ -14,14 +14,15 @@ use ethers::{
 };
 use reth_interfaces::RethError;
 use reth_primitives::{
-    constants::{BEACON_NONCE, EMPTY_OMMER_ROOT},
-    proofs, Address, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, Receipts,
+    constants::{BEACON_NONCE, EMPTY_OMMER_ROOT_HASH},
+    proofs,
+    revm::{compat::into_reth_log, env::tx_env_with_recovered},
+    Address, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, Receipts,
     TransactionSigned, TransactionSignedEcRecovered, Withdrawal, B256, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProvider, StateProviderFactory};
 use reth_revm::{
-    database::StateProviderDatabase, env::tx_env_with_recovered, into_reth_log,
-    state_change::post_block_withdrawals_balance_increments,
+    database::StateProviderDatabase, state_change::post_block_withdrawals_balance_increments,
 };
 use revm::{
     db::{states::bundle_state::BundleRetention, WrapDatabaseRef},
@@ -123,7 +124,7 @@ fn assemble_payload_with_payments(
 
     let header = Header {
         parent_hash: context.build.parent_hash,
-        ommers_hash: EMPTY_OMMER_ROOT,
+        ommers_hash: EMPTY_OMMER_ROOT_HASH,
         beneficiary: context.build.block_env.coinbase,
         state_root,
         transactions_root,
@@ -277,7 +278,8 @@ impl<'a> ExecutionContext<'a> {
         self.receipts.push(Some(receipt));
 
         let base_fee = self.build.base_fee();
-        let fee = tx.effective_tip_per_gas(base_fee).expect("fee is valid; execution succeeded");
+        let fee =
+            tx.effective_tip_per_gas(Some(base_fee)).expect("fee is valid; execution succeeded");
         self.total_fees += U256::from(fee) * U256::from(gas_used);
 
         self.executed_txs.push(tx.into_signed());
