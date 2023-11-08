@@ -753,7 +753,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=6338befe3db58b74a40376ebd4330843e3c3844a#6338befe3db58b74a40376ebd4330843e3c3844a"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=b9baee3f3b9fc76bd9b5bc22b78edc05446af815#b9baee3f3b9fc76bd9b5bc22b78edc05446af815"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -1191,6 +1191,21 @@ name = "c-kzg"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac926d808fb72fe09ebf471a091d6d72918876ccf0b4989766093d2d0d24a0ef"
+dependencies = [
+ "bindgen 0.66.1",
+ "blst",
+ "cc",
+ "glob",
+ "hex",
+ "libc",
+ "serde",
+]
+
+[[package]]
+name = "c-kzg"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32700dc7904064bb64e857d38a1766607372928e2466ee5f02a869829b3297d7"
 dependencies = [
  "bindgen 0.66.1",
  "blst",
@@ -2426,12 +2441,12 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=6338befe3db58b74a40376ebd4330843e3c3844a#6338befe3db58b74a40376ebd4330843e3c3844a"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=b9baee3f3b9fc76bd9b5bc22b78edc05446af815#b9baee3f3b9fc76bd9b5bc22b78edc05446af815"
 dependencies = [
  "async-stream",
  "blst",
  "bs58 0.4.0",
- "c-kzg",
+ "c-kzg 0.4.0",
  "enr 0.6.2",
  "hex",
  "integer-sqrt",
@@ -6384,7 +6399,7 @@ dependencies = [
  "arbitrary",
  "byteorder",
  "bytes",
- "c-kzg",
+ "c-kzg 0.1.1",
  "clap",
  "crc",
  "derive_more",
@@ -6780,7 +6795,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d360a88223d85709d2e95d4609eb1e19c649c47e28954bfabae5e92bb37e83e"
 dependencies = [
- "c-kzg",
+ "c-kzg 0.1.1",
  "k256 0.13.1",
  "num",
  "once_cell",
@@ -6801,7 +6816,7 @@ dependencies = [
  "auto_impl",
  "bitflags 2.4.1",
  "bitvec",
- "c-kzg",
+ "c-kzg 0.1.1",
  "enumn",
  "hashbrown 0.14.2",
  "hex",
@@ -7683,11 +7698,11 @@ checksum = "3b9b39299b249ad65f3b7e96443bad61c02ca5cd3589f46cb6d610a0fd6c0d6a"
 [[package]]
 name = "ssz_rs"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=6755022b7727e3392bfbc2b9c683cb7bf9caa4ce#6755022b7727e3392bfbc2b9c683cb7bf9caa4ce"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=db3bca54b23522df224b1d7d4ac3c3b805a49e84#db3bca54b23522df224b1d7d4ac3c3b805a49e84"
 dependencies = [
+ "alloy-primitives",
  "bitvec",
  "hex",
- "num-bigint",
  "serde",
  "sha2 0.9.9",
  "ssz_rs_derive",
@@ -7696,7 +7711,7 @@ dependencies = [
 [[package]]
 name = "ssz_rs_derive"
 version = "0.9.0"
-source = "git+https://github.com/ralexstokes/ssz-rs?rev=6755022b7727e3392bfbc2b9c683cb7bf9caa4ce#6755022b7727e3392bfbc2b9c683cb7bf9caa4ce"
+source = "git+https://github.com/ralexstokes/ssz-rs?rev=db3bca54b23522df224b1d7d4ac3c3b805a49e84#db3bca54b23522df224b1d7d4ac3c3b805a49e84"
 dependencies = [
  "proc-macro2",
  "quote",

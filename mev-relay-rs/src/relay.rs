@@ -416,8 +416,7 @@ impl Relay {
             }
         }
         let header = to_header(&mut execution_payload)?;
-        let mut bid =
-            BuilderBid { header, value: value.clone(), public_key: self.public_key.clone() };
+        let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 
@@ -572,7 +571,7 @@ impl BlindedBlockRelayer for Relay {
                 &signed_submission.execution_payload,
             )?;
             debug!(%auction_request, "validated builder submission");
-            (auction_request, bid_trace.value.clone(), bid_trace.builder_public_key.clone())
+            (auction_request, bid_trace.value, bid_trace.builder_public_key.clone())
         };
 
         signed_submission.verify_signature(&self.context)?;

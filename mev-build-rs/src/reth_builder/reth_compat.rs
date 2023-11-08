@@ -22,7 +22,7 @@ fn to_byte_vector(value: Bloom) -> ByteVector<256> {
 }
 
 pub(crate) fn to_u256(value: &U256) -> ssz_rs::U256 {
-    ssz_rs::U256::try_from_bytes_le(&value.to_le_bytes::<32>()).unwrap()
+    *value
 }
 
 pub(crate) fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {

@@ -53,7 +53,7 @@ fn validate_bid(
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
 fn select_best_bids(bids: impl Iterator<Item = (usize, U256)>) -> Vec<usize> {
     let (best_indices, _value) =
-        bids.fold((vec![], U256::zero()), |(mut best_indices, max), (index, value)| {
+        bids.fold((vec![], U256::ZERO), |(mut best_indices, max), (index, value)| {
             match value.cmp(&max) {
                 Ordering::Greater => (vec![index], value),
                 Ordering::Equal => {
@@ -200,7 +200,7 @@ impl BlindedBlockProvider for RelayMux {
 
         // TODO: change `value` so it does the copy internally
         let mut best_bid_indices =
-            select_best_bids(bids.iter().map(|(_, bid)| bid.message.value.clone()).enumerate());
+            select_best_bids(bids.iter().map(|(_, bid)| bid.message.value).enumerate());
 
         // if multiple distinct bids with same bid value, break tie by randomly picking one
         let mut rng = rand::thread_rng();

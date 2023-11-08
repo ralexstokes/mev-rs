@@ -28,7 +28,7 @@ pub struct BidTrace {
     pub value: U256,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SignedBidSubmission {
     pub message: BidTrace,
