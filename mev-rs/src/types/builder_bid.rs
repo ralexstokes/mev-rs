@@ -3,6 +3,7 @@ use crate::{
     types::ExecutionPayloadHeader,
 };
 use ethereum_consensus::{
+    deneb::{mainnet::MAX_BLOB_COMMITMENTS_PER_BLOCK, polynomial_commitments::KzgCommitment},
     primitives::{BlsPublicKey, BlsSignature, U256},
     ssz::prelude::*,
     state_transition::Context,
@@ -10,10 +11,12 @@ use ethereum_consensus::{
 };
 use std::fmt;
 
-#[derive(Debug, Clone, SimpleSerialize)]
+#[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BuilderBid {
     pub header: ExecutionPayloadHeader,
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub blob_kzg_commitments: Option<List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>>,
     #[serde(with = "crate::serde::as_str")]
     pub value: U256,
     #[serde(rename = "pubkey")]
@@ -100,6 +103,7 @@ mod tests {
         let public_key = key.public_key();
         let mut builder_bid = BuilderBid {
             header: ExecutionPayloadHeader::Deneb(Default::default()),
+            blob_kzg_commitments: Some(Default::default()),
             value: U256::from(234234),
             public_key,
         };
@@ -115,5 +119,36 @@ mod tests {
             serde_json::from_str(SIGNED_BUILDER_BID_JSON.trim()).unwrap();
         let context = Context::for_sepolia();
         signed_builder_bid.verify_signature(&context).expect("is valid signature");
+    }
+
+    #[test]
+    fn test_polymorphic_builder_bid() {
+        let mut rng = thread_rng();
+        let key = SecretKey::random(&mut rng).unwrap();
+        let public_key = key.public_key();
+
+        let pre_deneb_bid = BuilderBid {
+            header: ExecutionPayloadHeader::Capella(Default::default()),
+            blob_kzg_commitments: None,
+            value: U256::from(234),
+            public_key: public_key.clone(),
+        };
+        let pre_deneb_str = serde_json::to_string_pretty(&pre_deneb_bid).unwrap();
+        let pre_deneb_recovered: BuilderBid = serde_json::from_str(&pre_deneb_str).unwrap();
+        assert_eq!(pre_deneb_bid, pre_deneb_recovered);
+
+        let mut commitments = List::<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>::default();
+        commitments.push(Default::default());
+        commitments.push(Default::default());
+        commitments.push(Default::default());
+        let deneb_bid = BuilderBid {
+            header: ExecutionPayloadHeader::Deneb(Default::default()),
+            blob_kzg_commitments: Some(commitments),
+            value: U256::from(567),
+            public_key,
+        };
+        let deneb_str = serde_json::to_string_pretty(&deneb_bid).unwrap();
+        let deneb_recovered: BuilderBid = serde_json::from_str(&deneb_str).unwrap();
+        assert_eq!(deneb_bid, deneb_recovered);
     }
 }

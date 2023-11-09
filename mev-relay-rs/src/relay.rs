@@ -416,7 +416,12 @@ impl Relay {
             }
         }
         let header = to_header(&mut execution_payload)?;
-        let mut bid = BuilderBid { header, value, public_key: self.public_key.clone() };
+        let mut bid = BuilderBid {
+            header,
+            blob_kzg_commitments: None,
+            value,
+            public_key: self.public_key.clone(),
+        };
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 

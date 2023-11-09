@@ -11,6 +11,7 @@ mod tests {
         let signed_bid = SignedBuilderBid {
             message: BuilderBid {
                 header: ExecutionPayloadHeader::Deneb(Default::default()),
+                blob_kzg_commitments: None,
                 value: U256::from(234),
                 public_key: Default::default(),
             },

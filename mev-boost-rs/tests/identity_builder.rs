@@ -85,7 +85,12 @@ impl BlindedBlockProvider for IdentityBuilder {
             (ExecutionPayload::Capella(payload), header)
         };
 
-        let mut builder_bid = BuilderBid { header, value, public_key: self.public_key.clone() };
+        let mut builder_bid = BuilderBid {
+            header,
+            blob_kzg_commitments: None,
+            value,
+            public_key: self.public_key.clone(),
+        };
         let signature =
             sign_builder_message(&mut builder_bid, &self.signing_key, &self.context).unwrap();
         let signed_builder_bid = SignedBuilderBid { message: builder_bid, signature };
