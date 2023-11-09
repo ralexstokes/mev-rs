@@ -25,6 +25,7 @@ pub struct BidTrace {
     pub gas_limit: u64,
     #[serde(with = "crate::serde::as_str")]
     pub gas_used: u64,
+    #[serde(with = "crate::serde::as_str")]
     pub value: U256,
 }
 
