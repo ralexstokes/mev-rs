@@ -6,13 +6,14 @@ use ethereum_consensus::{
     crypto::SecretKey,
     primitives::{BlsPublicKey, Slot, U256},
     state_transition::Context,
+    Fork,
 };
 use mev_rs::{
     blinded_block_provider::BlindedBlockProvider,
     signing::sign_builder_message,
     types::{
-        AuctionContents, AuctionRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
-        SignedBlindedBeaconBlock, SignedBuilderBid,
+        builder_bid, AuctionContents, AuctionRequest, BuilderBid, ExecutionPayload,
+        ExecutionPayloadHeader, SignedBlindedBeaconBlock, SignedBuilderBid,
     },
     Error,
 };
@@ -61,7 +62,7 @@ impl BlindedBlockProvider for IdentityBuilder {
         let state = self.registrations.lock().unwrap();
         let preferences = state.get(public_key).unwrap();
         let value = U256::from(1337);
-        let (payload, header) = if *slot < capella_fork_slot {
+        let (payload, mut builder_bid) = if *slot < capella_fork_slot {
             let mut payload = bellatrix::ExecutionPayload {
                 parent_hash: parent_hash.clone(),
                 fee_recipient: preferences.fee_recipient.clone(),
@@ -71,7 +72,12 @@ impl BlindedBlockProvider for IdentityBuilder {
             let header = ExecutionPayloadHeader::Bellatrix(
                 bellatrix::ExecutionPayloadHeader::try_from(&mut payload).unwrap(),
             );
-            (ExecutionPayload::Bellatrix(payload), header)
+            let builder_bid = BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
+                header,
+                value,
+                public_key: self.public_key.clone(),
+            });
+            (ExecutionPayload::Bellatrix(payload), builder_bid)
         } else {
             let mut payload = capella::ExecutionPayload {
                 parent_hash: parent_hash.clone(),
@@ -82,15 +88,14 @@ impl BlindedBlockProvider for IdentityBuilder {
             let header = ExecutionPayloadHeader::Capella(
                 capella::ExecutionPayloadHeader::try_from(&mut payload).unwrap(),
             );
-            (ExecutionPayload::Capella(payload), header)
+            let builder_bid = BuilderBid::Capella(builder_bid::capella::BuilderBid {
+                header,
+                value,
+                public_key: self.public_key.clone(),
+            });
+            (ExecutionPayload::Capella(payload), builder_bid)
         };
 
-        let mut builder_bid = BuilderBid {
-            header,
-            blob_kzg_commitments: None,
-            value,
-            public_key: self.public_key.clone(),
-        };
         let signature =
             sign_builder_message(&mut builder_bid, &self.signing_key, &self.context).unwrap();
         let signed_builder_bid = SignedBuilderBid { message: builder_bid, signature };
@@ -106,6 +111,12 @@ impl BlindedBlockProvider for IdentityBuilder {
         let slot = signed_block.message().slot();
         let state = self.bids.lock().unwrap();
         let execution_payload = state.get(&slot).cloned().unwrap();
-        Ok(AuctionContents { execution_payload, blobs_bundle: None })
+        let auction_contents = match signed_block.message().version() {
+            Fork::Bellatrix => AuctionContents::Bellatrix(execution_payload),
+            Fork::Capella => AuctionContents::Capella(execution_payload),
+            Fork::Deneb => unimplemented!(),
+            _ => unreachable!("fork not reachable from this type"),
+        };
+        Ok(auction_contents)
     }
 }

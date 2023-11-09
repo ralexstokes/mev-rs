@@ -17,7 +17,7 @@ use ethereum_consensus::{
 use mev_rs::{
     signing::sign_builder_message,
     types::{
-        AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
+        builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
         ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
         SignedBuilderBid, SignedValidatorRegistration,
     },
@@ -416,11 +416,19 @@ impl Relay {
             }
         }
         let header = to_header(&mut execution_payload)?;
-        let mut bid = BuilderBid {
-            header,
-            blob_kzg_commitments: None,
-            value,
-            public_key: self.public_key.clone(),
+        let mut bid = match header.version() {
+            Fork::Bellatrix => BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
+                header,
+                value,
+                public_key: self.public_key.clone(),
+            }),
+            Fork::Capella => BuilderBid::Capella(builder_bid::capella::BuilderBid {
+                header,
+                value,
+                public_key: self.public_key.clone(),
+            }),
+            Fork::Deneb => unimplemented!(),
+            _ => unreachable!("this fork is not reachable from this type"),
         };
         let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
@@ -511,7 +519,7 @@ impl BlindedBlockProvider for Relay {
             let block = signed_block.message();
             let body = block.body();
             let execution_payload_header = body.execution_payload_header();
-            let local_header = &auction_context.signed_builder_bid.message.header;
+            let local_header = auction_context.signed_builder_bid.message.header();
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
                 return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
@@ -538,10 +546,13 @@ impl BlindedBlockProvider for Relay {
                     let local_payload = &auction_context.execution_payload;
                     let block_hash = local_payload.block_hash();
                     info!(%auction_request, %block_root, %block_hash, "returning local payload");
-                    Ok(AuctionContents {
-                        execution_payload: local_payload.clone(),
-                        blobs_bundle: None,
-                    })
+                    let auction_contents = match local_payload.version() {
+                        Fork::Bellatrix => AuctionContents::Bellatrix(local_payload.clone()),
+                        Fork::Capella => AuctionContents::Capella(local_payload.clone()),
+                        Fork::Deneb => unimplemented!(),
+                        _ => unreachable!("fork not reachable from type"),
+                    };
+                    Ok(auction_contents)
                 }
             }
             Err(err) => {

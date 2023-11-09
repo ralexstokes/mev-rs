@@ -1,7 +1,7 @@
 use crate::{
     types::{
-        AuctionContents, AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock,
-        SignedBuilderBid, SignedValidatorRegistration,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
     },
     Error,
 };
@@ -10,7 +10,6 @@ use beacon_api_client::{
     api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
     VersionedValue, ETH_CONSENSUS_VERSION_HEADER,
 };
-use ethereum_consensus::Fork;
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
@@ -81,26 +80,12 @@ impl Client {
             .map_err(beacon_api_client::Error::Http)?;
 
         let result = response
-            .json::<ApiResult<VersionedValue<serde_json::Value>>>()
+            .json::<ApiResult<VersionedValue<AuctionContents>>>()
             .await
             .map_err(beacon_api_client::Error::Http)?;
         match result {
-            ApiResult::Ok(result) => parse_auction_contents(result.version, result.data),
+            ApiResult::Ok(result) => Ok(result.data),
             ApiResult::Err(err) => Err(ApiError::from(err).into()),
-        }
-    }
-}
-
-fn parse_auction_contents(
-    version: Fork,
-    data: serde_json::Value,
-) -> Result<AuctionContents, Error> {
-    match version {
-        Fork::Deneb => Ok(serde_json::from_value(data).map_err(beacon_api_client::Error::from)?),
-        _ => {
-            let execution_payload: ExecutionPayload =
-                serde_json::from_value(data).map_err(beacon_api_client::Error::from)?;
-            Ok(AuctionContents { execution_payload, blobs_bundle: None })
         }
     }
 }
