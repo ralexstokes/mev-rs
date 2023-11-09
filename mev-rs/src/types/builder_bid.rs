@@ -3,24 +3,125 @@ use crate::{
     types::ExecutionPayloadHeader,
 };
 use ethereum_consensus::{
-    primitives::{BlsPublicKey, BlsSignature, U256},
+    deneb::{mainnet::MAX_BLOB_COMMITMENTS_PER_BLOCK, polynomial_commitments::KzgCommitment},
+    primitives::{BlsPublicKey, BlsSignature},
     ssz::prelude::*,
     state_transition::Context,
     Error, Fork,
 };
 use std::fmt;
 
-#[derive(Debug, Clone, SimpleSerialize)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct BuilderBid {
-    pub header: ExecutionPayloadHeader,
-    #[serde(with = "crate::serde::as_str")]
-    pub value: U256,
-    #[serde(rename = "pubkey")]
-    pub public_key: BlsPublicKey,
+pub mod bellatrix {
+    use super::ExecutionPayloadHeader;
+    use ethereum_consensus::{
+        primitives::{BlsPublicKey, U256},
+        ssz::prelude::*,
+    };
+    #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct BuilderBid {
+        pub header: ExecutionPayloadHeader,
+        #[serde(with = "crate::serde::as_str")]
+        pub value: U256,
+        #[serde(rename = "pubkey")]
+        pub public_key: BlsPublicKey,
+    }
+}
+
+pub mod capella {
+    pub use super::bellatrix::*;
+}
+
+pub mod deneb {
+    use super::{KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK};
+    use crate::types::ExecutionPayloadHeader;
+    use ethereum_consensus::{
+        primitives::{BlsPublicKey, U256},
+        ssz::prelude::*,
+    };
+    #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct BuilderBid {
+        pub header: ExecutionPayloadHeader,
+        pub blob_kzg_commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+        #[serde(with = "crate::serde::as_str")]
+        pub value: U256,
+        #[serde(rename = "pubkey")]
+        pub public_key: BlsPublicKey,
+    }
+}
+
+#[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
+#[serde(untagged)]
+#[ssz(transparent)]
+pub enum BuilderBid {
+    Bellatrix(bellatrix::BuilderBid),
+    Capella(capella::BuilderBid),
+    Deneb(deneb::BuilderBid),
+}
+
+impl<'de> serde::Deserialize<'de> for BuilderBid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Deneb(inner))
+        }
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Capella(inner))
+        }
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Bellatrix(inner))
+        }
+        Err(serde::de::Error::custom("no variant could be deserialized from input"))
+    }
 }
 
 impl BuilderBid {
+    pub fn version(&self) -> Fork {
+        match self {
+            Self::Bellatrix(..) => Fork::Bellatrix,
+            Self::Capella(..) => Fork::Capella,
+            Self::Deneb(..) => Fork::Deneb,
+        }
+    }
+
+    pub fn header(&self) -> &ExecutionPayloadHeader {
+        match self {
+            Self::Bellatrix(inner) => &inner.header,
+            Self::Capella(inner) => &inner.header,
+            Self::Deneb(inner) => &inner.header,
+        }
+    }
+
+    pub fn blob_kzg_commitments(
+        &self,
+    ) -> Option<&List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>> {
+        match self {
+            Self::Deneb(inner) => Some(&inner.blob_kzg_commitments),
+            _ => None,
+        }
+    }
+
+    pub fn value(&self) -> U256 {
+        match self {
+            Self::Bellatrix(inner) => inner.value,
+            Self::Capella(inner) => inner.value,
+            Self::Deneb(inner) => inner.value,
+        }
+    }
+
+    pub fn public_key(&self) -> &BlsPublicKey {
+        match self {
+            Self::Bellatrix(inner) => &inner.public_key,
+            Self::Capella(inner) => &inner.public_key,
+            Self::Deneb(inner) => &inner.public_key,
+        }
+    }
+
     pub fn sign(
         mut self,
         secret_key: &SecretKey,
@@ -39,14 +140,14 @@ pub struct SignedBuilderBid {
 
 impl SignedBuilderBid {
     pub fn version(&self) -> Fork {
-        self.message.header.version()
+        self.message.version()
     }
 }
 
 impl fmt::Display for SignedBuilderBid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let block_hash = self.message.header.block_hash();
-        let value = &self.message.value;
+        let block_hash = self.message.header().block_hash();
+        let value = self.message.value();
         write!(f, "block hash {block_hash} and value {value:?}")
     }
 }
@@ -54,7 +155,7 @@ impl fmt::Display for SignedBuilderBid {
 impl SignedBuilderBid {
     pub fn verify_signature(&mut self, context: &Context) -> Result<(), Error> {
         let signing_root = compute_builder_signing_root(&mut self.message, context)?;
-        let public_key = &self.message.public_key;
+        let public_key = self.message.public_key();
         verify_signature(public_key, signing_root.as_ref(), &self.signature)
     }
 }
@@ -98,14 +199,15 @@ mod tests {
         let mut rng = thread_rng();
         let key = SecretKey::random(&mut rng).unwrap();
         let public_key = key.public_key();
-        let mut builder_bid = BuilderBid {
-            header: ExecutionPayloadHeader::Deneb(Default::default()),
+        let mut builder_bid = capella::BuilderBid {
+            header: ExecutionPayloadHeader::Capella(Default::default()),
             value: U256::from(234234),
             public_key,
         };
         let context = Context::for_holesky();
         let signature = sign_builder_message(&mut builder_bid, &key, &context).unwrap();
-        let mut signed_builder_bid = SignedBuilderBid { message: builder_bid, signature };
+        let mut signed_builder_bid =
+            SignedBuilderBid { message: BuilderBid::Capella(builder_bid), signature };
         signed_builder_bid.verify_signature(&context).expect("is valid signature");
     }
 

@@ -1,14 +1,14 @@
 use crate::{
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
     Error,
 };
-use axum::http::StatusCode;
+use axum::http::{Method, StatusCode};
 use beacon_api_client::{
     api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
-    VersionedValue,
+    VersionedValue, ETH_CONSENSUS_VERSION_HEADER,
 };
 
 /// A `Client` for a service implementing the Builder APIs.
@@ -63,11 +63,26 @@ impl Client {
     pub async fn open_bid(
         &self,
         signed_block: &SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
-        let response = self.api.http_post("/eth/v1/builder/blinded_blocks", signed_block).await?;
+    ) -> Result<AuctionContents, Error> {
+        let endpoint = self
+            .api
+            .endpoint
+            .join("/eth/v1/builder/blinded_blocks")
+            .map_err(beacon_api_client::Error::Url)?;
+        let response = self
+            .api
+            .http
+            .request(Method::POST, endpoint)
+            .header(ETH_CONSENSUS_VERSION_HEADER, signed_block.version().to_string())
+            .json(signed_block)
+            .send()
+            .await
+            .map_err(beacon_api_client::Error::Http)?;
 
-        let result: ApiResult<VersionedValue<ExecutionPayload>> =
-            response.json().await.map_err(beacon_api_client::Error::Http)?;
+        let result = response
+            .json::<ApiResult<VersionedValue<AuctionContents>>>()
+            .await
+            .map_err(beacon_api_client::Error::Http)?;
         match result {
             ApiResult::Ok(result) => Ok(result.data),
             ApiResult::Err(err) => Err(ApiError::from(err).into()),

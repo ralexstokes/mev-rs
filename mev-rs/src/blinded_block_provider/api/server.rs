@@ -2,7 +2,7 @@ use crate::{
     blinded_block_provider::BlindedBlockProvider,
     error::Error,
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
 };
@@ -48,13 +48,14 @@ pub(crate) async fn handle_fetch_bid<B: BlindedBlockProvider>(
 pub(crate) async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
     Json(mut block): Json<SignedBlindedBeaconBlock>,
-) -> Result<Json<VersionedValue<ExecutionPayload>>, Error> {
-    let payload = builder.open_bid(&mut block).await?;
+) -> Result<Json<VersionedValue<AuctionContents>>, Error> {
+    let auction_contents = builder.open_bid(&mut block).await?;
+    let payload = auction_contents.execution_payload();
     let block_hash = payload.block_hash();
     let slot = block.message().slot();
     trace!(%slot, %block_hash, "returning payload");
     let version = payload.version();
-    let response = VersionedValue { version, data: payload, meta: Default::default() };
+    let response = VersionedValue { version, data: auction_contents, meta: Default::default() };
     Ok(Json(response))
 }
 

@@ -7,7 +7,7 @@ pub use {api::client::Client, api::server::Server};
 use crate::{
     error::Error,
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
 };
@@ -28,5 +28,5 @@ pub trait BlindedBlockProvider {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error>;
+    ) -> Result<AuctionContents, Error>;
 }

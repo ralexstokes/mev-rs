@@ -151,12 +151,12 @@ async fn propose_block(
         public_key: proposer.validator.public_key.clone(),
     };
     let signed_bid = beacon_node.fetch_best_bid(&request).await.unwrap();
-    let bid_parent_hash = signed_bid.message.header.parent_hash();
+    let bid_parent_hash = signed_bid.message.header().parent_hash();
     assert_eq!(bid_parent_hash, &parent_hash);
 
     let signed_block = match fork {
         Fork::Bellatrix => {
-            let header = signed_bid.message.header.bellatrix().unwrap().clone();
+            let header = signed_bid.message.header().bellatrix().unwrap().clone();
             let beacon_block_body = bellatrix::BlindedBeaconBlockBody {
                 execution_payload_header: header,
                 ..Default::default()
@@ -182,7 +182,7 @@ async fn propose_block(
             SignedBlindedBeaconBlock::Bellatrix(signed_block)
         }
         Fork::Capella => {
-            let header = signed_bid.message.header.capella().unwrap().clone();
+            let header = signed_bid.message.header().capella().unwrap().clone();
             let beacon_block_body = capella::BlindedBeaconBlockBody {
                 execution_payload_header: header,
                 ..Default::default()
@@ -212,7 +212,8 @@ async fn propose_block(
 
     beacon_node.check_status().await.unwrap();
 
-    let payload = beacon_node.open_bid(&signed_block).await.unwrap();
+    let auction_contents = beacon_node.open_bid(&signed_block).await.unwrap();
+    let payload = auction_contents.execution_payload();
 
     let payload_parent_hash = payload.parent_hash();
     assert_eq!(payload_parent_hash, &parent_hash);

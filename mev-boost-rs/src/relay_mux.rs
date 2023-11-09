@@ -7,7 +7,7 @@ use futures::{stream, StreamExt};
 use mev_rs::{
     relay::Relay,
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
     BlindedBlockProvider, BoostError, Error,
@@ -39,7 +39,7 @@ fn validate_bid(
     public_key: &BlsPublicKey,
     context: &Context,
 ) -> Result<(), Error> {
-    let bid_public_key = &bid.message.public_key;
+    let bid_public_key = bid.message.public_key();
     if bid_public_key != public_key {
         return Err(BoostError::BidPublicKeyMismatch {
             bid: bid_public_key.clone(),
@@ -200,7 +200,7 @@ impl BlindedBlockProvider for RelayMux {
 
         // TODO: change `value` so it does the copy internally
         let mut best_bid_indices =
-            select_best_bids(bids.iter().map(|(_, bid)| bid.message.value).enumerate());
+            select_best_bids(bids.iter().map(|(_, bid)| bid.message.value()).enumerate());
 
         // if multiple distinct bids with same bid value, break tie by randomly picking one
         let mut rng = rand::thread_rng();
@@ -210,12 +210,12 @@ impl BlindedBlockProvider for RelayMux {
             best_bid_indices.split_first().expect("there is at least one bid");
 
         let (best_relay, best_bid) = &bids[*best_bid_index];
-        let best_block_hash = best_bid.message.header.block_hash();
+        let best_block_hash = best_bid.message.header().block_hash();
 
         let mut best_relays = vec![best_relay.clone()];
         for bid_index in rest {
             let (relay, bid) = &bids[*bid_index];
-            if bid.message.header.block_hash() == best_block_hash {
+            if bid.message.header().block_hash() == best_block_hash {
                 best_relays.push(relay.clone());
             }
         }
@@ -241,7 +241,7 @@ impl BlindedBlockProvider for RelayMux {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<AuctionContents, Error> {
         let (auction_request, relays) = {
             let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
@@ -269,11 +269,11 @@ impl BlindedBlockProvider for RelayMux {
         let expected_block_hash = payload_header.block_hash();
         for (relay, response) in responses.into_iter() {
             match response {
-                Ok(payload) => {
-                    let block_hash = payload.block_hash();
+                Ok(auction_contents) => {
+                    let block_hash = auction_contents.execution_payload().block_hash();
                     if block_hash == expected_block_hash {
                         info!(%auction_request, %block_hash, %relay, "acquired payload");
-                        return Ok(payload)
+                        return Ok(auction_contents)
                     } else {
                         warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
                     }
