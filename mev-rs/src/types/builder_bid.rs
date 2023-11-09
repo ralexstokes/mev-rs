@@ -14,6 +14,7 @@ use std::fmt;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BuilderBid {
     pub header: ExecutionPayloadHeader,
+    #[serde(with = "crate::serde::as_str")]
     pub value: U256,
     #[serde(rename = "pubkey")]
     pub public_key: BlsPublicKey,
