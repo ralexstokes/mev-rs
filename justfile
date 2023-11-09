@@ -12,7 +12,7 @@ test:
 fmt:
     cargo +nightly fmt --all
 lint: fmt validate-example-config
-    cargo +nightly clippy # --all-targets --all-features --all
+    cargo +nightly clippy --all-targets --all-features --all
 build:
     cargo build --all-targets --all-features --all
 run-ci: lint build test
