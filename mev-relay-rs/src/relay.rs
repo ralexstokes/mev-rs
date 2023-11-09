@@ -17,9 +17,9 @@ use ethereum_consensus::{
 use mev_rs::{
     signing::sign_builder_message,
     types::{
-        AuctionRequest, BidTrace, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
-        ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock, SignedBuilderBid,
-        SignedValidatorRegistration,
+        AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
+        ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
+        SignedBuilderBid, SignedValidatorRegistration,
     },
     BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, RelayError,
     ValidatorRegistry,
@@ -486,7 +486,7 @@ impl BlindedBlockProvider for Relay {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<AuctionContents, Error> {
         let auction_request = {
             let block = signed_block.message();
             let slot = block.slot();
@@ -538,7 +538,10 @@ impl BlindedBlockProvider for Relay {
                     let local_payload = &auction_context.execution_payload;
                     let block_hash = local_payload.block_hash();
                     info!(%auction_request, %block_root, %block_hash, "returning local payload");
-                    Ok(local_payload.clone())
+                    Ok(AuctionContents {
+                        execution_payload: local_payload.clone(),
+                        blobs_bundle: None,
+                    })
                 }
             }
             Err(err) => {

@@ -1,8 +1,10 @@
+mod auction_contents;
 mod auction_request;
 mod block_submission;
 mod builder_bid;
 mod proposer_schedule;
 
+pub use auction_contents::*;
 pub use auction_request::*;
 pub use block_submission::*;
 pub use builder_bid::*;

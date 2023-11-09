@@ -11,7 +11,7 @@ use mev_rs::{
     blinded_block_provider::BlindedBlockProvider,
     signing::sign_builder_message,
     types::{
-        AuctionRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
+        AuctionContents, AuctionRequest, BuilderBid, ExecutionPayload, ExecutionPayloadHeader,
         SignedBlindedBeaconBlock, SignedBuilderBid,
     },
     Error,
@@ -102,9 +102,10 @@ impl BlindedBlockProvider for IdentityBuilder {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<AuctionContents, Error> {
         let slot = signed_block.message().slot();
         let state = self.bids.lock().unwrap();
-        Ok(state.get(&slot).cloned().unwrap())
+        let execution_payload = state.get(&slot).cloned().unwrap();
+        Ok(AuctionContents { execution_payload, blobs_bundle: None })
     }
 }

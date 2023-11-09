@@ -7,7 +7,7 @@ use futures::{stream, StreamExt};
 use mev_rs::{
     relay::Relay,
     types::{
-        AuctionRequest, ExecutionPayload, SignedBlindedBeaconBlock, SignedBuilderBid,
+        AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
     BlindedBlockProvider, BoostError, Error,
@@ -241,7 +241,7 @@ impl BlindedBlockProvider for RelayMux {
     async fn open_bid(
         &self,
         signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<ExecutionPayload, Error> {
+    ) -> Result<AuctionContents, Error> {
         let (auction_request, relays) = {
             let mut state = self.state.lock();
             let key = bid_key_from(signed_block, &state.latest_pubkey);
@@ -269,11 +269,11 @@ impl BlindedBlockProvider for RelayMux {
         let expected_block_hash = payload_header.block_hash();
         for (relay, response) in responses.into_iter() {
             match response {
-                Ok(payload) => {
-                    let block_hash = payload.block_hash();
+                Ok(auction_contents) => {
+                    let block_hash = auction_contents.execution_payload.block_hash();
                     if block_hash == expected_block_hash {
                         info!(%auction_request, %block_hash, %relay, "acquired payload");
-                        return Ok(payload)
+                        return Ok(auction_contents)
                     } else {
                         warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
                     }

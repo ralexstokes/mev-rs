@@ -212,7 +212,8 @@ async fn propose_block(
 
     beacon_node.check_status().await.unwrap();
 
-    let payload = beacon_node.open_bid(&signed_block).await.unwrap();
+    let auction_contents = beacon_node.open_bid(&signed_block).await.unwrap();
+    let payload = auction_contents.execution_payload;
 
     let payload_parent_hash = payload.parent_hash();
     assert_eq!(payload_parent_hash, &parent_hash);
