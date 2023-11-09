@@ -14,7 +14,7 @@ async fn main() {
 
     let url = Url::parse("https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net/").unwrap();
     let relay_endpoint = RelayEndpoint::try_from(url).unwrap();
-    let relay = Relay::try_from(relay_endpoint).unwrap();
+    let relay = Relay::from(relay_endpoint);
     let schedules = relay.get_proposal_schedule().await.unwrap();
     for schedule in schedules {
         if schedule.slot == slot {
