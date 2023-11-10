@@ -287,11 +287,14 @@ impl Relay {
             self.refresh_proposer_schedule(epoch).await;
         }
 
-        let retain_slot = slot - AUCTION_LIFETIME_SLOTS;
-        trace!(retain_slot, "dropping old auctions");
+        trace!(retain_slot = slot - AUCTION_LIFETIME_SLOTS, "dropping old auctions");
         let mut state = self.state.lock();
-        state.open_auctions.retain(|auction_request| auction_request.slot >= retain_slot);
-        state.auctions.retain(|auction_request, _| auction_request.slot >= retain_slot);
+        state
+            .open_auctions
+            .retain(|auction_request| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
+        state
+            .auctions
+            .retain(|auction_request, _| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
     }
 
     // TODO: build tip context and support reorgs...
