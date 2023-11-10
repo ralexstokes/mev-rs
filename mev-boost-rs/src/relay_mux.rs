@@ -255,9 +255,16 @@ impl BlindedBlockProvider for RelayMux {
 
         let signed_block = &signed_block;
         let responses = stream::iter(relays)
-            .map(|relay| async move {
-                let response = relay.open_bid(signed_block).await;
-                (relay, response)
+            .map(|relay| {
+                let signed_block = signed_block.clone(); 
+                async move {
+                    let response = tokio::time::timeout(
+                        Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
+                        relay.open_bid(&signed_block),
+                    )
+                    .await;
+                    (relay, response)
+                }
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
