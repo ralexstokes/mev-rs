@@ -7,6 +7,7 @@ mod builder;
 mod cancelled;
 mod error;
 mod payload_builder;
+mod payload_builder_ext;
 mod reth_compat;
 mod reth_ext;
 mod service;
