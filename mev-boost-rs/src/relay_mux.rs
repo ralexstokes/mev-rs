@@ -17,9 +17,8 @@ use rand::prelude::*;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tracing::{debug, info, warn};
 
-// See note in the `mev-relay-rs::Relay` about this constant.
-// TODO likely drop this feature...
-const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+// Sets the lifetime of an auction with respect to its proposal slot.
+const AUCTION_LIFETIME_SLOTS: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
@@ -103,7 +102,7 @@ impl RelayMux {
         let mut state = self.state.lock();
         state
             .outstanding_bids
-            .retain(|auction_request, _| auction_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+            .retain(|auction_request, _| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
     }
 
     pub fn on_epoch(&self, epoch: Epoch) {
