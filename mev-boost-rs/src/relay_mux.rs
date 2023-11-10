@@ -255,16 +255,13 @@ impl BlindedBlockProvider for RelayMux {
 
         let signed_block = &signed_block;
         let responses = stream::iter(relays)
-            .map(|relay| {
-                let signed_block = signed_block.clone(); 
-                async move {
-                    let response = tokio::time::timeout(
-                        Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
-                        relay.open_bid(&signed_block),
-                    )
-                    .await;
-                    (relay, response)
-                }
+            .map(|relay| async move {
+                let response = tokio::time::timeout(
+                    Duration::from_secs(FETCH_BEST_BID_TIME_OUT_SECS),
+                    relay.open_bid(&signed_block),
+                )
+                .await;
+                (relay, response)
             })
             .buffer_unordered(self.relays.len())
             .collect::<Vec<_>>()
@@ -276,7 +273,8 @@ impl BlindedBlockProvider for RelayMux {
         let expected_block_hash = payload_header.block_hash();
         for (relay, response) in responses.into_iter() {
             match response {
-                Ok(auction_contents) => {
+                Ok(Ok(auction_contents)) => {
+                    // Handle successful response
                     let block_hash = auction_contents.execution_payload().block_hash();
                     if block_hash == expected_block_hash {
                         info!(%auction_request, %block_hash, %relay, "acquired payload");
@@ -285,8 +283,13 @@ impl BlindedBlockProvider for RelayMux {
                         warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
                     }
                 }
-                Err(err) => {
+                Ok(Err(err)) => {
+                    // Handle error from open_bid
                     warn!(%err, %relay, "error opening bid");
+                }
+                Err(_) => {
+                    // Handle timeout
+                    warn!(timeout_in_sec = FETCH_BEST_BID_TIME_OUT_SECS, %relay, "timeout when opening bid");
                 }
             }
         }
