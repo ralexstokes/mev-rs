@@ -4347,6 +4347,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "pin-project",
  "reth",
+ "reth-basic-payload-builder",
  "reth-interfaces",
  "reth-payload-builder",
  "reth-primitives",
