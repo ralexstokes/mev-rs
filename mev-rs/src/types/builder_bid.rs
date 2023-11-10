@@ -148,7 +148,7 @@ impl fmt::Display for SignedBuilderBid {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let block_hash = self.message.header().block_hash();
         let value = self.message.value();
-        write!(f, "block hash {block_hash} and value {value:?}")
+        write!(f, "block hash {block_hash} and value {value}")
     }
 }
 
