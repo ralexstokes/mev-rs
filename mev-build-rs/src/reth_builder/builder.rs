@@ -292,6 +292,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             gas_reserve: 21000,
             bid_percent: self.bid_percent,
             subsidy: subsidy_in_wei,
+            id_cache: Default::default(),
         };
         Ok(context)
     }
@@ -313,7 +314,8 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
         let mut state = self.state.lock().expect("can lock");
         let mut new_builds = vec![];
         for (proposer, relays) in proposals {
-            let build_identifier = compute_build_id(slot, parent_hash, &proposer.public_key);
+            let build_identifier = compute_build_id(&slot, &parent_hash, &proposer.public_key)
+                .map_err(|_| Error::Internal("failed to compute build id"))?;
 
             if state.builds.contains_key(&build_identifier) {
                 return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes))
