@@ -4,8 +4,6 @@ version.workspace = true
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["serde", "builder-api", "relay-api"]
 builder-api = ["api"]
@@ -34,3 +32,8 @@ beacon-api-client = { workspace = true, optional = true }
 
 [dev-dependencies]
 rand = "0.8.5"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "registry"
+harness = false

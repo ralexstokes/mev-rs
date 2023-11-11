@@ -83,8 +83,25 @@ pub struct State {
     // data from registered validators
     validator_preferences: HashMap<BlsPublicKey, SignedValidatorRegistration>,
     // data from consensus
-    validators: HashMap<BlsPublicKey, ValidatorSummary>,
-    pubkeys_by_index: HashMap<ValidatorIndex, BlsPublicKey>,
+    pub validators: HashMap<BlsPublicKey, ValidatorSummary>,
+    pub pubkeys_by_index: HashMap<ValidatorIndex, BlsPublicKey>,
+}
+
+impl State {
+    /// Extends the [State] list of [`ValidatorSummary`] items.
+    pub fn extend_summaries(&mut self, summaries: Vec<ValidatorSummary>) -> Result<(), Error> {
+        let pubkeys_by_index = summaries
+            .iter()
+            .map(|summary| (summary.index, summary.validator.public_key.clone()))
+            .collect::<Vec<_>>();
+        let validators = summaries
+            .into_iter()
+            .map(|summary| (summary.validator.public_key.clone(), summary))
+            .collect::<Vec<_>>();
+        self.pubkeys_by_index.extend(pubkeys_by_index);
+        self.validators.extend(validators);
+        Ok(())
+    }
 }
 
 // Maintains validators we are aware of
@@ -100,17 +117,11 @@ impl ValidatorRegistry {
         Self { client, slots_per_epoch, state }
     }
 
-    // TODO: load more efficiently
     pub async fn on_epoch(&self, epoch: Epoch) -> Result<(), Error> {
         let slot = epoch * self.slots_per_epoch;
         let summaries = self.client.get_validators(StateId::Slot(slot), &[], &[]).await?;
         let mut state = self.state.write();
-        for summary in summaries.into_iter() {
-            let public_key = summary.validator.public_key.clone();
-            state.pubkeys_by_index.insert(summary.index, public_key.clone());
-            state.validators.insert(public_key, summary);
-        }
-        Ok(())
+        state.extend_summaries(summaries)
     }
 
     // Return the BLS public key for the validator's `index`, reflecting the index
@@ -166,7 +177,7 @@ impl ValidatorRegistry {
             let status =
                 determine_validator_registration_status(message.timestamp, latest_timestamp);
             if matches!(status, ValidatorRegistrationStatus::Outdated) {
-                return Err(Error::OutdatedRegistration(message.clone(), latest_timestamp))
+                return Err(Error::OutdatedRegistration(message.clone(), latest_timestamp));
             }
             status
         } else {
