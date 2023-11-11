@@ -12,15 +12,23 @@ use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::StreamExt;
 use mev_rs::{relay::parse_relay_endpoints, Error, Relay};
 use reth_primitives::{Bytes, ChainSpec};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 use std::{future::Future, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{error, info};
 
 const DEFAULT_BID_PERCENT: f64 = 0.9;
 
-#[derive(Deserialize, Debug, Default, Clone)]
+fn serialize_secret_key<S>(x: &SecretKey, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(format!("{:?}", x).as_str())
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct Config {
+    #[serde(serialize_with = "serialize_secret_key")]
     pub secret_key: SecretKey,
     pub relays: Vec<String>,
     pub extra_data: Bytes,

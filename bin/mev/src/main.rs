@@ -1,6 +1,5 @@
-mod cmd;
-
 use clap::{Parser, Subcommand};
+use mev::cmd;
 use std::future::Future;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
@@ -14,13 +13,14 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Commands {
+    Config(cmd::debug::Command),
+    Init(cmd::init::Command),
     #[cfg(feature = "boost")]
     Boost(cmd::boost::Command),
     #[cfg(feature = "build")]
     Build(cmd::build::Command),
     #[cfg(feature = "relay")]
     Relay(cmd::relay::Command),
-    Config(cmd::config::Command),
 }
 
 fn setup_logging() {
@@ -49,12 +49,13 @@ async fn main() -> eyre::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Config(cmd) => run_task_until_signal(cmd.execute()).await,
+        Commands::Init(cmd) => cmd.execute(),
         #[cfg(feature = "boost")]
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute()).await,
         #[cfg(feature = "build")]
         Commands::Build(cmd) => tokio::task::block_in_place(|| cmd.run()),
         #[cfg(feature = "relay")]
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute()).await,
-        Commands::Config(cmd) => run_task_until_signal(cmd.execute()).await,
     }
 }
