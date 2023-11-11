@@ -15,7 +15,6 @@ use reth::{
 };
 use reth_payload_builder::{PayloadBuilderHandle, PayloadBuilderService};
 use std::{sync::Arc, time::Duration};
-use tracing::info;
 
 #[derive(Debug, Args)]
 pub struct ServiceExt {
@@ -46,7 +45,7 @@ impl RethNodeCommandConfig for ServiceExt {
 
         let config = from_toml_file::<_, Config>(config_file)?;
         let network = &config.network;
-        info!("configured for `{network}`");
+        tracing::info!("configured for `{network}`");
 
         self.config = Some(config);
         Ok(())
@@ -61,7 +60,7 @@ impl RethNodeCommandConfig for ServiceExt {
         Conf: PayloadBuilderConfig,
         Reth: RethNodeComponents,
     {
-        let config = self.config.as_ref().expect("already loaded config");
+        let config = self.config.as_ref().ok_or(eyre::eyre!("already loaded config"))?;
         let context = Arc::new(Context::try_from(config.network.clone())?);
         let clock = context.clock().unwrap_or_else(|| {
             let genesis_time = networks::typical_genesis_time(&context);
@@ -79,7 +78,7 @@ impl RethNodeCommandConfig for ServiceExt {
             bidder,
             components.chain_spec(),
         )
-        .unwrap();
+        .map_err(|err| eyre::eyre!(err))?;
 
         let (payload_service, payload_builder) = PayloadBuilderService::new(builder);
 

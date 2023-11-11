@@ -8,7 +8,7 @@ use ethereum_consensus::{
     ssz::prelude::*,
     state_transition::Context,
 };
-use ethers::signers::LocalWallet;
+use ethers_signers::LocalWallet;
 use mev_rs::{
     signing::sign_builder_message,
     types::{BidTrace, SignedBidSubmission},

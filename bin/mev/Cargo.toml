@@ -4,8 +4,6 @@ version.workspace = true
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["boost", "build", "relay"]
 boost = ["mev-boost-rs"]
