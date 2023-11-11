@@ -14,6 +14,8 @@ pub enum BoostError {
     MissingOpenBid,
     #[error("could not register with any relay")]
     CouldNotRegister,
+    #[error("current epoch fetch failure")]
+    EpochFetchFailure,
     #[error("no payload returned for opened bid with block hash {0:?}")]
     MissingPayload(Hash32),
 }
@@ -68,6 +70,8 @@ pub enum Error {
     Consensus(#[from] ConsensusError),
     #[error(transparent)]
     Api(#[from] ApiError),
+    #[error(transparent)]
+    Hyper(#[from] hyper::Error),
 }
 
 #[cfg(feature = "api")]

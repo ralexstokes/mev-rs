@@ -1,4 +1,6 @@
+mod config;
 mod relay_mux;
 mod service;
 
-pub use service::{Config, Service};
+pub use config::Config;
+pub use service::Service;
