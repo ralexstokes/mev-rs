@@ -8,7 +8,7 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, Epoch, ExecutionAddress, Slot},
     state_transition::Context,
 };
-use ethers::signers::{LocalWallet, Signer};
+use ethers_signers::{LocalWallet, Signer};
 use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, compute_preferred_gas_limit, Relay};
 use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256};
@@ -316,7 +316,7 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             let build_identifier = compute_build_id(slot, parent_hash, &proposer.public_key);
 
             if state.builds.contains_key(&build_identifier) {
-                return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes))
+                return Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes));
             }
 
             tracing::info!(slot, ?relays, %build_identifier, "constructing new build");

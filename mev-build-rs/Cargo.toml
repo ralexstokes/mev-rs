@@ -4,8 +4,6 @@ version.workspace = true
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1.14"
@@ -32,6 +30,7 @@ reth-interfaces = { workspace = true }
 reth-revm = { workspace = true }
 reth = { workspace = true }
 
-ethers = "2.0"
+ethers-core = "2.0"
+ethers-signers = "2.0"
 eyre = { workspace = true }
 clap = { version = "4.1.4", features = ["derive", "env"] }

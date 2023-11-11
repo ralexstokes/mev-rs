@@ -8,14 +8,13 @@ use ethereum_consensus::{
     crypto::SecretKey,
     state_transition::Context,
 };
-use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
+use ethers_signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::StreamExt;
 use mev_rs::{relay::parse_relay_endpoints, Error, Relay};
 use reth_primitives::{Bytes, ChainSpec};
 use serde::Deserialize;
 use std::{future::Future, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use tracing::{error, info};
 
 const DEFAULT_BID_PERCENT: f64 = 0.9;
 
@@ -61,12 +60,12 @@ impl<
             .collect::<Vec<_>>();
 
         if relays.is_empty() {
-            error!("no valid relays provided; please restart with correct configuration");
+            tracing::error!("no valid relays provided; please restart with correct configuration");
         } else {
             let count = relays.len();
-            info!("configured with {count} relay(s)");
+            tracing::info!("configured with {count} relay(s)");
             for relay in &relays {
-                info!(%relay, "configured with relay");
+                tracing::info!(%relay, "configured with relay");
             }
         }
 
@@ -134,7 +133,7 @@ impl<
                 Ok(stream) => stream,
                 Err(err) => {
                     tracing::error!(err = ?err, "could not open builds stream");
-                    return
+                    return;
                 }
             };
 
@@ -175,7 +174,7 @@ impl<
                 Ok(stream) => stream,
                 Err(err) => {
                     tracing::error!(err = ?err, "could not open payload attributes stream");
-                    return
+                    return;
                 }
             };
 
@@ -230,11 +229,11 @@ impl Future for ServiceHandle {
 
         let clock = this.clock.poll(cx);
         if clock.is_ready() {
-            return clock
+            return clock;
         }
         let builder = this.payload_builder.poll(cx);
         if builder.is_ready() {
-            return builder
+            return builder;
         }
         this.bidder.poll(cx)
     }
