@@ -412,40 +412,23 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
 mod tests {
     use super::*;
     use ethereum_consensus::clock::for_mainnet;
-    use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
-    use reth_primitives::{Bytes, MAINNET, B256, Address};
+    use ethers::{
+        prelude::rand,
+        signers::{coins_bip39::English, MnemonicBuilder, Signer},
+    };
+    use reth_primitives::ChainSpecBuilder;
     use reth_provider::test_utils::NoopProvider;
     use reth_transaction_pool::test_utils::testing_pool;
-    use reth_payload_builder::PayloadId;
     use std::sync::Arc;
-    use ethers::prelude::rand;
 
     #[tokio::test]
-    async fn test_submit_bid() -> Result<(), Error> {
-        let secret_key = SecretKey::random(&mut rand::thread_rng())?;
-        let context = BuildContext {
-            slot: 0,
-            parent_hash: B256::ZERO,
-            proposer: secret_key.public_key(),
-            extra_data: Bytes::default(),
-            fee_recipient: Address::ZERO,
-            gas_limit: 0,
-            relays: vec![],
-        };
-        let clock = for_mainnet();
-
-        // Mainnet chain spec
-        let chain_spec = MAINNET;
-
-        // Mock client
-        let client = Arc::new(NoopProvider::default());
-
-        // Mock pool
-        let pool = testing_pool();
-
+    async fn test_submit_missing_bid() -> Result<(), Error> {
+        // Builder components
+        let secret_key = SecretKey::random(&mut rand::thread_rng()).unwrap();
+        let chain_spec = Arc::new(ChainSpecBuilder::mainnet().build());
         // Test phrase from hardhhat
         let phrase = "test test test test test test test test test test test junk";
-        let derivation_index = 0;
+        let derivation_index = 0_u32;
         let wallet = MnemonicBuilder::<English>::default()
             .phrase(phrase)
             .index(derivation_index)
@@ -453,12 +436,19 @@ mod tests {
             .build()
             .expect("is valid phrase");
         let builder_wallet = wallet.with_chain_id(chain_spec.chain.id());
-        let bid_percent = 100;
+        let bid_percent = 100_f64;
         let subsidy_gwei = 0;
-        let mut builder = Builder::new(
+        let clock = for_mainnet();
+        let context = ethereum_consensus::state_transition::Context::for_mainnet();
+        let client = Arc::new(NoopProvider::default());
+        let pool = testing_pool();
+
+        // Create the builder
+        let builder = Builder::new(
             secret_key,
-            context,
+            Arc::new(context),
             clock,
+            vec![],
             pool,
             client,
             chain_spec,
@@ -468,34 +458,8 @@ mod tests {
             subsidy_gwei,
         );
 
-        let payload_attributes = PayloadBuilderAttributes {
-            id: PayloadId::new([0; 8]),
-            parent: B256::ZERO,
-            timestamp: 0,
-            suggested_fee_recipient: Address::ZERO,
-            prev_randao: B256::ZERO,
-            withdrawals: vec![],
-            parent_beacon_block_root: None,
-        };
-
-        let outcome = builder.process_payload_attributes(payload_attributes)?;
-        match outcome {
-            PayloadAttributesProcessingOutcome::NewBuilds(builds) => {
-                assert_eq!(builds.len(), 1);
-                let build = builder.build_for(&builds[0]).unwrap();
-                assert_eq!(build.context.slot, 0);
-                assert_eq!(build.context.parent_hash, B256::ZERO);
-                assert_eq!(build.context.proposer, builder.builder_wallet);
-                assert_eq!(build.context.payload_attributes.timestamp, 0);
-                assert_eq!(build.context.payload_attributes.extra_data, vec![]);
-                assert_eq!(build.context.bid_percent, 100);
-                assert_eq!(build.context.subsidy, 0);
-                assert_eq!(build.context.gas_limit, 0);
-                assert_eq!(build.context.gas_reserve, 21000);
-                assert_eq!(build.context.relays, vec![]);
-            }
-            _ => panic!("unexpected outcome"),
-        }
+        let e = builder.submit_bid(&BuildIdentifier::default()).await;
+        assert!(matches!(e.unwrap_err(), Error::MissingBuild(_)));
 
         Ok(())
     }
