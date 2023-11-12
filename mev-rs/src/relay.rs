@@ -56,8 +56,8 @@ pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
 
 #[derive(Clone)]
 pub struct Relay {
-    provider: BlockProvider,
-    relayer: Relayer,
+    pub(crate) provider: BlockProvider,
+    pub(crate) relayer: Relayer,
     pub public_key: BlsPublicKey,
     pub endpoint: Url,
 }
