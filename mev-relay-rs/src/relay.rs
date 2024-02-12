@@ -15,7 +15,7 @@ use ethereum_consensus::{
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
-    signing::sign_builder_message,
+    signing::{compute_consensus_signing_root, sign_builder_message, verify_signature},
     types::{
         builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
         ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
@@ -364,7 +364,7 @@ impl Relay {
             return Err(RelayError::InvalidFeeRecipient(
                 proposer_public_key.clone(),
                 fee_recipient.clone(),
-            ))
+            ));
         }
 
         // NOTE: disabled in the "trusted" validation
@@ -381,25 +381,28 @@ impl Relay {
             return Err(RelayError::InvalidGasLimit(
                 bid_trace.gas_limit,
                 execution_payload.gas_limit(),
-            ))
+            ));
         }
 
         if bid_trace.gas_used != execution_payload.gas_used() {
-            return Err(RelayError::InvalidGasUsed(bid_trace.gas_used, execution_payload.gas_used()))
+            return Err(RelayError::InvalidGasUsed(
+                bid_trace.gas_used,
+                execution_payload.gas_used(),
+            ));
         }
 
         if &bid_trace.parent_hash != execution_payload.parent_hash() {
             return Err(RelayError::InvalidParentHash(
                 bid_trace.parent_hash.clone(),
                 execution_payload.parent_hash().clone(),
-            ))
+            ));
         }
 
         if &bid_trace.block_hash != execution_payload.block_hash() {
             return Err(RelayError::InvalidBlockHash(
                 bid_trace.block_hash.clone(),
                 execution_payload.block_hash().clone(),
-            ))
+            ));
         }
 
         Ok(())
@@ -415,7 +418,7 @@ impl Relay {
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value > value {
                 info!(%auction_request, %builder_public_key, "block submission was not greater in value; ignoring");
-                return Ok(())
+                return Ok(());
             }
         }
         let header = to_header(&mut execution_payload)?;
@@ -447,6 +450,28 @@ impl Relay {
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
         Ok(())
+    }
+
+    fn verify_blinded_block_signature(
+        &self,
+        signed_block: &mut SignedBlindedBeaconBlock,
+    ) -> Result<(), ethereum_consensus::Error> {
+        let proposer = self
+            .validator_registry
+            .get_public_key(signed_block.message().proposer_index())
+            .unwrap();
+        let slot = signed_block.message().slot(); // signed_block.message().slot() + 1 ???;
+        let genesis_validators_root = [0u8; 4].hash_tree_root().map_err(ConsensusError::from)?; // Should `compute_consenus_signing_root()` take Option<&Root> ?
+        let mut block =
+            signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
+        let signing_root = compute_consensus_signing_root(
+            &mut block,
+            slot,
+            &genesis_validators_root,
+            &self.context,
+        )?;
+
+        verify_signature(&proposer, signing_root.deref(), signed_block.signature())
     }
 }
 
@@ -525,9 +550,11 @@ impl BlindedBlockProvider for Relay {
             let local_header = auction_context.signed_builder_bid.message.header();
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
             }
         }
+
+        assert!(self.verify_blinded_block_signature(signed_block).is_ok());
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
@@ -560,7 +587,7 @@ impl BlindedBlockProvider for Relay {
             }
             Err(err) => {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
             }
         }
     }
