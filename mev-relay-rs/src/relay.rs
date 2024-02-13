@@ -8,7 +8,7 @@ use ethereum_consensus::{
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
     deneb::mainnet as deneb,
-    primitives::{BlsPublicKey, Epoch, Slot, U256},
+    primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
     ssz::prelude::Merkleized,
     state_transition::Context,
     types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
@@ -203,6 +203,7 @@ pub struct Inner {
     beacon_node: ApiClient,
     context: Context,
     state: Mutex<State>,
+    pub genesis_validators_root: Root,
 }
 
 #[derive(Debug)]
@@ -230,6 +231,7 @@ impl Relay {
         secret_key: SecretKey,
         accepted_builders: Vec<BlsPublicKey>,
         context: Context,
+        genesis_validators_root: Root,
     ) -> Self {
         let public_key = secret_key.public_key();
         let slots_per_epoch = context.slots_per_epoch;
@@ -244,6 +246,7 @@ impl Relay {
             beacon_node,
             context,
             state: Default::default(),
+            genesis_validators_root,
         };
         info!(public_key = %inner.public_key, "relay initialized");
         Self(Arc::new(inner))
@@ -451,28 +454,6 @@ impl Relay {
         state.auctions.insert(auction_request, auction_context);
         Ok(())
     }
-
-    fn verify_blinded_block_signature(
-        &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
-    ) -> Result<(), ethereum_consensus::Error> {
-        let proposer = self
-            .validator_registry
-            .get_public_key(signed_block.message().proposer_index())
-            .unwrap();
-        let slot = signed_block.message().slot(); // signed_block.message().slot() + 1 ???;
-        let genesis_validators_root = [0u8; 4].hash_tree_root().map_err(ConsensusError::from)?; // Should `compute_consenus_signing_root()` take Option<&Root> ?
-        let mut block =
-            signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
-        let signing_root = compute_consensus_signing_root(
-            &mut block,
-            slot,
-            &genesis_validators_root,
-            &self.context,
-        )?;
-
-        verify_signature(&proposer, signing_root.deref(), signed_block.signature())
-    }
 }
 
 #[async_trait]
@@ -550,11 +531,11 @@ impl BlindedBlockProvider for Relay {
             let local_header = auction_context.signed_builder_bid.message.header();
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
             }
         }
 
-        assert!(self.verify_blinded_block_signature(signed_block).is_ok());
+        verify_blinded_block_signature(&self.context, &auction_request, signed_block)?;
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
@@ -633,4 +614,19 @@ impl BlindedBlockRelayer for Relay {
 
         Ok(())
     }
+}
+
+fn verify_blinded_block_signature(
+    context: &Context,
+    auction_request: &AuctionRequest,
+    signed_block: &mut SignedBlindedBeaconBlock,
+) -> Result<(), Error> {
+    let proposer = &auction_request.public_key;
+    let slot = signed_block.message().slot();
+    let genesis_validators_root = [0u8; 4].hash_tree_root().map_err(ConsensusError::from)?; // Should `compute_consenus_signing_root()` take Option<&Root> ?
+    let mut block = signed_block.message_mut();
+    let signing_root =
+        compute_consensus_signing_root(&mut block, slot, &genesis_validators_root, &context)?;
+
+    Ok(verify_signature(&proposer, signing_root.as_ref(), signed_block.signature())?)
 }
