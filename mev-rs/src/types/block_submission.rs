@@ -3,7 +3,7 @@ use crate::{
     types::ExecutionPayload,
 };
 use ethereum_consensus::{
-    primitives::{BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Slot, U256},
+    primitives::{BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Slot},
     ssz::prelude::*,
     state_transition::Context,
     Error,

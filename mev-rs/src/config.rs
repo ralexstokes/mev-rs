@@ -1,6 +1,5 @@
 use std::{io, path::Path};
 use thiserror::Error;
-use toml;
 
 #[derive(Debug, Error)]
 pub enum Error {

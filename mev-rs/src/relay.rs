@@ -121,7 +121,7 @@ impl BlindedBlockRelayer for Relay {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ethereum_consensus::{crypto::SecretKey, serde::try_bytes_from_hex_str};
+    use ethereum_consensus::crypto::SecretKey;
 
     const URL: &str = "https://relay.com";
     const RELAY_URL: &str = "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net";
