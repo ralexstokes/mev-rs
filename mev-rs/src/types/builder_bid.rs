@@ -13,10 +13,7 @@ use std::fmt;
 
 pub mod bellatrix {
     use super::ExecutionPayloadHeader;
-    use ethereum_consensus::{
-        primitives::{BlsPublicKey, U256},
-        ssz::prelude::*,
-    };
+    use ethereum_consensus::{primitives::BlsPublicKey, ssz::prelude::*};
     #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BuilderBid {
@@ -35,10 +32,7 @@ pub mod capella {
 pub mod deneb {
     use super::{KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK};
     use crate::types::ExecutionPayloadHeader;
-    use ethereum_consensus::{
-        primitives::{BlsPublicKey, U256},
-        ssz::prelude::*,
-    };
+    use ethereum_consensus::{primitives::BlsPublicKey, ssz::prelude::*};
     #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BuilderBid {
@@ -163,8 +157,6 @@ impl SignedBuilderBid {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signing::sign_builder_message;
-    use ethereum_consensus::{crypto::SecretKey, state_transition::Context};
     use rand::prelude::*;
 
     const SIGNED_BUILDER_BID_JSON: &str = r#"
