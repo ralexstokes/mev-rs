@@ -1708,21 +1708,12 @@ dependencies = [
 
 [[package]]
 name = "darling"
-<<<<<<< Updated upstream
 version = "0.20.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "54e36fcd13ed84ffdfda6f5be89b31287cbb80c439841fe69e04841435464391"
 dependencies = [
  "darling_core 0.20.8",
  "darling_macro 0.20.8",
-=======
-version = "0.20.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3a5d17510e4a1a87f323de70b7b1eaac1ee0e37866c6720b2d279452d0edf389"
-dependencies = [
- "darling_core 0.20.7",
- "darling_macro 0.20.7",
->>>>>>> Stashed changes
 ]
 
 [[package]]
@@ -1741,15 +1732,9 @@ dependencies = [
 
 [[package]]
 name = "darling_core"
-<<<<<<< Updated upstream
 version = "0.20.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c2cf1c23a687a1feeb728783b993c4e1ad83d99f351801977dd809b48d0a70f"
-=======
-version = "0.20.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a98eea36a7ff910fa751413d0895551143a8ea41d695d9798ec7d665df7f7f5e"
->>>>>>> Stashed changes
 dependencies = [
  "fnv",
  "ident_case",
@@ -1772,19 +1757,11 @@ dependencies = [
 
 [[package]]
 name = "darling_macro"
-<<<<<<< Updated upstream
 version = "0.20.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a668eda54683121533a393014d8692171709ff57a7d61f187b6e782719f8933f"
 dependencies = [
  "darling_core 0.20.8",
-=======
-version = "0.20.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6a366a3f90c5d59a4b91169775f88e52e8f71a0e7804cc98a8db2932cf4ed57"
-dependencies = [
- "darling_core 0.20.7",
->>>>>>> Stashed changes
  "quote",
  "syn 2.0.50",
 ]
@@ -7354,11 +7331,7 @@ version = "3.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "865f9743393e638991566a8b7a479043c2c8da94a33e0a31f18214c9cae0a64d"
 dependencies = [
-<<<<<<< Updated upstream
  "darling 0.20.8",
-=======
- "darling 0.20.7",
->>>>>>> Stashed changes
  "proc-macro2",
  "quote",
  "syn 2.0.50",
