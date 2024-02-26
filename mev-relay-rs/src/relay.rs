@@ -616,7 +616,6 @@ impl BlindedBlockRelayer for Relay {
     }
 }
 
-// TODO: Pass in the root from the relay data
 fn verify_blinded_block_signature(
     auction_request: &AuctionRequest,
     signed_block: &mut SignedBlindedBeaconBlock,
