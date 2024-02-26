@@ -203,7 +203,7 @@ pub struct Inner {
     beacon_node: ApiClient,
     context: Context,
     state: Mutex<State>,
-    pub genesis_validators_root: Root,
+    genesis_validators_root: Root,
 }
 
 #[derive(Debug)]
@@ -535,7 +535,7 @@ impl BlindedBlockProvider for Relay {
             }
         }
 
-        verify_blinded_block_signature(&self.context, &auction_request, signed_block)?;
+        verify_blinded_block_signature(&auction_request, signed_block, &self)?;
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
@@ -616,17 +616,21 @@ impl BlindedBlockRelayer for Relay {
     }
 }
 
+// TODO: Pass in the root from the relay data
 fn verify_blinded_block_signature(
-    context: &Context,
     auction_request: &AuctionRequest,
     signed_block: &mut SignedBlindedBeaconBlock,
+    relay: &Relay,
 ) -> Result<(), Error> {
     let proposer = &auction_request.public_key;
     let slot = signed_block.message().slot();
-    let genesis_validators_root = [0u8; 4].hash_tree_root().map_err(ConsensusError::from)?; // Should `compute_consenus_signing_root()` take Option<&Root> ?
     let mut block = signed_block.message_mut();
-    let signing_root =
-        compute_consensus_signing_root(&mut block, slot, &genesis_validators_root, &context)?;
+    let signing_root = compute_consensus_signing_root(
+        &mut block,
+        slot,
+        &relay.genesis_validators_root,
+        &relay.context,
+    )?;
 
     Ok(verify_signature(&proposer, signing_root.as_ref(), signed_block.signature())?)
 }
