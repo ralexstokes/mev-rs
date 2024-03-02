@@ -1,4 +1,4 @@
-use crate::cmd::config::Config;
+use crate::config::Config;
 use clap::Args;
 use mev_boost_rs::Service;
 use tracing::info;

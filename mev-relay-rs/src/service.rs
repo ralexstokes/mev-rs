@@ -9,17 +9,25 @@ use ethereum_consensus::{
 };
 use futures::StreamExt;
 use mev_rs::{blinded_block_relayer::Server as BlindedBlockRelayerServer, Error};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize, Serializer};
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{error, warn};
 use url::Url;
 
-#[derive(Deserialize, Debug)]
+fn serialize_secret_key<S>(x: &SecretKey, s: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    s.serialize_str(format!("{:?}", x).as_str())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub beacon_node_url: String,
+    #[serde(serialize_with = "serialize_secret_key")]
     pub secret_key: SecretKey,
     pub accepted_builders: Vec<BlsPublicKey>,
 }
