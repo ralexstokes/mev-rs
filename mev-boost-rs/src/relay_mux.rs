@@ -45,7 +45,7 @@ fn validate_bid(
             bid: bid_public_key.clone(),
             relay: public_key.clone(),
         }
-        .into())
+        .into());
     }
     Ok(bid.verify_signature(context)?)
 }
@@ -195,7 +195,7 @@ impl BlindedBlockProvider for RelayMux {
 
         if bids.is_empty() {
             info!(%auction_request, "no relays had bids prepared");
-            return Err(Error::NoBidPrepared(auction_request.clone()))
+            return Err(Error::NoBidPrepared(auction_request.clone()));
         }
 
         // TODO: change `value` so it does the copy internally
@@ -204,17 +204,17 @@ impl BlindedBlockProvider for RelayMux {
 
         // if multiple distinct bids with same bid value, break tie by randomly picking one
         let mut rng = rand::thread_rng();
-        best_bid_indices.shuffle(&mut rng);
+        let best_bid_index = *best_bid_indices.choose(&mut rng).expect("there is at least one bid");
+        best_bid_indices.remove(
+            best_bid_indices.iter().position(|x| x == &best_bid_index).expect("bid not found"),
+        );
 
-        let (best_bid_index, rest) =
-            best_bid_indices.split_first().expect("there is at least one bid");
-
-        let (best_relay, best_bid) = &bids[*best_bid_index];
+        let (best_relay, best_bid) = &bids[best_bid_index];
         let best_block_hash = best_bid.message.header().block_hash();
 
         let mut best_relays = vec![best_relay.clone()];
-        for bid_index in rest {
-            let (relay, bid) = &bids[*bid_index];
+        for bid_index in best_bid_indices {
+            let (relay, bid) = &bids[bid_index];
             if bid.message.header().block_hash() == best_block_hash {
                 best_relays.push(relay.clone());
             }
@@ -273,7 +273,7 @@ impl BlindedBlockProvider for RelayMux {
                     let block_hash = auction_contents.execution_payload().block_hash();
                     if block_hash == expected_block_hash {
                         info!(%auction_request, %block_hash, %relay, "acquired payload");
-                        return Ok(auction_contents)
+                        return Ok(auction_contents);
                     } else {
                         warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
                     }
@@ -316,7 +316,7 @@ mod tests {
             assert_eq!(expected, best_bid_indices);
 
             if best_bid_indices.is_empty() {
-                continue
+                continue;
             }
 
             // NOTE: test randomization logic
