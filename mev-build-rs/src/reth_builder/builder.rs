@@ -292,6 +292,8 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             gas_reserve: 21000,
             bid_percent: self.bid_percent,
             subsidy: subsidy_in_wei,
+            parent_block: Arc::new(parent_block),
+            payload_attributes: payload_attributes.clone(),
         };
         Ok(context)
     }

@@ -14,6 +14,7 @@ use mev_rs::{
     types::{BidTrace, SignedBidSubmission},
     Relay,
 };
+use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, B256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
 use std::sync::{Arc, Mutex};
@@ -67,6 +68,9 @@ pub struct BuildContext {
     pub bid_percent: f64,
     // Amount to add to the block's value to bid to the proposer
     pub subsidy: U256,
+    // TODO: refactor these w/ the above fields
+    pub parent_block: Arc<SealedBlock>,
+    pub payload_attributes: PayloadBuilderAttributes,
 }
 
 pub fn compute_build_id(slot: Slot, parent_hash: B256, proposer: &BlsPublicKey) -> BuildIdentifier {

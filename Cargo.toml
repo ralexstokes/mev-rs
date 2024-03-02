@@ -18,6 +18,7 @@ ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus"
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "fc049504a200926c8bd5f0fbd3f9696c6c6f699d" }
 
 reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
 reth-primitives = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
 reth-provider = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
 reth-rpc-types = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
