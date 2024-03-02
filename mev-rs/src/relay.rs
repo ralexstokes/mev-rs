@@ -10,7 +10,6 @@ use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
 use std::{cmp, fmt, hash, ops::Deref};
-use tracing::{error, warn};
 use url::Url;
 
 #[derive(Clone, Debug)]
@@ -30,28 +29,86 @@ impl TryFrom<Url> for RelayEndpoint {
     }
 }
 
+/// A wrapper around a vector of [`RelayEndpoint`]s.
+#[derive(Clone, Debug)]
+pub struct RelayEndpoints(Vec<RelayEndpoint>);
+
+impl RelayEndpoints {
+    pub fn iter(&self) -> impl Iterator<Item = &RelayEndpoint> {
+        self.0.iter()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl IntoIterator for RelayEndpoints {
+    type Item = RelayEndpoint;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<T> From<Vec<T>> for RelayEndpoints
+where
+    T: AsRef<str>,
+{
+    fn from(value: Vec<T>) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
+impl<T> From<&Vec<T>> for RelayEndpoints
+where
+    T: AsRef<str>,
+{
+    fn from(value: &Vec<T>) -> Self {
+        Self::from(value.as_slice())
+    }
+}
+
+impl<T> From<&[T]> for RelayEndpoints
+where
+    T: AsRef<str>,
+{
+    fn from(value: &[T]) -> Self {
+        let mut relays = vec![];
+        for endpoint in value {
+            let e = endpoint.as_ref();
+            let url = match Url::parse(e) {
+                Ok(url) => url,
+                Err(err) => {
+                    tracing::error!(%err, %e, "error parsing relay URL from config");
+                    continue;
+                }
+            };
+            match RelayEndpoint::try_from(url) {
+                Ok(relay) => relays.push(relay),
+                Err(err) => {
+                    tracing::warn!(%err, %e, "error parsing relay from URL")
+                }
+            }
+        }
+        if relays.is_empty() {
+            tracing::error!(
+                "no relays could be loaded from the configuration; please fix and restart"
+            );
+        }
+        RelayEndpoints(relays)
+    }
+}
+
 impl fmt::Display for RelayEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.write_str(self.url.as_str())
     }
-}
-
-pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
-    let mut relays = vec![];
-
-    for relay_url in relay_urls {
-        match relay_url.parse::<Url>() {
-            Ok(url) => match RelayEndpoint::try_from(url) {
-                Ok(relay) => relays.push(relay),
-                Err(err) => warn!(%err, %relay_url, "error parsing relay from URL"),
-            },
-            Err(err) => warn!(%err, %relay_url, "error parsing relay URL from config"),
-        }
-    }
-    if relays.is_empty() {
-        error!("no relays could be loaded from the configuration; please fix and restart");
-    }
-    relays
 }
 
 #[derive(Clone)]
@@ -125,6 +182,20 @@ mod tests {
 
     const URL: &str = "https://relay.com";
     const RELAY_URL: &str = "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net";
+
+    #[test]
+    fn test_relay_endpoints_from_vec() {
+        let endpoints = vec![URL, RELAY_URL];
+        let relay_endpoints = RelayEndpoints::from(endpoints);
+        assert_eq!(relay_endpoints.len(), 1);
+    }
+
+    #[test]
+    fn test_empty_relay_endpoints_from_vec() {
+        let endpoints = vec![URL];
+        let relay_endpoints = RelayEndpoints::from(endpoints);
+        assert_eq!(relay_endpoints.len(), 0);
+    }
 
     #[test]
     fn parse_relay_endpoint() {
