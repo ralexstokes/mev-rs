@@ -36,7 +36,7 @@ impl Bidder for DeadlineBidder {
         let slot = build.context.slot;
         let target = self.clock.duration_until_slot(slot);
         let duration = target.checked_sub(self.deadline).unwrap_or_default();
-        let id = build.context.id();
+        let id = build.context.id().map_err(|_| Error::Internal("missing build id"))?;
         tracing::debug!(%id, slot, ?duration, "waiting to submit bid");
         tokio::time::sleep(duration).await;
 

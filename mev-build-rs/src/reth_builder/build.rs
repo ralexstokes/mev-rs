@@ -16,7 +16,10 @@ use mev_rs::{
 };
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, B256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
-use std::sync::{Arc, Mutex};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
 pub type BuildIdentifier = ByteVector<4>;
 
@@ -67,21 +70,46 @@ pub struct BuildContext {
     pub bid_percent: f64,
     // Amount to add to the block's value to bid to the proposer
     pub subsidy: U256,
+    /// An internal cache of computed build context ids
+    pub id_cache: Arc<Mutex<HashMap<Vec<u8>, BuildIdentifier>>>,
 }
 
-pub fn compute_build_id(slot: Slot, parent_hash: B256, proposer: &BlsPublicKey) -> BuildIdentifier {
+pub fn compute_build_id(
+    slot: &Slot,
+    parent_hash: &B256,
+    proposer: &BlsPublicKey,
+) -> Result<BuildIdentifier, Error> {
+    let id = compute_serialized_id(slot, parent_hash, proposer)?;
+    hash_serialized_id(id)
+}
+
+pub fn compute_serialized_id(
+    slot: &Slot,
+    parent_hash: &B256,
+    proposer: &BlsPublicKey,
+) -> Result<Vec<u8>, Error> {
     let mut data = Vec::with_capacity(88);
-    slot.serialize(&mut data).expect("can serialize");
-    parent_hash.serialize(&mut data).expect("can serialize");
-    proposer.serialize(&mut data).expect("can serialize");
-    let summary = hash(data);
-    summary.as_ref()[..4].try_into().unwrap()
+    slot.serialize(&mut data).map_err(|_| Error::Internal("slot serialization failed"))?;
+    parent_hash
+        .serialize(&mut data)
+        .map_err(|_| Error::Internal("parent hash serialization failed"))?;
+    proposer.serialize(&mut data).map_err(|_| Error::Internal("proposer serialization failed"))?;
+    Ok(data)
+}
+
+pub fn hash_serialized_id(id: Vec<u8>) -> Result<BuildIdentifier, Error> {
+    let summary = hash(id);
+    summary.as_ref()[..4].try_into().map_err(|_| Error::Internal("build id hashing failed"))
 }
 
 impl BuildContext {
-    pub fn id(&self) -> BuildIdentifier {
-        // TODO: cache this
-        compute_build_id(self.slot, self.parent_hash, &self.proposer)
+    pub fn id(&self) -> Result<BuildIdentifier, Error> {
+        let serialized_id = compute_serialized_id(&self.slot, &self.parent_hash, &self.proposer)?;
+        let cache = self.id_cache.lock().map_err(|_| Error::Internal("id_cache lock poisoned"))?;
+        if let Some(id) = cache.get(&serialized_id) {
+            return Ok(id.clone())
+        }
+        hash_serialized_id(serialized_id)
     }
 
     pub fn base_fee(&self) -> u64 {
@@ -127,10 +155,12 @@ impl Build {
         let build_context = &self.context;
         let state = self.state.lock().unwrap();
         let payload_with_payments = &state.payload_with_payments;
-        let payload = payload_with_payments
-            .payload
-            .as_ref()
-            .ok_or_else(|| Error::PayloadNotPrepared(build_context.id()))?;
+        let payload = payload_with_payments.payload.as_ref().ok_or_else(|| {
+            build_context
+                .id()
+                .map(Error::PayloadNotPrepared)
+                .unwrap_or(Error::Internal("Failed to compute build id"))
+        })?;
         let payment = &payload_with_payments.proposer_payment;
         let builder_payment = payload_with_payments.builder_payment;
         Ok((
