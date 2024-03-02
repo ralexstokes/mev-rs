@@ -84,7 +84,9 @@ impl fmt::Debug for Relay {
 
 impl fmt::Display for Relay {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        let str =
+            if let Some(host) = self.endpoint.host_str() { host } else { self.endpoint.as_str() };
+        f.write_str(str)
     }
 }
 
