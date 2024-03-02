@@ -1,7 +1,6 @@
 use crate::cmd::config::Config;
 use clap::{Args, Subcommand};
 use mev_relay_rs::Service;
-use tracing::info;
 
 #[derive(Debug, Args)]
 #[clap(about = "🏗 connecting builders to proposers", subcommand_negates_reqs = true)]
@@ -31,7 +30,7 @@ impl Command {
         let config = Config::from_toml_file(config_file)?;
 
         let network = config.network;
-        info!("configured for `{network}`");
+        tracing::info!("configured for `{network}`");
 
         if let Some(config) = config.relay {
             let service = Service::from(network, config).spawn().await?;

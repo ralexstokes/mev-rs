@@ -1,9 +1,9 @@
-mod cmd;
-
 use clap::{Parser, Subcommand};
 use std::future::Future;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+mod cmd;
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about = "utilities for block space", long_about = None)]
