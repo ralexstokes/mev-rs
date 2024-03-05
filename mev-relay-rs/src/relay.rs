@@ -535,7 +535,7 @@ impl BlindedBlockProvider for Relay {
             }
         }
 
-        verify_blinded_block_signature(&auction_request, signed_block, &self)?;
+        verify_blinded_block_signature(&auction_request, signed_block, self)?;
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
@@ -631,5 +631,5 @@ fn verify_blinded_block_signature(
         &relay.context,
     )?;
 
-    Ok(verify_signature(&proposer, signing_root.as_ref(), signed_block.signature())?)
+    Ok(verify_signature(proposer, signing_root.as_ref(), signed_block.signature())?)
 }
