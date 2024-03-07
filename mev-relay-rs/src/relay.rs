@@ -631,5 +631,5 @@ fn verify_blinded_block_signature(
         &relay.context,
     )?;
 
-    Ok(verify_signature(proposer, signing_root.as_ref(), signed_block.signature())?)
+    verify_signature(proposer, signing_root.as_ref(), signed_block.signature()).map_err(Into::into)
 }
