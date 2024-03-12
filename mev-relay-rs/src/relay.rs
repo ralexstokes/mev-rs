@@ -367,7 +367,7 @@ impl Relay {
             return Err(RelayError::InvalidFeeRecipient(
                 proposer_public_key.clone(),
                 fee_recipient.clone(),
-            ));
+            ))
         }
 
         // NOTE: disabled in the "trusted" validation
@@ -384,28 +384,25 @@ impl Relay {
             return Err(RelayError::InvalidGasLimit(
                 bid_trace.gas_limit,
                 execution_payload.gas_limit(),
-            ));
+            ))
         }
 
         if bid_trace.gas_used != execution_payload.gas_used() {
-            return Err(RelayError::InvalidGasUsed(
-                bid_trace.gas_used,
-                execution_payload.gas_used(),
-            ));
+            return Err(RelayError::InvalidGasUsed(bid_trace.gas_used, execution_payload.gas_used()))
         }
 
         if &bid_trace.parent_hash != execution_payload.parent_hash() {
             return Err(RelayError::InvalidParentHash(
                 bid_trace.parent_hash.clone(),
                 execution_payload.parent_hash().clone(),
-            ));
+            ))
         }
 
         if &bid_trace.block_hash != execution_payload.block_hash() {
             return Err(RelayError::InvalidBlockHash(
                 bid_trace.block_hash.clone(),
                 execution_payload.block_hash().clone(),
-            ));
+            ))
         }
 
         Ok(())
@@ -421,7 +418,7 @@ impl Relay {
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value > value {
                 info!(%auction_request, %builder_public_key, "block submission was not greater in value; ignoring");
-                return Ok(());
+                return Ok(())
             }
         }
         let header = to_header(&mut execution_payload)?;
@@ -568,7 +565,7 @@ impl BlindedBlockProvider for Relay {
             }
             Err(err) => {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
             }
         }
     }
