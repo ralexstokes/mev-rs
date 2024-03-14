@@ -8,14 +8,14 @@ use ethereum_consensus::{
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
     deneb::mainnet as deneb,
-    primitives::{BlsPublicKey, Epoch, Slot, U256},
+    primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
     ssz::prelude::Merkleized,
     state_transition::Context,
     types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
-    signing::sign_builder_message,
+    signing::{compute_consensus_signing_root, sign_builder_message, verify_signature},
     types::{
         builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
         ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
@@ -203,6 +203,7 @@ pub struct Inner {
     beacon_node: ApiClient,
     context: Context,
     state: Mutex<State>,
+    genesis_validators_root: Root,
 }
 
 #[derive(Debug)]
@@ -230,6 +231,7 @@ impl Relay {
         secret_key: SecretKey,
         accepted_builders: Vec<BlsPublicKey>,
         context: Context,
+        genesis_validators_root: Root,
     ) -> Self {
         let public_key = secret_key.public_key();
         let slots_per_epoch = context.slots_per_epoch;
@@ -244,6 +246,7 @@ impl Relay {
             beacon_node,
             context,
             state: Default::default(),
+            genesis_validators_root,
         };
         info!(public_key = %inner.public_key, "relay initialized");
         Self(Arc::new(inner))
@@ -529,6 +532,8 @@ impl BlindedBlockProvider for Relay {
             }
         }
 
+        verify_blinded_block_signature(&auction_request, signed_block, self)?;
+
         match unblind_block(signed_block, &auction_context.execution_payload) {
             Ok(mut signed_block) => {
                 let version = signed_block.version();
@@ -606,4 +611,22 @@ impl BlindedBlockRelayer for Relay {
 
         Ok(())
     }
+}
+
+fn verify_blinded_block_signature(
+    auction_request: &AuctionRequest,
+    signed_block: &mut SignedBlindedBeaconBlock,
+    relay: &Relay,
+) -> Result<(), Error> {
+    let proposer = &auction_request.public_key;
+    let slot = signed_block.message().slot();
+    let mut block = signed_block.message_mut();
+    let signing_root = compute_consensus_signing_root(
+        &mut block,
+        slot,
+        &relay.genesis_validators_root,
+        &relay.context,
+    )?;
+
+    verify_signature(proposer, signing_root.as_ref(), signed_block.signature()).map_err(Into::into)
 }

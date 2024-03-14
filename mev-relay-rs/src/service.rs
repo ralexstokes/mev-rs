@@ -69,7 +69,16 @@ impl Service {
             let genesis_time = networks::typical_genesis_time(&context);
             context.clock_at(genesis_time)
         });
-        let relay = Relay::new(beacon_node.clone(), secret_key, accepted_builders, context);
+        let genesis_validators_root =
+            beacon_node.get_genesis_details().await?.genesis_validators_root;
+
+        let relay = Relay::new(
+            beacon_node.clone(),
+            secret_key,
+            accepted_builders,
+            context,
+            genesis_validators_root,
+        );
 
         let relay_for_api = relay.clone();
         let server = BlindedBlockRelayerServer::new(host, port, relay_for_api).spawn();
