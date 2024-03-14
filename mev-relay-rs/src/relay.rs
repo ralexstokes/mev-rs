@@ -534,7 +534,7 @@ impl BlindedBlockProvider for Relay {
 
         if let Err(err) = verify_blinded_block_signature(&auction_request, signed_block, self) {
             warn!(%err, %auction_request, "invalid incoming signed blinded block signature");
-            return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+            return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
         };
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
