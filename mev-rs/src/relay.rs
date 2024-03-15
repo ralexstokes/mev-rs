@@ -9,7 +9,7 @@ use beacon_api_client::Client as BeaconClient;
 use ethereum_consensus::{
     crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
-use std::{cmp, fmt, hash, ops::Deref};
+use std::{cmp, fmt, hash, ops::Deref, sync::Arc};
 use tracing::{error, warn};
 use url::Url;
 
@@ -100,9 +100,9 @@ impl From<RelayEndpoint> for Relay {
     fn from(value: RelayEndpoint) -> Self {
         let RelayEndpoint { url, public_key } = value;
         let endpoint = url.clone();
-        let api_client = BeaconClient::new(url);
-        let provider = BlockProvider::new(api_client.clone());
-        let relayer = Relayer::new(api_client.clone());
+        let api_client = Arc::new(BeaconClient::new(url));
+        let provider = BlockProvider::new(Arc::clone(&api_client));
+        let relayer = Relayer::new(api_client);
         Self { provider, relayer, public_key, endpoint }
     }
 }
