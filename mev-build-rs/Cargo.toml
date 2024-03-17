@@ -35,3 +35,7 @@ reth = { workspace = true }
 ethers = "2.0"
 eyre = { workspace = true }
 clap = { version = "4.1.4", features = ["derive", "env"] }
+
+[dev-dependencies]
+reth-provider = { workspace = true, features = ["test-utils"] }
+reth-transaction-pool = { workspace = true, features = ["test-utils"] }
