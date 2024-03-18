@@ -9,7 +9,7 @@ use ethereum_consensus::{
     crypto::SecretKey,
     deneb::mainnet as deneb,
     primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
-    ssz::prelude::{Merkleized, Node},
+    ssz::prelude::Merkleized,
     state_transition::Context,
     types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
     Error as ConsensusError, Fork,
@@ -624,7 +624,7 @@ impl BlindedBlockRelayer for Relay {
 fn verify_blinded_block_signature(
     auction_request: &AuctionRequest,
     signed_block: &mut SignedBlindedBeaconBlock,
-    genesis_validators_root: &Node,
+    genesis_validators_root: &Root,
     context: &Context,
 ) -> Result<(), Error> {
     let proposer = &auction_request.public_key;
