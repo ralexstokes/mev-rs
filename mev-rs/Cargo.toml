@@ -4,13 +4,12 @@ version.workspace = true
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["serde", "builder-api", "relay-api"]
 builder-api = ["api"]
 relay-api = ["api", "builder-api"]
 api = ["tokio", "axum", "hyper", "beacon-api-client", "tracing", "serde_json"]
+test-utils = ["serde"]
 
 [dependencies]
 tokio = { version = "1.0", optional = true }
