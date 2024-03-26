@@ -532,8 +532,13 @@ impl BlindedBlockProvider for Relay {
             }
         }
 
-        if let Err(err) = verify_blinded_block_signature(&auction_request, signed_block, self) {
-            warn!(%err, %auction_request, "invalid signature on incoming signed blinded block");
+        if let Err(err) = verify_blinded_block_signature(
+            &auction_request,
+            signed_block,
+            &self.genesis_validators_root,
+            &self.context,
+        ) {
+            warn!(%err, %auction_request, "invalid incoming signed blinded beacon block signature");
             return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
         }
 
@@ -619,17 +624,14 @@ impl BlindedBlockRelayer for Relay {
 fn verify_blinded_block_signature(
     auction_request: &AuctionRequest,
     signed_block: &mut SignedBlindedBeaconBlock,
-    relay: &Relay,
+    genesis_validators_root: &Root,
+    context: &Context,
 ) -> Result<(), Error> {
     let proposer = &auction_request.public_key;
     let slot = signed_block.message().slot();
     let mut block = signed_block.message_mut();
-    let signing_root = compute_consensus_signing_root(
-        &mut block,
-        slot,
-        &relay.genesis_validators_root,
-        &relay.context,
-    )?;
+    let signing_root =
+        compute_consensus_signing_root(&mut block, slot, genesis_validators_root, context)?;
 
     verify_signature(proposer, signing_root.as_ref(), signed_block.signature()).map_err(Into::into)
 }
