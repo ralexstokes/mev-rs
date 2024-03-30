@@ -1,4 +1,15 @@
-FROM rust:1.67-bullseye AS chef
+FROM rust:1.77-bullseye AS chef
+
+RUN set -x \
+    && apt-get -qq update \
+    && apt-get -qq -y install \
+    clang \
+    cmake \
+    libudev-dev \
+    libssl-dev \
+    pkg-config \
+    zlib1g-dev
+
 RUN cargo install cargo-chef
 WORKDIR /app
 
