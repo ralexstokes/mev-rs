@@ -9,6 +9,7 @@ use ethereum_consensus::{
     state_transition::Context,
 };
 use ethers::signers::{LocalWallet, Signer};
+use futures::stream::FuturesUnordered;
 use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, compute_preferred_gas_limit, Relay};
 use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256};
@@ -204,23 +205,32 @@ impl<Pool, Client> Builder<Pool, Client> {
 
         let context = &build.context;
 
-        let (mut signed_submission, builder_payment) =
+        let (signed_submission, builder_payment) =
             build.prepare_bid(&self.secret_key, &self.public_key, &self.context)?;
 
-        // TODO: make calls concurrently
-        for relay in context.relays.iter() {
-            let slot = signed_submission.message.slot;
-            let parent_hash = &signed_submission.message.parent_hash;
-            let block_hash = &signed_submission.message.block_hash;
-            let value = &signed_submission.message.value;
-            tracing::info!(%id, %relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
-            match relay.submit_bid(&mut signed_submission).await {
-                Ok(_) => tracing::info!(%id, %relay, "successfully submitted bid"),
-                Err(err) => {
-                    tracing::warn!(%err, %id, %relay, "error submitting bid");
+        // Concurrently submit bids to all relays
+        let tasks = context.relays.iter().map(|relay| {
+            let relay = relay.clone();
+            let id = id.clone();
+            let mut signed_submission = signed_submission.clone();
+            tokio::spawn(async move {
+                let slot = signed_submission.message.slot;
+                let parent_hash = &signed_submission.message.parent_hash;
+                let block_hash = &signed_submission.message.block_hash;
+                let value = &signed_submission.message.value;
+                tracing::info!(%id, %relay, slot, %parent_hash, %block_hash, ?value, %builder_payment, "submitting bid");
+                match relay.submit_bid(&mut signed_submission).await {
+                    Ok(_) => tracing::info!(%id, %relay, "successfully submitted bid"),
+                    Err(err) => {
+                        tracing::warn!(%err, %id, %relay, "error submitting bid");
+                    }
                 }
-            }
-        }
+            })
+        })
+        .collect::<FuturesUnordered<_>>();
+
+        // Wait for all bids to be submitted
+        futures::future::join_all(tasks).await;
 
         Ok(())
     }
@@ -395,5 +405,125 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ethereum_consensus::clock::{for_mainnet, MAINNET_GENESIS_TIME};
+    use ethers::{
+        prelude::rand,
+        signers::{coins_bip39::English, MnemonicBuilder, Signer},
+    };
+    use reth_primitives::ChainSpecBuilder;
+    use reth_provider::test_utils::MockEthProvider;
+    use reth_transaction_pool::test_utils::{testing_pool, TestPool};
+    use std::sync::Arc;
+
+    // TODO: construct mock relays with mock relay test-utils once added
+    fn test_relays() -> Vec<Arc<Relay>> {
+        vec![]
+    }
+
+    // TODO: move this into a `test_utils` module
+    fn test_mainnet_builder() -> Builder<TestPool, MockEthProvider> {
+        // Builder components
+        let secret_key = SecretKey::random(&mut rand::thread_rng()).unwrap();
+        let chain_spec = Arc::new(ChainSpecBuilder::mainnet().build());
+        // Test phrase from hardhat
+        let phrase = "test test test test test test test test test test test junk";
+        let derivation_index = 0_u32;
+        let wallet = MnemonicBuilder::<English>::default()
+            .phrase(phrase)
+            .index(derivation_index)
+            .unwrap()
+            .build()
+            .expect("is valid phrase");
+        let builder_wallet = wallet.with_chain_id(chain_spec.chain.id());
+        let bid_percent = 100_f64;
+        let subsidy_gwei = 0;
+        let clock = for_mainnet();
+        let context = ethereum_consensus::state_transition::Context::for_mainnet();
+        let client = MockEthProvider::default();
+        let pool = testing_pool();
+
+        // Create the builder
+        Builder::new(
+            secret_key,
+            Arc::new(context),
+            clock,
+            test_relays(),
+            pool,
+            client,
+            chain_spec,
+            Default::default(),
+            builder_wallet,
+            bid_percent,
+            subsidy_gwei,
+        )
+    }
+
+    #[tokio::test]
+    async fn test_submit_missing_bid() -> Result<(), Error> {
+        let builder = test_mainnet_builder();
+
+        let e = builder.submit_bid(&BuildIdentifier::default()).await;
+        assert!(matches!(e.unwrap_err(), Error::MissingBuild(_)));
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_initialize() -> Result<(), Error> {
+        let builder = test_mainnet_builder();
+        let current_epoch = builder.clock.current_epoch().expect("failed to fetch current epoch");
+
+        builder.initialize(current_epoch).await;
+
+        Ok(())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_process_payload_attributes_not_past_genesis_panics() {
+        let builder = test_mainnet_builder();
+        let payload_builder_attributes = PayloadBuilderAttributes {
+            id: reth_payload_builder::PayloadId::new([0; 8]),
+            parent: B256::ZERO,
+            timestamp: 0,
+            suggested_fee_recipient: Address::ZERO,
+            prev_randao: B256::ZERO,
+            withdrawals: vec![],
+            parent_beacon_block_root: None,
+        };
+
+        // This should panic since the payload attributes timestamp is not past mainnet genesis
+        let _ = builder.process_payload_attributes(payload_builder_attributes).unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_process_payload_attributes_no_proposals() -> Result<(), Error> {
+        let builder = test_mainnet_builder();
+        let current_epoch = builder.clock.current_epoch().expect("failed to fetch current epoch");
+        builder.initialize(current_epoch).await;
+
+        let payload_builder_attributes = PayloadBuilderAttributes {
+            id: reth_payload_builder::PayloadId::new([0; 8]),
+            parent: B256::ZERO,
+            timestamp: MAINNET_GENESIS_TIME + 1,
+            suggested_fee_recipient: Address::ZERO,
+            prev_randao: B256::ZERO,
+            withdrawals: vec![],
+            parent_beacon_block_root: None,
+        };
+
+        match builder.process_payload_attributes(payload_builder_attributes) {
+            Ok(_) => panic!("expected error"),
+            Err(Error::NoProposals(_)) => {}
+            Err(err) => panic!("unexpected error: {:?}", err),
+        }
+
+        Ok(())
     }
 }
