@@ -1,4 +1,4 @@
-FROM rust:1.77-bullseye AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-slim-bullseye AS chef
 
 RUN set -x \
     && apt-get -qq update \
