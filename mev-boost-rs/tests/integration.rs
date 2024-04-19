@@ -108,14 +108,14 @@ async fn test_end_to_end() {
         .iter()
         .map(|proposer| {
             let timestamp = get_time();
-            let mut registration = ValidatorRegistration {
+            let registration = ValidatorRegistration {
                 fee_recipient: proposer.fee_recipient.clone(),
                 gas_limit: 30_000_000,
                 timestamp,
                 public_key: proposer.validator.public_key.clone(),
             };
             let signature =
-                sign_builder_message(&mut registration, &proposer.signing_key, &context).unwrap();
+                sign_builder_message(&registration, &proposer.signing_key, &context).unwrap();
             SignedValidatorRegistration { message: registration, signature }
         })
         .collect::<Vec<_>>();
@@ -161,7 +161,7 @@ async fn propose_block(
                 execution_payload_header: header,
                 ..Default::default()
             };
-            let mut beacon_block = bellatrix::BlindedBeaconBlock {
+            let beacon_block = bellatrix::BlindedBeaconBlock {
                 slot: current_slot,
                 proposer_index: proposer.index,
                 body: beacon_block_body,
@@ -175,8 +175,7 @@ async fn propose_block(
                 context,
             )
             .unwrap();
-            let signature =
-                sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
+            let signature = sign_with_domain(&beacon_block, &proposer.signing_key, domain).unwrap();
             let signed_block =
                 bellatrix::SignedBlindedBeaconBlock { message: beacon_block, signature };
             SignedBlindedBeaconBlock::Bellatrix(signed_block)
@@ -187,7 +186,7 @@ async fn propose_block(
                 execution_payload_header: header,
                 ..Default::default()
             };
-            let mut beacon_block = capella::BlindedBeaconBlock {
+            let beacon_block = capella::BlindedBeaconBlock {
                 slot: current_slot,
                 proposer_index: proposer.index,
                 body: beacon_block_body,
@@ -201,8 +200,7 @@ async fn propose_block(
                 context,
             )
             .unwrap();
-            let signature =
-                sign_with_domain(&mut beacon_block, &proposer.signing_key, domain).unwrap();
+            let signature = sign_with_domain(&beacon_block, &proposer.signing_key, domain).unwrap();
             let signed_block =
                 capella::SignedBlindedBeaconBlock { message: beacon_block, signature };
             SignedBlindedBeaconBlock::Capella(signed_block)

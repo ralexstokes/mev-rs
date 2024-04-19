@@ -14,8 +14,8 @@ default-members = ["bin/mev"]
 version = "0.3.0"
 
 [workspace.dependencies]
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "fc049504a200926c8bd5f0fbd3f9696c6c6f699d" }
-beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "fc049504a200926c8bd5f0fbd3f9696c6c6f699d" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "72800f5e4cc28ad384f9cc7639d19da8dab50fb0" }
+beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "72800f5e4cc28ad384f9cc7639d19da8dab50fb0" }
 
 reth-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }
 reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "0a3884ba81579a775a0305be3a6621cd6782176a" }

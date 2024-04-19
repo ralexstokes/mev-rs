@@ -118,9 +118,7 @@ impl<
         let clock_handle = clock.clone();
         let clock = tokio::spawn(async move {
             let builder = builder_handle;
-            let slots = clock.stream_slots();
-
-            tokio::pin!(slots);
+            let mut slots = clock.into_stream();
 
             while let Some(slot) = slots.next().await {
                 builder.on_slot(slot).await;

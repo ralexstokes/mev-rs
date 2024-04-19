@@ -29,7 +29,7 @@ fn make_submission(
     payload: &SealedBlock,
     payment: &U256,
 ) -> Result<SignedBidSubmission, Error> {
-    let mut message = BidTrace {
+    let message = BidTrace {
         slot: build_context.slot,
         parent_hash: to_bytes32(payload.parent_hash),
         block_hash: to_bytes32(payload.hash),
@@ -41,7 +41,7 @@ fn make_submission(
         value: to_u256(payment),
     };
     let execution_payload = to_execution_payload(payload);
-    let signature = sign_builder_message(&mut message, signing_key, context)?;
+    let signature = sign_builder_message(&message, signing_key, context)?;
     Ok(SignedBidSubmission { message, execution_payload, signature })
 }
 

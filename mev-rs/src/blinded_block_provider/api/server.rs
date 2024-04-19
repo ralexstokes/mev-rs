@@ -28,10 +28,10 @@ pub(crate) async fn handle_status_check() -> impl IntoResponse {
 
 pub(crate) async fn handle_validator_registration<B: BlindedBlockProvider>(
     State(builder): State<B>,
-    Json(mut registrations): Json<Vec<SignedValidatorRegistration>>,
+    Json(registrations): Json<Vec<SignedValidatorRegistration>>,
 ) -> Result<(), Error> {
     trace!(count = registrations.len(), "processing validator registrations");
-    builder.register_validators(&mut registrations).await.map_err(From::from)
+    builder.register_validators(&registrations).await.map_err(From::from)
 }
 
 pub(crate) async fn handle_fetch_bid<B: BlindedBlockProvider>(
@@ -47,9 +47,9 @@ pub(crate) async fn handle_fetch_bid<B: BlindedBlockProvider>(
 
 pub(crate) async fn handle_open_bid<B: BlindedBlockProvider>(
     State(builder): State<B>,
-    Json(mut block): Json<SignedBlindedBeaconBlock>,
+    Json(block): Json<SignedBlindedBeaconBlock>,
 ) -> Result<Json<VersionedValue<AuctionContents>>, Error> {
-    let auction_contents = builder.open_bid(&mut block).await?;
+    let auction_contents = builder.open_bid(&block).await?;
     let payload = auction_contents.execution_payload();
     let block_hash = payload.block_hash();
     let slot = block.message().slot();

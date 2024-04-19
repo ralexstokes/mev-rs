@@ -124,9 +124,7 @@ impl Service {
         });
 
         let relay = tokio::spawn(async move {
-            let slots = clock.stream_slots();
-
-            tokio::pin!(slots);
+            let mut slots = clock.clone().into_stream();
 
             let mut current_epoch = clock.current_epoch().expect("after genesis");
             relay.on_epoch(current_epoch).await;

@@ -22,7 +22,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct IdentityBuilder {
     signing_key: SecretKey,
     public_key: BlsPublicKey,
@@ -35,7 +35,13 @@ impl IdentityBuilder {
     pub fn new(context: Context) -> Self {
         let signing_key = SecretKey::try_from([1u8; 32].as_ref()).unwrap();
         let public_key = signing_key.public_key();
-        Self { signing_key, public_key, context: Arc::new(context), ..Default::default() }
+        Self {
+            signing_key,
+            public_key,
+            context: Arc::new(context),
+            bids: Default::default(),
+            registrations: Default::default(),
+        }
     }
 }
 
@@ -43,7 +49,7 @@ impl IdentityBuilder {
 impl BlindedBlockProvider for IdentityBuilder {
     async fn register_validators(
         &self,
-        registrations: &mut [SignedValidatorRegistration],
+        registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let mut state = self.registrations.lock().unwrap();
         for registration in registrations {
@@ -62,15 +68,15 @@ impl BlindedBlockProvider for IdentityBuilder {
         let state = self.registrations.lock().unwrap();
         let preferences = state.get(public_key).unwrap();
         let value = U256::from(1337);
-        let (payload, mut builder_bid) = if *slot < capella_fork_slot {
-            let mut payload = bellatrix::ExecutionPayload {
+        let (payload, builder_bid) = if *slot < capella_fork_slot {
+            let payload = bellatrix::ExecutionPayload {
                 parent_hash: parent_hash.clone(),
                 fee_recipient: preferences.fee_recipient.clone(),
                 gas_limit: preferences.gas_limit,
                 ..Default::default()
             };
             let header = ExecutionPayloadHeader::Bellatrix(
-                bellatrix::ExecutionPayloadHeader::try_from(&mut payload).unwrap(),
+                bellatrix::ExecutionPayloadHeader::try_from(&payload).unwrap(),
             );
             let builder_bid = BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
                 header,
@@ -79,14 +85,14 @@ impl BlindedBlockProvider for IdentityBuilder {
             });
             (ExecutionPayload::Bellatrix(payload), builder_bid)
         } else {
-            let mut payload = capella::ExecutionPayload {
+            let payload = capella::ExecutionPayload {
                 parent_hash: parent_hash.clone(),
                 fee_recipient: preferences.fee_recipient.clone(),
                 gas_limit: preferences.gas_limit,
                 ..Default::default()
             };
             let header = ExecutionPayloadHeader::Capella(
-                capella::ExecutionPayloadHeader::try_from(&mut payload).unwrap(),
+                capella::ExecutionPayloadHeader::try_from(&payload).unwrap(),
             );
             let builder_bid = BuilderBid::Capella(builder_bid::capella::BuilderBid {
                 header,
@@ -97,7 +103,7 @@ impl BlindedBlockProvider for IdentityBuilder {
         };
 
         let signature =
-            sign_builder_message(&mut builder_bid, &self.signing_key, &self.context).unwrap();
+            sign_builder_message(&builder_bid, &self.signing_key, &self.context).unwrap();
         let signed_builder_bid = SignedBuilderBid { message: builder_bid, signature };
         let mut state = self.bids.lock().unwrap();
         state.insert(*slot, payload);
@@ -106,7 +112,7 @@ impl BlindedBlockProvider for IdentityBuilder {
 
     async fn open_bid(
         &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
+        signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<AuctionContents, Error> {
         let slot = signed_block.message().slot();
         let state = self.bids.lock().unwrap();

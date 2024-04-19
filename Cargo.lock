@@ -527,28 +527,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-stream"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd56dd203fef61ac097dd65721a419ddccb106b2d2b70ba60a6b529f03961a51"
-dependencies = [
- "async-stream-impl",
- "futures-core",
- "pin-project-lite",
-]
-
-[[package]]
-name = "async-stream-impl"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16e62a023e7c117e27523144c5d2459f4397fcc3cab0085af8e2224f643a0193"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.50",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -741,7 +719,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=fc049504a200926c8bd5f0fbd3f9696c6c6f699d#fc049504a200926c8bd5f0fbd3f9696c6c6f699d"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=72800f5e4cc28ad384f9cc7639d19da8dab50fb0#72800f5e4cc28ad384f9cc7639d19da8dab50fb0"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -2349,9 +2327,8 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=fc049504a200926c8bd5f0fbd3f9696c6c6f699d#fc049504a200926c8bd5f0fbd3f9696c6c6f699d"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=72800f5e4cc28ad384f9cc7639d19da8dab50fb0#72800f5e4cc28ad384f9cc7639d19da8dab50fb0"
 dependencies = [
- "async-stream",
  "blst",
  "bs58 0.4.0",
  "c-kzg",

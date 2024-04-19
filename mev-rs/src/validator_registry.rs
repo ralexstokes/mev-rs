@@ -1,7 +1,4 @@
-use crate::{
-    signing::{compute_builder_signing_root, verify_signature},
-    types::SignedValidatorRegistration,
-};
+use crate::{signing::verify_signed_builder_data, types::SignedValidatorRegistration};
 use beacon_api_client::{
     mainnet::Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary,
 };
@@ -149,16 +146,16 @@ impl ValidatorRegistry {
 
     fn process_registration<'a>(
         &'a self,
-        registration: &'a mut SignedValidatorRegistration,
+        registration: &'a SignedValidatorRegistration,
         current_timestamp: u64,
         context: &Context,
-    ) -> Result<Option<&'a mut SignedValidatorRegistration>, Error> {
+    ) -> Result<Option<&'a SignedValidatorRegistration>, Error> {
         let state = self.state.read();
         let latest_timestamp = state
             .validator_preferences
             .get(&registration.message.public_key)
             .map(|r| r.message.timestamp);
-        let message = &mut registration.message;
+        let message = &registration.message;
 
         validate_registration_is_not_from_future(message, current_timestamp)?;
 
@@ -181,9 +178,7 @@ impl ValidatorRegistry {
             .ok_or(Error::UnknownPubkey)?;
         validate_validator_status(message, validator_status)?;
 
-        let signing_root = compute_builder_signing_root(message, context)?;
-        let public_key = &message.public_key;
-        verify_signature(public_key, signing_root.as_ref(), &registration.signature)?;
+        verify_signed_builder_data(message, &message.public_key, &registration.signature, context)?;
 
         let update = if matches!(registration_status, ValidatorRegistrationStatus::New) {
             trace!(%public_key, "processed new registration");
@@ -198,12 +193,12 @@ impl ValidatorRegistry {
     // and any errors encountered while processing.
     pub fn process_registrations(
         &self,
-        registrations: &mut [SignedValidatorRegistration],
+        registrations: &[SignedValidatorRegistration],
         current_timestamp: u64,
         context: &Context,
     ) -> (HashSet<BlsPublicKey>, Vec<Error>) {
         let (updates, errs): (Vec<_>, Vec<_>) = registrations
-            .par_iter_mut()
+            .par_iter()
             .map(|registration| self.process_registration(registration, current_timestamp, context))
             .partition(|result| result.is_ok());
         let mut state = self.state.write();

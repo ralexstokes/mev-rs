@@ -6,6 +6,7 @@ use ethereum_consensus::{
 use futures::{stream, StreamExt};
 use mev_rs::{
     relay::Relay,
+    signing::verify_signed_builder_data,
     types::{
         AuctionContents, AuctionRequest, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
@@ -35,7 +36,7 @@ fn bid_key_from(
 }
 
 fn validate_bid(
-    bid: &mut SignedBuilderBid,
+    bid: &SignedBuilderBid,
     public_key: &BlsPublicKey,
     context: &Context,
 ) -> Result<(), Error> {
@@ -47,7 +48,8 @@ fn validate_bid(
         }
         .into())
     }
-    Ok(bid.verify_signature(context)?)
+    verify_signed_builder_data(&bid.message, public_key, &bid.signature, context)
+        .map_err(Into::into)
 }
 
 // Select the most valuable bids in `bids`, breaking ties by `block_hash`
@@ -122,7 +124,7 @@ impl RelayMux {
 impl BlindedBlockProvider for RelayMux {
     async fn register_validators(
         &self,
-        registrations: &mut [SignedValidatorRegistration],
+        registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let responses = stream::iter(self.relays.iter().cloned())
             .map(|relay| async {
@@ -168,8 +170,8 @@ impl BlindedBlockProvider for RelayMux {
             .buffer_unordered(self.relays.len())
             .filter_map(|(relay, response)| async {
                 match response {
-                    Ok(Ok(mut bid)) => {
-                        if let Err(err) = validate_bid(&mut bid, &relay.public_key, &self.context) {
+                    Ok(Ok(bid)) => {
+                        if let Err(err) = validate_bid(&bid, &relay.public_key, &self.context) {
                             warn!(%err, %relay, "invalid signed builder bid");
                             None
                         } else {
@@ -240,7 +242,7 @@ impl BlindedBlockProvider for RelayMux {
 
     async fn open_bid(
         &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
+        signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<AuctionContents, Error> {
         let (auction_request, relays) = {
             let mut state = self.state.lock();
