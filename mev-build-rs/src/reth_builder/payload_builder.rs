@@ -63,14 +63,14 @@ fn assemble_txs_from_pool<Pool: reth_transaction_pool::TransactionPool>(
     let effective_gas_limit = block_gas_limit - context.build.gas_reserve;
     while let Some(pool_tx) = best_txs.next() {
         if context.is_cancelled() {
-            return Ok(())
+            return Ok(());
         }
 
         // NOTE: we withhold the `gas_reserve` so the "bidder" has some guaranteed room
         // to play with the payload after it is built.
         if context.cumulative_gas_used + pool_tx.gas_limit() > effective_gas_limit {
             best_txs.mark_invalid(&pool_tx);
-            continue
+            continue;
         }
 
         let tx = pool_tx.to_recovered_transaction();
@@ -81,7 +81,7 @@ fn assemble_txs_from_pool<Pool: reth_transaction_pool::TransactionPool>(
                     if !matches!(err, InvalidTransaction::NonceTooLow { .. }) {
                         best_txs.mark_invalid(&pool_tx);
                     }
-                    continue
+                    continue;
                 }
                 _ => return Err(err),
             }
@@ -106,7 +106,7 @@ fn assemble_payload_with_payments(
     )?;
 
     if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
+        return Ok(BuildOutcome::Cancelled);
     }
 
     context.db.merge_transitions(BundleRetention::PlainState);
@@ -274,6 +274,8 @@ impl<'a> ExecutionContext<'a> {
             success: result.is_success(),
             cumulative_gas_used: self.cumulative_gas_used,
             logs: result.logs().into_iter().map(into_reth_log).collect(),
+            #[cfg(feature = "optimism")]
+            deposit_nonce: None,
         };
         self.receipts.push(Some(receipt));
 
@@ -301,12 +303,12 @@ pub fn build_payload<
     let mut context = ExecutionContext::try_from(context, cancel, provider)?;
 
     if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
+        return Ok(BuildOutcome::Cancelled);
     }
     assemble_txs_from_pool(&mut context, pool)?;
 
     if context.total_fees < threshold_value {
-        return Ok(BuildOutcome::Worse { threshold: threshold_value, provided: context.total_fees })
+        return Ok(BuildOutcome::Worse { threshold: threshold_value, provided: context.total_fees });
     }
 
     context.compute_payment_from_fees();
@@ -314,14 +316,14 @@ pub fn build_payload<
     let payment_tx = construct_payment_tx(&mut context)?;
 
     if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
+        return Ok(BuildOutcome::Cancelled);
     }
 
     // NOTE: assume payment transaction always succeeds
     context.extend_transaction(payment_tx)?;
 
     if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
+        return Ok(BuildOutcome::Cancelled);
     }
 
     assemble_payload_with_payments(context, provider)

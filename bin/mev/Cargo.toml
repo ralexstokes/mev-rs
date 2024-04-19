@@ -11,6 +11,7 @@ default = ["boost", "build", "relay"]
 boost = ["mev-boost-rs"]
 build = ["mev-build-rs", "reth"]
 relay = ["mev-relay-rs"]
+optimism = ["reth/optimism", "mev-build-rs/optimism"]
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
