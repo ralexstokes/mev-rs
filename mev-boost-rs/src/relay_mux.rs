@@ -17,9 +17,8 @@ use rand::prelude::*;
 use std::{cmp::Ordering, collections::HashMap, ops::Deref, sync::Arc, time::Duration};
 use tracing::{debug, info, warn};
 
-// See note in the `mev-relay-rs::Relay` about this constant.
-// TODO likely drop this feature...
-const PROPOSAL_TOLERANCE_DELAY: Slot = 1;
+// Sets the lifetime of an auction with respect to its proposal slot.
+const AUCTION_LIFETIME_SLOTS: Slot = 1;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 
@@ -103,7 +102,7 @@ impl RelayMux {
         let mut state = self.state.lock();
         state
             .outstanding_bids
-            .retain(|auction_request, _| auction_request.slot + PROPOSAL_TOLERANCE_DELAY >= slot);
+            .retain(|auction_request, _| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
     }
 
     pub fn on_epoch(&self, epoch: Epoch) {
@@ -170,22 +169,22 @@ impl BlindedBlockProvider for RelayMux {
                 match response {
                     Ok(Ok(mut bid)) => {
                         if let Err(err) = validate_bid(&mut bid, &relay.public_key, &self.context) {
-                            warn!(%err, %relay, "invalid signed builder bid");
+                            warn!(%err, %auction_request, %relay, "invalid signed builder bid");
                             None
                         } else {
                             Some((relay, bid))
                         }
                     }
                     Ok(Err(Error::NoBidPrepared(auction_request))) => {
-                        debug!(%auction_request, %relay, "relay did not have a bid prepared");
+                        debug!(slot = auction_request.slot, parent_hash = %auction_request.parent_hash, proposer = %auction_request.public_key, %relay, "relay did not have a bid prepared");
                         None
                     }
                     Ok(Err(err)) => {
-                        warn!(%err, %relay, "failed to get a bid");
+                        warn!(%err, %auction_request, %relay, "failed to get a bid");
                         None
                     }
                     Err(_) => {
-                        warn!(timeout_in_sec = FETCH_BEST_BID_TIME_OUT_SECS, %relay, "timeout when fetching bid");
+                        warn!(timeout_in_sec = FETCH_BEST_BID_TIME_OUT_SECS, %auction_request, %relay, "timeout when fetching bid");
                         None
                     }
                 }
@@ -194,7 +193,7 @@ impl BlindedBlockProvider for RelayMux {
             .await;
 
         if bids.is_empty() {
-            info!(%auction_request, "no relays had bids prepared");
+            info!(slot = auction_request.slot, parent_hash = %auction_request.parent_hash, proposer = %auction_request.public_key, "no relays had bids prepared");
             return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
@@ -220,12 +219,13 @@ impl BlindedBlockProvider for RelayMux {
             }
         }
 
+        let value = best_bid.message.value();
         let relays_desc = best_relays
             .iter()
             .map(|relay| format!("{relay}"))
             .reduce(|desc, next| format!("{desc}, {next}"))
             .expect("at least one relay");
-        info!(%auction_request, %best_bid, relays=relays_desc, "acquired best bid");
+        info!(slot = auction_request.slot, parent_hash = %auction_request.parent_hash, proposer = %auction_request.public_key, block_hash = %best_block_hash, %value, relays = relays_desc, "acquired best bid");
 
         {
             let mut state = self.state.lock();
@@ -267,24 +267,36 @@ impl BlindedBlockProvider for RelayMux {
         let block_body = block.body();
         let payload_header = block_body.execution_payload_header();
         let expected_block_hash = payload_header.block_hash();
+        let mut best_auction_contents = None;
+        let mut relays_with_contents = vec![];
         for (relay, response) in responses.into_iter() {
             match response {
                 Ok(auction_contents) => {
                     let block_hash = auction_contents.execution_payload().block_hash();
                     if block_hash == expected_block_hash {
-                        info!(%auction_request, %block_hash, %relay, "acquired payload");
-                        return Ok(auction_contents)
+                        best_auction_contents = best_auction_contents.or(Some(auction_contents));
+                        relays_with_contents.push(relay);
                     } else {
-                        warn!(?block_hash, ?expected_block_hash, %relay, "incorrect block hash delivered by relay");
+                        warn!(?block_hash, ?expected_block_hash, %auction_request, %relay, "incorrect block hash delivered by relay");
                     }
                 }
                 Err(err) => {
-                    warn!(%err, %relay, "error opening bid");
+                    warn!(%err, %auction_request, %relay, "error opening bid");
                 }
             }
         }
-
-        Err(BoostError::MissingPayload(expected_block_hash.clone()).into())
+        if let Some(auction_contents) = best_auction_contents {
+            let relays_desc = relays_with_contents
+                .iter()
+                .map(|relay| format!("{relay}"))
+                .reduce(|desc, next| format!("{desc}, {next}"))
+                .expect("at least one relay");
+            let block_hash = auction_contents.execution_payload().block_hash();
+            info!(slot = auction_request.slot, parent_hash = %auction_request.parent_hash, proposer = %auction_request.public_key, %block_hash, relays = relays_desc, "acquired payload");
+            Ok(auction_contents)
+        } else {
+            Err(BoostError::MissingPayload(expected_block_hash.clone()).into())
+        }
     }
 }
 
