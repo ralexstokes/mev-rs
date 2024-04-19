@@ -2,7 +2,6 @@
 /// the `reth-basic-payload-builder` package in the `reth` codebase.
 use crate::reth_builder::{
     build::{BuildContext, PayloadWithPayments},
-    cancelled::Cancelled,
     error::Error,
 };
 use ethers::{
@@ -12,13 +11,17 @@ use ethers::{
         U256 as ethers_U256,
     },
 };
+use reth_basic_payload_builder::{
+    default_payload_builder, BuildArguments, BuildOutcome as RethOutcome, Cancelled, PayloadConfig,
+};
 use reth_interfaces::RethError;
+use reth_payload_builder::{error::PayloadBuilderError, BuiltPayload, PayloadId};
 use reth_primitives::{
     constants::{BEACON_NONCE, EMPTY_OMMER_ROOT_HASH},
     proofs,
     revm::{compat::into_reth_log, env::tx_env_with_recovered},
-    Address, Block, Bytes, ChainSpec, Header, IntoRecoveredTransaction, Receipt, Receipts,
-    TransactionSigned, TransactionSignedEcRecovered, Withdrawal, B256, U256,
+    Address, Block, Bytes, ChainSpec, Header, Receipt, Receipts, TransactionSigned,
+    TransactionSignedEcRecovered, Withdrawal, B256, U256,
 };
 use reth_provider::{BundleStateWithReceipts, StateProvider, StateProviderFactory};
 use reth_revm::{
@@ -26,10 +29,45 @@ use reth_revm::{
 };
 use revm::{
     db::{states::bundle_state::BundleRetention, WrapDatabaseRef},
-    primitives::{EVMError, Env, InvalidTransaction, ResultAndState},
+    primitives::{Env, ResultAndState},
     Database, DatabaseCommit, State,
 };
-use std::fmt;
+use std::{fmt, sync::Arc};
+
+pub struct RethPayloadBuilder<Pool, Client> {
+    build_arguments: BuildArguments<Pool, Client>,
+}
+
+impl<Pool, Client> RethPayloadBuilder<Pool, Client>
+where
+    Client: reth_provider::StateProviderFactory,
+    Pool: reth_transaction_pool::TransactionPool,
+{
+    pub fn new(
+        context: &BuildContext,
+        client: Client,
+        pool: Pool,
+        cancel: Cancelled,
+        best_payload: Option<Arc<BuiltPayload>>,
+    ) -> Self {
+        let cached_reads = Default::default();
+        let config = PayloadConfig::new(
+            context.parent_block.clone(),
+            context.extra_data.clone(),
+            context.payload_attributes.clone(),
+            context.chain_spec.clone(),
+        );
+
+        let build_arguments =
+            BuildArguments::new(client, pool, cached_reads, config, cancel, best_payload);
+
+        Self { build_arguments }
+    }
+
+    pub fn build(self) -> Result<RethOutcome, PayloadBuilderError> {
+        default_payload_builder(self.build_arguments)
+    }
+}
 
 fn process_withdrawals<DB: Database<Error = RethError>>(
     withdrawals: &[Withdrawal],
@@ -51,48 +89,9 @@ pub enum BuildOutcome {
     Cancelled,
 }
 
-fn assemble_txs_from_pool<Pool: reth_transaction_pool::TransactionPool>(
-    context: &mut ExecutionContext,
-    pool: &Pool,
-) -> Result<(), Error> {
-    let base_fee = context.build.base_fee();
-    let block_gas_limit = context.build.gas_limit();
-
-    let mut best_txs = pool.best_transactions_with_base_fee(base_fee);
-
-    let effective_gas_limit = block_gas_limit - context.build.gas_reserve;
-    while let Some(pool_tx) = best_txs.next() {
-        if context.is_cancelled() {
-            return Ok(())
-        }
-
-        // NOTE: we withhold the `gas_reserve` so the "bidder" has some guaranteed room
-        // to play with the payload after it is built.
-        if context.cumulative_gas_used + pool_tx.gas_limit() > effective_gas_limit {
-            best_txs.mark_invalid(&pool_tx);
-            continue
-        }
-
-        let tx = pool_tx.to_recovered_transaction();
-
-        if let Err(err) = context.extend_transaction(tx) {
-            match err {
-                Error::Execution(EVMError::Transaction(err)) => {
-                    if !matches!(err, InvalidTransaction::NonceTooLow { .. }) {
-                        best_txs.mark_invalid(&pool_tx);
-                    }
-                    continue
-                }
-                _ => return Err(err),
-            }
-        }
-    }
-    Ok(())
-}
-
-fn assemble_payload_with_payments(
+fn assemble_payload_with_payments<P: StateProviderFactory>(
     mut context: ExecutionContext,
-    client: &dyn StateProviderFactory,
+    client: P,
 ) -> Result<BuildOutcome, Error> {
     let base_fee = context.build.base_fee();
     let block_number = context.build.number();
@@ -152,8 +151,14 @@ fn assemble_payload_with_payments(
         withdrawals: Some(context.build.withdrawals.clone()),
     };
 
+    let payload = BuiltPayload::new(
+        PayloadId::new(Default::default()),
+        payload.seal_slow(),
+        context.total_fees,
+    );
+
     let payload_with_payments = PayloadWithPayments {
-        payload: Some(payload.seal_slow()),
+        payload: Some(Arc::new(payload)),
         proposer_payment: context.total_payment,
         builder_payment: context.revenue,
     };
@@ -197,7 +202,7 @@ fn construct_payment_tx(
 
 struct ExecutionContext<'a> {
     build: &'a BuildContext,
-    cancel: &'a Cancelled,
+    cancel: Cancelled,
     db: revm::State<WrapDatabaseRef<StateProviderDatabase<Box<dyn StateProvider + 'a>>>>,
     receipts: Vec<Option<Receipt>>,
     cumulative_gas_used: u64,
@@ -219,23 +224,23 @@ impl<'a> fmt::Debug for ExecutionContext<'a> {
     }
 }
 
+type DB<'a> = revm::State<WrapDatabaseRef<StateProviderDatabase<Box<dyn StateProvider + 'a>>>>;
+
 impl<'a> ExecutionContext<'a> {
-    fn try_from<P: reth_provider::StateProviderFactory + 'a>(
+    fn try_from(
         context: &'a BuildContext,
-        cancel: &'a Cancelled,
-        provider: &'a P,
+        cancel: Cancelled,
+        db: DB<'a>,
+        payload: BuiltPayload,
     ) -> Result<Self, Error> {
-        let state_provider = provider.state_by_block_hash(context.parent_hash)?;
-        let state = StateProviderDatabase::new(state_provider);
-        let db = State::builder().with_database_ref(state).with_bundle_update().build();
         Ok(ExecutionContext {
             build: context,
             cancel,
             db,
             receipts: Default::default(),
             cumulative_gas_used: 0,
-            total_fees: U256::ZERO,
-            executed_txs: Default::default(),
+            total_fees: payload.fees(),
+            executed_txs: payload.block().body.clone(),
             total_payment: U256::ZERO,
             revenue: U256::ZERO,
         })
@@ -289,40 +294,53 @@ impl<'a> ExecutionContext<'a> {
 }
 
 pub fn build_payload<
-    Provider: reth_provider::StateProviderFactory,
+    Provider: reth_provider::StateProviderFactory + Clone,
     Pool: reth_transaction_pool::TransactionPool,
 >(
     context: &BuildContext,
-    threshold_value: U256,
-    provider: &Provider,
-    pool: &Pool,
-    cancel: &Cancelled,
+    best_payload: Option<Arc<BuiltPayload>>,
+    client: Provider,
+    pool: Pool,
+    cancel: Cancelled,
 ) -> Result<BuildOutcome, Error> {
-    let mut context = ExecutionContext::try_from(context, cancel, provider)?;
+    let payload_builder = RethPayloadBuilder::new(
+        context,
+        client.clone(),
+        pool,
+        cancel.clone(),
+        best_payload.clone(),
+    );
+    match payload_builder.build() {
+        Ok(RethOutcome::Aborted { fees, .. }) => Ok(BuildOutcome::Worse {
+            threshold: best_payload.map(|p| p.fees()).unwrap_or_default(),
+            provided: fees,
+        }),
+        // TODO: leverage cached reads
+        Ok(RethOutcome::Better { payload, .. }) => {
+            let client_handle = client.clone();
+            let state_provider = client_handle.state_by_block_hash(context.parent_hash)?;
+            let state = StateProviderDatabase::new(state_provider);
+            let db = State::builder().with_database_ref(state).with_bundle_update().build();
+            let mut context = ExecutionContext::try_from(context, cancel, db, payload)?;
 
-    if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
+            context.compute_payment_from_fees();
+
+            let payment_tx = construct_payment_tx(&mut context)?;
+
+            if context.is_cancelled() {
+                return Ok(BuildOutcome::Cancelled)
+            }
+
+            // NOTE: assume payment transaction always succeeds
+            context.extend_transaction(payment_tx)?;
+
+            if context.is_cancelled() {
+                return Ok(BuildOutcome::Cancelled)
+            }
+
+            assemble_payload_with_payments(context, client)
+        }
+        Ok(RethOutcome::Cancelled) => Ok(BuildOutcome::Cancelled),
+        Err(err) => Err(err.into()),
     }
-    assemble_txs_from_pool(&mut context, pool)?;
-
-    if context.total_fees < threshold_value {
-        return Ok(BuildOutcome::Worse { threshold: threshold_value, provided: context.total_fees })
-    }
-
-    context.compute_payment_from_fees();
-
-    let payment_tx = construct_payment_tx(&mut context)?;
-
-    if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
-    }
-
-    // NOTE: assume payment transaction always succeeds
-    context.extend_transaction(payment_tx)?;
-
-    if context.is_cancelled() {
-        return Ok(BuildOutcome::Cancelled)
-    }
-
-    assemble_payload_with_payments(context, provider)
 }

@@ -4,7 +4,6 @@ mod auction_schedule;
 mod bidder;
 mod build;
 mod builder;
-mod cancelled;
 mod error;
 mod payload_builder;
 mod reth_compat;

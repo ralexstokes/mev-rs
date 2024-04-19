@@ -199,7 +199,9 @@ impl<
                             });
                         }
                     }
-                    Ok(PayloadAttributesProcessingOutcome::Duplicate(_)) => continue,
+                    Ok(PayloadAttributesProcessingOutcome::Duplicate(payload_attributes)) => {
+                        info!(?payload_attributes, "duplicate payload attributes encountered");
+                    }
                     Err(BuilderError::NoProposals(_)) => continue,
                     Err(err) => {
                         tracing::warn!(err = ?err, "could not process payload attributes");

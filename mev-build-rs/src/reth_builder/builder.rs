@@ -1,6 +1,5 @@
 use crate::reth_builder::{
-    auction_schedule::AuctionSchedule, build::*, cancelled::Cancelled, error::Error,
-    payload_builder::*,
+    auction_schedule::AuctionSchedule, build::*, error::Error, payload_builder::*,
 };
 use ethereum_consensus::{
     clock::SystemClock,
@@ -10,6 +9,7 @@ use ethereum_consensus::{
 };
 use ethers::signers::{LocalWallet, Signer};
 use mev_rs::{blinded_block_relayer::BlindedBlockRelayer, compute_preferred_gas_limit, Relay};
+use reth_basic_payload_builder::Cancelled;
 use reth_payload_builder::PayloadBuilderAttributes;
 use reth_primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256};
 use reth_provider::{BlockReaderIdExt, BlockSource, StateProviderFactory};
@@ -22,6 +22,7 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tokio_stream::{wrappers::ReceiverStream, Stream};
+use tracing::debug;
 
 // The amount to let the build progress into its target slot.
 // The build will stop early if stopped by an outside process.
@@ -231,7 +232,9 @@ pub enum PayloadAttributesProcessingOutcome {
     Duplicate(PayloadBuilderAttributes),
 }
 
-impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Builder<Pool, Client> {
+impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt + Clone>
+    Builder<Pool, Client>
+{
     // TODO: clean up argument set
     #[allow(clippy::too_many_arguments)]
     // NOTE: this is held inside a lock currently, minimize work here
@@ -289,9 +292,11 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             extra_data: self.extra_data.clone(),
             builder_wallet: self.builder_wallet.clone(),
             // TODO: handle smart contract payments to fee recipient
-            gas_reserve: 21000,
+            _gas_reserve: 21000,
             bid_percent: self.bid_percent,
             subsidy: subsidy_in_wei,
+            parent_block: Arc::new(parent_block),
+            payload_attributes: payload_attributes.clone(),
         };
         Ok(context)
     }
@@ -334,11 +339,14 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
             let build = Arc::new(Build::new(context));
 
             // TODO: encapsulate these details
-            let current_value = build.value();
             let cancel = Cancelled::default();
-            if let Ok(BuildOutcome::BetterOrEqual(payload_with_payments)) =
-                build_payload(&build.context, current_value, &self.client, &self.pool, &cancel)
-            {
+            if let Ok(BuildOutcome::BetterOrEqual(payload_with_payments)) = build_payload(
+                &build.context,
+                None,
+                self.client.clone(),
+                self.pool.clone(),
+                cancel.clone(),
+            ) {
                 let mut state = build.state.lock().unwrap();
                 state.payload_with_payments = payload_with_payments;
             }
@@ -379,13 +387,14 @@ impl<Pool: TransactionPool, Client: StateProviderFactory + BlockReaderIdExt> Bui
                     return Ok(())
                 }
                 _ = interval.tick() => {
-                    let current_value = build.value();
-                    match build_payload(&build.context, current_value, &self.client, &self.pool, &cancel) {
+                    match build_payload(&build.context, build.payload(), self.client.clone(), self.pool.clone(), cancel.clone()) {
                         Ok(BuildOutcome::BetterOrEqual(payload_with_payments)) => {
                             let mut state = build.state.lock().unwrap();
                             state.payload_with_payments = payload_with_payments;
                         }
-                        Ok(BuildOutcome::Worse { .. }) => continue,
+                        Ok(BuildOutcome::Worse { threshold, provided  }) => {
+                           debug!(%threshold, %provided, "did not build a better payload");
+                        }
                         Ok(BuildOutcome::Cancelled) => {
                             tracing::trace!(%id, "build cancelled");
                             return Ok(())

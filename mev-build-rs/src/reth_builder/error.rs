@@ -1,6 +1,7 @@
 use crate::reth_builder::build::BuildIdentifier;
 use ethereum_consensus::{primitives::Slot, Error as ConsensusError};
 use reth_interfaces::RethError;
+use reth_payload_builder::error::PayloadBuilderError;
 use reth_primitives::B256;
 use revm::primitives::EVMError;
 use thiserror::Error;
@@ -19,6 +20,8 @@ pub enum Error {
     Consensus(#[from] ConsensusError),
     #[error(transparent)]
     Reth(#[from] RethError),
+    #[error(transparent)]
+    RethPayloadBuilder(#[from] PayloadBuilderError),
     #[error("evm execution error: {0:?}")]
     Execution(#[from] EVMError<RethError>),
     #[error("{0}")]

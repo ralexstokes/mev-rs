@@ -14,6 +14,7 @@ use mev_rs::{
     types::{BidTrace, SignedBidSubmission},
     Relay,
 };
+use reth_payload_builder::{BuiltPayload, PayloadBuilderAttributes};
 use reth_primitives::{Bytes, ChainSpec, SealedBlock, Withdrawal, B256, U256};
 use revm::primitives::{BlockEnv, CfgEnv};
 use std::sync::{Arc, Mutex};
@@ -62,11 +63,14 @@ pub struct BuildContext {
     pub builder_wallet: LocalWallet,
     // Amount of gas to reserve after building a payload
     // e.g. used for end-of-block proposer payments
-    pub gas_reserve: u64,
+    pub _gas_reserve: u64,
     // Amount of the block's value to bid to the proposer
     pub bid_percent: f64,
     // Amount to add to the block's value to bid to the proposer
     pub subsidy: U256,
+    // TODO: refactor these w/ the above fields
+    pub parent_block: Arc<SealedBlock>,
+    pub payload_attributes: PayloadBuilderAttributes,
 }
 
 pub fn compute_build_id(slot: Slot, parent_hash: B256, proposer: &BlsPublicKey) -> BuildIdentifier {
@@ -113,9 +117,9 @@ impl Build {
         Self { context, state: Mutex::new(Default::default()) }
     }
 
-    pub fn value(&self) -> U256 {
+    pub fn payload(&self) -> Option<Arc<BuiltPayload>> {
         let state = self.state.lock().unwrap();
-        state.payload_with_payments.proposer_payment
+        state.payload_with_payments.payload.clone()
     }
 
     pub fn prepare_bid(
@@ -134,7 +138,14 @@ impl Build {
         let payment = &payload_with_payments.proposer_payment;
         let builder_payment = payload_with_payments.builder_payment;
         Ok((
-            make_submission(secret_key, public_key, context, build_context, payload, payment)?,
+            make_submission(
+                secret_key,
+                public_key,
+                context,
+                build_context,
+                payload.block(),
+                payment,
+            )?,
             builder_payment,
         ))
     }
@@ -142,7 +153,7 @@ impl Build {
 
 #[derive(Debug, Default)]
 pub struct PayloadWithPayments {
-    pub payload: Option<SealedBlock>,
+    pub payload: Option<Arc<BuiltPayload>>,
     pub proposer_payment: U256,
     pub builder_payment: U256,
 }
