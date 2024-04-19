@@ -6,7 +6,7 @@ use ethereum_consensus::{
 use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
-    relay::{parse_relay_endpoints, Relay, RelayEndpoint},
+    relay::{Relay, RelayEndpoints},
     Error,
 };
 use serde::Deserialize;
@@ -30,13 +30,13 @@ impl Default for Config {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<RelayEndpoint>,
+    relays: RelayEndpoints,
     network: Network,
 }
 
 impl Service {
     pub fn from(network: Network, config: Config) -> Self {
-        let relays = parse_relay_endpoints(&config.relays);
+        let relays = config.relays.into();
 
         Self { host: config.host, port: config.port, relays, network }
     }
@@ -50,7 +50,7 @@ impl Service {
         } else {
             let count = relays.len();
             info!("configured with {count} relay(s)");
-            for relay in &relays {
+            for relay in relays.iter() {
                 info!(%relay, "configured with relay");
             }
         }
@@ -106,7 +106,7 @@ impl Future for ServiceHandle {
         let this = self.project();
         let relay_mux = this.relay_mux.poll(cx);
         if relay_mux.is_ready() {
-            return relay_mux
+            return relay_mux;
         }
         this.server.poll(cx)
     }

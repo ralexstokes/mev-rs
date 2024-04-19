@@ -10,7 +10,7 @@ use ethereum_consensus::{
 };
 use ethers::signers::{coins_bip39::English, MnemonicBuilder, Signer};
 use futures::StreamExt;
-use mev_rs::{relay::parse_relay_endpoints, Error, Relay};
+use mev_rs::{relay::RelayEndpoints, Error, Relay};
 use reth_primitives::{Bytes, ChainSpec};
 use serde::Deserialize;
 use std::{future::Future, pin::Pin, sync::Arc, task::Poll};
@@ -55,7 +55,7 @@ impl<
         chain_spec: Arc<ChainSpec>,
     ) -> Result<(Self, Builder<Pool, Client>), Error> {
         let secret_key = &config.secret_key;
-        let relays = parse_relay_endpoints(&config.relays)
+        let relays = RelayEndpoints::from(&config.relays)
             .into_iter()
             .map(|endpoint| Arc::new(Relay::from(endpoint)))
             .collect::<Vec<_>>();
@@ -134,7 +134,7 @@ impl<
                 Ok(stream) => stream,
                 Err(err) => {
                     tracing::error!(err = ?err, "could not open builds stream");
-                    return
+                    return;
                 }
             };
 
@@ -175,7 +175,7 @@ impl<
                 Ok(stream) => stream,
                 Err(err) => {
                     tracing::error!(err = ?err, "could not open payload attributes stream");
-                    return
+                    return;
                 }
             };
 
@@ -230,11 +230,11 @@ impl Future for ServiceHandle {
 
         let clock = this.clock.poll(cx);
         if clock.is_ready() {
-            return clock
+            return clock;
         }
         let builder = this.payload_builder.poll(cx);
         if builder.is_ready() {
-            return builder
+            return builder;
         }
         this.bidder.poll(cx)
     }
