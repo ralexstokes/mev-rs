@@ -23,6 +23,7 @@ use mev_rs::{
 use rand::seq::SliceRandom;
 use std::{
     net::Ipv4Addr,
+    sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
@@ -98,9 +99,9 @@ async fn test_end_to_end() {
     let service = Service::from(network, config);
     service.spawn().unwrap();
 
-    let beacon_node = RelayClient::new(ApiClient::new(
+    let beacon_node = RelayClient::new(Arc::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),
-    ));
+    )));
 
     beacon_node.check_status().await.unwrap();
 

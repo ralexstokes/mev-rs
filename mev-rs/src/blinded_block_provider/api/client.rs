@@ -10,6 +10,7 @@ use beacon_api_client::{
     api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
     VersionedValue, ETH_CONSENSUS_VERSION_HEADER,
 };
+use std::sync::Arc;
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
@@ -17,11 +18,11 @@ use beacon_api_client::{
 /// it accepts.
 #[derive(Clone)]
 pub struct Client {
-    api: BeaconApiClient,
+    api: Arc<BeaconApiClient>,
 }
 
 impl Client {
-    pub fn new(api_client: BeaconApiClient) -> Self {
+    pub fn new(api_client: Arc<BeaconApiClient>) -> Self {
         Self { api: api_client }
     }
 
@@ -49,7 +50,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(auction_request.clone()))
+            return Err(Error::NoBidPrepared(auction_request.clone()));
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =
