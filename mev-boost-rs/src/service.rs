@@ -7,25 +7,10 @@ use futures::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
     relay::{parse_relay_endpoints, Relay, RelayEndpoint},
-    Error,
+    BoostError, Error,
 };
-use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use tracing::{error, info};
-
-#[derive(Debug, Deserialize)]
-pub struct Config {
-    pub host: Ipv4Addr,
-    pub port: u16,
-    pub relays: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
-    }
-}
 
 pub struct Service {
     host: Ipv4Addr,
@@ -35,7 +20,7 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn from(network: Network, config: Config) -> Self {
+    pub fn from(network: Network, config: crate::Config) -> Self {
         let relays = parse_relay_endpoints(&config.relays);
 
         Self { host: config.host, port: config.port, relays, network }
@@ -46,12 +31,12 @@ impl Service {
         let Self { host, port, relays, network } = self;
 
         if relays.is_empty() {
-            error!("no valid relays provided; please restart with correct configuration");
+            tracing::error!("no valid relays provided; please restart with correct configuration");
         } else {
             let count = relays.len();
-            info!("configured with {count} relay(s)");
+            tracing::info!("configured with {count} relay(s)");
             for relay in &relays {
-                info!(%relay, "configured with relay");
+                tracing::info!(%relay, "configured with relay");
             }
         }
 
@@ -63,6 +48,7 @@ impl Service {
         });
         let relay_mux = RelayMux::new(relays, context);
 
+        // NOTE: cloning is inexpensive as the relay max wraps an Arc inner type
         let relay_mux_clone = relay_mux.clone();
         let relay_task = tokio::spawn(async move {
             let relay_mux = relay_mux_clone;
@@ -70,7 +56,8 @@ impl Service {
 
             tokio::pin!(slots);
 
-            let mut current_epoch = clock.current_epoch().expect("after genesis");
+            let mut current_epoch =
+                clock.current_epoch().ok_or(Error::Boost(BoostError::EpochFetchFailure))?;
             while let Some(slot) = slots.next().await {
                 relay_mux.on_slot(slot);
 
@@ -80,6 +67,8 @@ impl Service {
                     current_epoch = epoch;
                 }
             }
+
+            Ok(())
         });
 
         let server = BlindedBlockProviderServer::new(host, port, relay_mux).spawn();
@@ -94,19 +83,19 @@ impl Service {
 #[pin_project::pin_project]
 pub struct ServiceHandle {
     #[pin]
-    relay_mux: JoinHandle<()>,
+    relay_mux: JoinHandle<Result<(), Error>>,
     #[pin]
-    server: JoinHandle<()>,
+    server: JoinHandle<Result<(), Error>>,
 }
 
 impl Future for ServiceHandle {
-    type Output = Result<(), JoinError>;
+    type Output = Result<Result<(), Error>, JoinError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
         let relay_mux = this.relay_mux.poll(cx);
         if relay_mux.is_ready() {
-            return relay_mux
+            return relay_mux;
         }
         this.server.poll(cx)
     }
