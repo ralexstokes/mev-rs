@@ -9,12 +9,12 @@ use mev_rs::{
     relay::{parse_relay_endpoints, Relay, RelayEndpoint},
     Error,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{error, info};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,

@@ -4,8 +4,6 @@ version.workspace = true
 edition = "2021"
 license = "MIT OR Apache-2.0"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [features]
 default = ["boost", "build", "relay"]
 boost = ["mev-boost-rs"]
@@ -16,6 +14,7 @@ relay = ["mev-relay-rs"]
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+toml = "0.8.2"
 
 mev-boost-rs = { path = "../../mev-boost-rs", optional = true }
 mev-relay-rs = { path = "../../mev-relay-rs", optional = true }

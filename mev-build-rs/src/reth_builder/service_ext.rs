@@ -26,7 +26,7 @@ pub struct ServiceExt {
 }
 
 // NOTE: this is duplicated here to avoid circular import b/t `mev` bin and `mev-rs` crate
-#[derive(Debug, serde::Deserialize)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 struct Config {
     pub network: Network,
     #[serde(rename = "builder")]
