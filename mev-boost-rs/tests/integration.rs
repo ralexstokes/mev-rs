@@ -96,7 +96,7 @@ async fn test_end_to_end() {
 
     let mux_port = config.port;
     let service = Service::from(network, config);
-    service.spawn().unwrap();
+    service.spawn().await.unwrap();
 
     let beacon_node = RelayClient::new(ApiClient::new(
         Url::parse(&format!("http://127.0.0.1:{mux_port}")).unwrap(),

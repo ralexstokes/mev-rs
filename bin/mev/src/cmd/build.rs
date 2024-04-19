@@ -1,4 +1,19 @@
-use mev_build_rs::reth_builder::ServiceExt;
+use crate::cmd::config::Config;
+use clap::Args;
 use reth::cli::Cli;
 
-pub type Command = Cli<ServiceExt>;
+#[derive(Debug, Args)]
+pub struct CliArgs {
+    #[clap(env, long = "mev-builder-config", default_value = "config.toml")]
+    pub config_file: String,
+}
+
+impl TryFrom<CliArgs> for Config {
+    type Error = eyre::Error;
+
+    fn try_from(value: CliArgs) -> Result<Self, Self::Error> {
+        Self::from_toml_file(value.config_file)
+    }
+}
+
+pub type Command = Cli<CliArgs>;

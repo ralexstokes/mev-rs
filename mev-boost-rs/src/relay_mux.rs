@@ -3,7 +3,7 @@ use ethereum_consensus::{
     primitives::{BlsPublicKey, Epoch, Slot, U256},
     state_transition::Context,
 };
-use futures::{stream, StreamExt};
+use futures_util::{stream, StreamExt};
 use mev_rs::{
     relay::Relay,
     signing::verify_signed_builder_data,

@@ -6,14 +6,15 @@ use std::{
     sync::Arc,
 };
 
+pub type RelaySet = HashSet<Arc<Relay>>;
+pub type Proposals = HashMap<Proposer, RelaySet>;
+
 #[derive(Debug, Default, Hash, PartialEq, Eq)]
 pub struct Proposer {
     pub public_key: BlsPublicKey,
     pub fee_recipient: ExecutionAddress,
     pub gas_limit: u64,
 }
-
-type Proposals = HashMap<Proposer, HashSet<Arc<Relay>>>;
 
 #[derive(Debug, Default)]
 pub struct AuctionSchedule {
@@ -32,7 +33,7 @@ impl AuctionSchedule {
         state.schedule.retain(|&slot, _| slot >= retain_slot);
     }
 
-    pub fn take_proposal(&self, slot: Slot) -> Option<Proposals> {
+    pub fn take_matching_proposals(&self, slot: Slot) -> Option<Proposals> {
         let mut state = self.state.lock();
         state.schedule.remove(&slot)
     }

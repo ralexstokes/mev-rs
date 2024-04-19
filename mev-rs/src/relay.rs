@@ -13,7 +13,7 @@ use std::{cmp, fmt, hash, ops::Deref};
 use tracing::{error, warn};
 use url::Url;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RelayEndpoint {
     url: Url,
     public_key: BlsPublicKey,
@@ -36,6 +36,7 @@ impl fmt::Display for RelayEndpoint {
     }
 }
 
+// TODO: refactor to yield error
 pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
     let mut relays = vec![];
 
@@ -54,7 +55,6 @@ pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
     relays
 }
 
-#[derive(Clone)]
 pub struct Relay {
     provider: BlockProvider,
     relayer: Relayer,
