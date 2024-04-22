@@ -11,7 +11,6 @@ tokio = { version = "1.0", features = ["full"] }
 tokio-stream = "0.1.15"
 tracing = "0.1"
 async-trait = "0.1.53"
-parking_lot = "0.12.1"
 pin-project = "1.0.12"
 futures-util = { workspace = true }
 

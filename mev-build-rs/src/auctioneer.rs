@@ -74,7 +74,6 @@ pub struct Auctioneer {
     clock: broadcast::Receiver<ClockMessage>,
     builder: Sender<BuilderMessage>,
     relays: Vec<Arc<Relay>>,
-    // TODO: can drop mutex on inner
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
     executor: TaskExecutor,
