@@ -1,5 +1,5 @@
 use crate::{
-    signing::{compute_builder_signing_root, sign_builder_message, verify_signature, SecretKey},
+    signing::{sign_builder_message, SecretKey},
     types::ExecutionPayloadHeader,
 };
 use ethereum_consensus::{
@@ -14,7 +14,8 @@ use std::fmt;
 pub mod bellatrix {
     use super::ExecutionPayloadHeader;
     use ethereum_consensus::{primitives::BlsPublicKey, ssz::prelude::*};
-    #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+
+    #[derive(Debug, Clone, Serializable, HashTreeRoot, PartialEq, Eq)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BuilderBid {
         pub header: ExecutionPayloadHeader,
@@ -33,7 +34,7 @@ pub mod deneb {
     use super::{KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK};
     use crate::types::ExecutionPayloadHeader;
     use ethereum_consensus::{primitives::BlsPublicKey, ssz::prelude::*};
-    #[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+    #[derive(Debug, Clone, Serializable, HashTreeRoot, PartialEq, Eq)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BuilderBid {
         pub header: ExecutionPayloadHeader,
@@ -45,7 +46,7 @@ pub mod deneb {
     }
 }
 
-#[derive(Debug, Clone, SimpleSerialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serializable, HashTreeRoot, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[serde(untagged)]
 #[ssz(transparent)]
@@ -117,16 +118,16 @@ impl BuilderBid {
     }
 
     pub fn sign(
-        mut self,
+        self,
         secret_key: &SecretKey,
         context: &Context,
     ) -> Result<SignedBuilderBid, Error> {
-        let signature = sign_builder_message(&mut self, secret_key, context)?;
+        let signature = sign_builder_message(&self, secret_key, context)?;
         Ok(SignedBuilderBid { message: self, signature })
     }
 }
 
-#[derive(Debug, Clone, SimpleSerialize, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Serializable, HashTreeRoot, serde::Serialize, serde::Deserialize)]
 pub struct SignedBuilderBid {
     pub message: BuilderBid,
     pub signature: BlsSignature,
@@ -146,17 +147,10 @@ impl fmt::Display for SignedBuilderBid {
     }
 }
 
-impl SignedBuilderBid {
-    pub fn verify_signature(&mut self, context: &Context) -> Result<(), Error> {
-        let signing_root = compute_builder_signing_root(&mut self.message, context)?;
-        let public_key = self.message.public_key();
-        verify_signature(public_key, signing_root.as_ref(), &self.signature)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signing::verify_signed_builder_data;
     use rand::prelude::*;
 
     const SIGNED_BUILDER_BID_JSON: &str = r#"
@@ -191,23 +185,35 @@ mod tests {
         let mut rng = thread_rng();
         let key = SecretKey::random(&mut rng).unwrap();
         let public_key = key.public_key();
-        let mut builder_bid = capella::BuilderBid {
+        let builder_bid = capella::BuilderBid {
             header: ExecutionPayloadHeader::Capella(Default::default()),
             value: U256::from(234234),
             public_key,
         };
         let context = Context::for_holesky();
-        let signature = sign_builder_message(&mut builder_bid, &key, &context).unwrap();
-        let mut signed_builder_bid =
+        let signature = sign_builder_message(&builder_bid, &key, &context).unwrap();
+        let signed_builder_bid =
             SignedBuilderBid { message: BuilderBid::Capella(builder_bid), signature };
-        signed_builder_bid.verify_signature(&context).expect("is valid signature");
+        verify_signed_builder_data(
+            &signed_builder_bid.message,
+            signed_builder_bid.message.public_key(),
+            &signed_builder_bid.signature,
+            &context,
+        )
+        .expect("is valid signature");
     }
 
     #[test]
     fn test_builder_bid_signature_from_relay() {
-        let mut signed_builder_bid: SignedBuilderBid =
+        let signed_builder_bid: SignedBuilderBid =
             serde_json::from_str(SIGNED_BUILDER_BID_JSON.trim()).unwrap();
         let context = Context::for_sepolia();
-        signed_builder_bid.verify_signature(&context).expect("is valid signature");
+        verify_signed_builder_data(
+            &signed_builder_bid.message,
+            signed_builder_bid.message.public_key(),
+            &signed_builder_bid.signature,
+            &context,
+        )
+        .expect("is valid signature");
     }
 }

@@ -20,7 +20,7 @@ impl Command {
         info!("configured for `{network}`");
 
         if let Some(config) = config.boost {
-            Ok(Service::from(network, config).spawn()?.await?)
+            Ok(Service::from(network, config).spawn().await?.await?)
         } else {
             Err(eyre::eyre!("missing boost config from file provided"))
         }

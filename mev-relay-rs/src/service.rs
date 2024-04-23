@@ -2,13 +2,10 @@ use crate::relay::Relay;
 use backoff::ExponentialBackoff;
 use beacon_api_client::{mainnet::Client, PayloadAttributesTopic};
 use ethereum_consensus::{
-    crypto::SecretKey,
-    networks::{self, Network},
-    primitives::BlsPublicKey,
-    state_transition::Context,
+    crypto::SecretKey, networks::Network, primitives::BlsPublicKey, state_transition::Context,
 };
 use futures::StreamExt;
-use mev_rs::{blinded_block_relayer::Server as BlindedBlockRelayerServer, Error};
+use mev_rs::{blinded_block_relayer::Server as BlindedBlockRelayerServer, get_genesis_time, Error};
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
@@ -65,10 +62,8 @@ impl Service {
         let Self { host, port, beacon_node, network, secret_key, accepted_builders } = self;
 
         let context = Context::try_from(network)?;
-        let clock = context.clock().unwrap_or_else(|| {
-            let genesis_time = networks::typical_genesis_time(&context);
-            context.clock_at(genesis_time)
-        });
+        let genesis_time = get_genesis_time(&context, None, Some(&beacon_node)).await;
+        let clock = context.clock_at(genesis_time);
         let genesis_validators_root =
             beacon_node.get_genesis_details().await?.genesis_validators_root;
 
@@ -124,9 +119,7 @@ impl Service {
         });
 
         let relay = tokio::spawn(async move {
-            let slots = clock.stream_slots();
-
-            tokio::pin!(slots);
+            let mut slots = clock.clone().into_stream();
 
             let mut current_epoch = clock.current_epoch().expect("after genesis");
             relay.on_epoch(current_epoch).await;

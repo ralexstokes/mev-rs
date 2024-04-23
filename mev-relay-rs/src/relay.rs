@@ -9,13 +9,16 @@ use ethereum_consensus::{
     crypto::SecretKey,
     deneb::mainnet as deneb,
     primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
-    ssz::prelude::Merkleized,
+    ssz::prelude::HashTreeRoot,
     state_transition::Context,
     types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
-    signing::{compute_consensus_signing_root, sign_builder_message, verify_signature},
+    signing::{
+        compute_consensus_domain, sign_builder_message, verify_signed_builder_data,
+        verify_signed_data,
+    },
     types::{
         builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
         ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
@@ -35,7 +38,7 @@ use tracing::{debug, error, info, trace, warn};
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;
 
-fn to_header(execution_payload: &mut ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
+fn to_header(execution_payload: &ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
     let header = match execution_payload {
         ExecutionPayload::Bellatrix(payload) => {
             ExecutionPayloadHeader::Bellatrix(payload.try_into()?)
@@ -411,7 +414,7 @@ impl Relay {
     fn insert_bid_if_greater(
         &self,
         auction_request: AuctionRequest,
-        mut execution_payload: ExecutionPayload,
+        execution_payload: ExecutionPayload,
         value: U256,
         builder_public_key: BlsPublicKey,
     ) -> Result<(), Error> {
@@ -421,8 +424,8 @@ impl Relay {
                 return Ok(())
             }
         }
-        let header = to_header(&mut execution_payload)?;
-        let mut bid = match header.version() {
+        let header = to_header(&execution_payload)?;
+        let bid = match header.version() {
             Fork::Bellatrix => BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
                 header,
                 value,
@@ -436,7 +439,7 @@ impl Relay {
             Fork::Deneb => unimplemented!(),
             _ => unreachable!("this fork is not reachable from this type"),
         };
-        let signature = sign_builder_message(&mut bid, &self.secret_key, &self.context)?;
+        let signature = sign_builder_message(&bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 
         let block_hash = execution_payload.block_hash().clone();
@@ -457,7 +460,7 @@ impl Relay {
 impl BlindedBlockProvider for Relay {
     async fn register_validators(
         &self,
-        registrations: &mut [SignedValidatorRegistration],
+        registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error> {
         let current_time = get_current_unix_time_in_nanos().try_into().expect("fits in type");
         let (updated_keys, errs) = self.validator_registry.process_registrations(
@@ -499,7 +502,7 @@ impl BlindedBlockProvider for Relay {
 
     async fn open_bid(
         &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
+        signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<AuctionContents, Error> {
         let auction_request = {
             let block = signed_block.message();
@@ -543,10 +546,10 @@ impl BlindedBlockProvider for Relay {
         }
 
         match unblind_block(signed_block, &auction_context.execution_payload) {
-            Ok(mut signed_block) => {
+            Ok(signed_block) => {
                 let version = signed_block.version();
                 let block_root =
-                    signed_block.message_mut().hash_tree_root().map_err(ConsensusError::from)?;
+                    signed_block.message().hash_tree_root().map_err(ConsensusError::from)?;
                 if let Err(err) = self
                     .beacon_node
                     .post_signed_beacon_block_v2(
@@ -588,7 +591,7 @@ impl BlindedBlockRelayer for Relay {
         Ok(schedule)
     }
 
-    async fn submit_bid(&self, signed_submission: &mut SignedBidSubmission) -> Result<(), Error> {
+    async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
         let (auction_request, value, builder_public_key) = {
             let bid_trace = &signed_submission.message;
             let builder_public_key = &bid_trace.builder_public_key;
@@ -609,7 +612,10 @@ impl BlindedBlockRelayer for Relay {
             (auction_request, bid_trace.value, bid_trace.builder_public_key.clone())
         };
 
-        signed_submission.verify_signature(&self.context)?;
+        let message = &signed_submission.message;
+        let public_key = &signed_submission.message.builder_public_key;
+        let signature = &signed_submission.signature;
+        verify_signed_builder_data(message, public_key, signature, &self.context)?;
 
         let execution_payload = signed_submission.execution_payload.clone();
         // NOTE: this does _not_ respect cancellations
@@ -623,15 +629,18 @@ impl BlindedBlockRelayer for Relay {
 
 fn verify_blinded_block_signature(
     auction_request: &AuctionRequest,
-    signed_block: &mut SignedBlindedBeaconBlock,
+    signed_block: &SignedBlindedBeaconBlock,
     genesis_validators_root: &Root,
     context: &Context,
 ) -> Result<(), Error> {
-    let proposer = &auction_request.public_key;
+    let proposer_public_key = &auction_request.public_key;
     let slot = signed_block.message().slot();
-    let mut block = signed_block.message_mut();
-    let signing_root =
-        compute_consensus_signing_root(&mut block, slot, genesis_validators_root, context)?;
-
-    verify_signature(proposer, signing_root.as_ref(), signed_block.signature()).map_err(Into::into)
+    let domain = compute_consensus_domain(slot, genesis_validators_root, context)?;
+    verify_signed_data(
+        &signed_block.message(),
+        signed_block.signature(),
+        proposer_public_key,
+        domain,
+    )
+    .map_err(Into::into)
 }

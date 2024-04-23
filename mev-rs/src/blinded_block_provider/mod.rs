@@ -17,7 +17,7 @@ use async_trait::async_trait;
 pub trait BlindedBlockProvider {
     async fn register_validators(
         &self,
-        registrations: &mut [SignedValidatorRegistration],
+        registrations: &[SignedValidatorRegistration],
     ) -> Result<(), Error>;
 
     async fn fetch_best_bid(
@@ -27,6 +27,6 @@ pub trait BlindedBlockProvider {
 
     async fn open_bid(
         &self,
-        signed_block: &mut SignedBlindedBeaconBlock,
+        signed_block: &SignedBlindedBeaconBlock,
     ) -> Result<AuctionContents, Error>;
 }

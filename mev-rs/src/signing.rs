@@ -1,37 +1,33 @@
 use ethereum_consensus::{
     builder::compute_builder_domain,
+    crypto,
     domains::DomainType,
     phase0::mainnet::compute_domain,
-    primitives::{BlsSignature, Root, Slot},
-    signing::sign_with_domain,
-    ssz::prelude::Merkleized,
+    primitives::{BlsPublicKey, BlsSignature, Domain, Root, Slot},
+    signing::{compute_signing_root, sign_with_domain},
+    ssz::prelude::HashTreeRoot,
     state_transition::Context,
     Error,
 };
-pub use ethereum_consensus::{
-    crypto::SecretKey,
-    signing::{compute_signing_root, verify_signature},
-};
+pub use ethereum_consensus::{crypto::SecretKey, signing::verify_signed_data};
 
-pub fn compute_consensus_signing_root<T: Merkleized>(
-    data: &mut T,
+pub fn compute_consensus_domain(
     slot: Slot,
     genesis_validators_root: &Root,
     context: &Context,
-) -> Result<Root, Error> {
+) -> Result<Domain, Error> {
     let fork = context.fork_for(slot);
     let fork_version = context.fork_version_for(fork);
-    let domain = compute_domain(
+    compute_domain(
         DomainType::BeaconProposer,
         Some(fork_version),
         Some(*genesis_validators_root),
         context,
-    )?;
-    compute_signing_root(data, domain)
+    )
 }
 
-pub fn sign_builder_message<T: Merkleized>(
-    message: &mut T,
+pub fn sign_builder_message<T: HashTreeRoot>(
+    message: &T,
     signing_key: &SecretKey,
     context: &Context,
 ) -> Result<BlsSignature, Error> {
@@ -39,10 +35,13 @@ pub fn sign_builder_message<T: Merkleized>(
     sign_with_domain(message, signing_key, domain)
 }
 
-pub fn compute_builder_signing_root<T: Merkleized>(
-    data: &mut T,
+pub fn verify_signed_builder_data<T: HashTreeRoot>(
+    data: &T,
+    public_key: &BlsPublicKey,
+    signature: &BlsSignature,
     context: &Context,
-) -> Result<Root, Error> {
+) -> Result<(), Error> {
     let domain = compute_builder_domain(context)?;
-    compute_signing_root(data, domain)
+    let signing_root = compute_signing_root(data, domain)?;
+    crypto::verify_signature(public_key, signing_root.as_ref(), signature).map_err(Into::into)
 }

@@ -1,11 +1,9 @@
 use crate::relay_mux::RelayMux;
-use ethereum_consensus::{
-    networks::{self, Network},
-    state_transition::Context,
-};
-use futures::StreamExt;
+use ethereum_consensus::{networks::Network, state_transition::Context};
+use futures_util::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
+    get_genesis_time,
     relay::{parse_relay_endpoints, Relay, RelayEndpoint},
     Error,
 };
@@ -19,11 +17,12 @@ pub struct Config {
     pub host: Ipv4Addr,
     pub port: u16,
     pub relays: Vec<String>,
+    pub beacon_node_url: Option<String>,
 }
 
 impl Default for Config {
     fn default() -> Self {
-        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![] }
+        Self { host: Ipv4Addr::UNSPECIFIED, port: 18550, relays: vec![], beacon_node_url: None }
     }
 }
 
@@ -32,18 +31,19 @@ pub struct Service {
     port: u16,
     relays: Vec<RelayEndpoint>,
     network: Network,
+    config: Config,
 }
 
 impl Service {
     pub fn from(network: Network, config: Config) -> Self {
         let relays = parse_relay_endpoints(&config.relays);
 
-        Self { host: config.host, port: config.port, relays, network }
+        Self { host: config.host, port: config.port, relays, network, config }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub fn spawn(self) -> Result<ServiceHandle, Error> {
-        let Self { host, port, relays, network } = self;
+    pub async fn spawn(self) -> Result<ServiceHandle, Error> {
+        let Self { host, port, relays, network, config } = self;
 
         if relays.is_empty() {
             error!("no valid relays provided; please restart with correct configuration");
@@ -55,22 +55,19 @@ impl Service {
             }
         }
 
-        let context = Context::try_from(network)?;
         let relays = relays.into_iter().map(Relay::from);
-        let clock = context.clock().unwrap_or_else(|| {
-            let genesis_time = networks::typical_genesis_time(&context);
-            context.clock_at(genesis_time)
-        });
+
+        let context = Context::try_from(network)?;
+        let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
+        let clock = context.clock_at(genesis_time);
         let relay_mux = RelayMux::new(relays, context);
 
         let relay_mux_clone = relay_mux.clone();
         let relay_task = tokio::spawn(async move {
             let relay_mux = relay_mux_clone;
-            let slots = clock.stream_slots();
-
-            tokio::pin!(slots);
-
+            let mut slots = clock.clone().into_stream();
             let mut current_epoch = clock.current_epoch().expect("after genesis");
+
             while let Some(slot) = slots.next().await {
                 relay_mux.on_slot(slot);
 
