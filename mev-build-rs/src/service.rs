@@ -1,7 +1,8 @@
 use crate::{
     auctioneer::{Auctioneer, Config as AuctioneerConfig},
     builder::{Builder, Config as BuilderConfig},
-    payload::service_builder::PayloadServiceBuilder,
+    node::BuilderNode,
+    payload::builder_attributes::BuilderPayloadBuilderAttributes,
 };
 use ethereum_consensus::{
     clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
@@ -10,12 +11,11 @@ use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
     builder::{InitState, WithLaunchContext},
-    payload::{EthBuiltPayload, EthPayloadBuilderAttributes, PayloadBuilderHandle},
+    payload::{EthBuiltPayload, PayloadBuilderHandle},
     primitives::Bytes,
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
-use reth_node_ethereum::EthereumNode;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::{
@@ -55,7 +55,7 @@ pub struct Config {
 
 pub struct Services<
     Engine: EngineTypes<
-        PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
         BuiltPayload = EthBuiltPayload,
     >,
 > {
@@ -68,7 +68,7 @@ pub struct Services<
 
 pub async fn construct<
     Engine: EngineTypes<
-            PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+            PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
             BuiltPayload = EthBuiltPayload,
         > + 'static,
 >(
@@ -123,8 +123,8 @@ pub async fn launch(
     // TODO:  ability to just run reth
 
     let handle = node_builder
-        .with_types(EthereumNode::default())
-        .with_components(EthereumNode::components().payload(PayloadServiceBuilder))
+        .with_types(BuilderNode::default())
+        .with_components(BuilderNode::components())
         .launch()
         .await?;
 

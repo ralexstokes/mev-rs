@@ -1,4 +1,10 @@
-use crate::payload::job_generator::{PayloadJobGenerator, PayloadJobGeneratorConfig};
+use crate::{
+    node::BuilderEngineTypes,
+    payload::{
+        builder::PayloadBuilder,
+        job_generator::{PayloadJobGenerator, PayloadJobGeneratorConfig},
+    },
+};
 use reth::{
     builder::{node::FullNodeTypes, BuilderContext},
     cli::config::PayloadBuilderConfig,
@@ -6,7 +12,6 @@ use reth::{
     providers::CanonStateSubscriptions,
     transaction_pool::TransactionPool,
 };
-use reth_node_ethereum::EthEngineTypes;
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct PayloadServiceBuilder;
@@ -14,7 +19,7 @@ pub struct PayloadServiceBuilder;
 impl<Node, Pool> reth::builder::components::PayloadServiceBuilder<Node, Pool>
     for PayloadServiceBuilder
 where
-    Node: FullNodeTypes<Engine = EthEngineTypes>,
+    Node: FullNodeTypes<Engine = BuilderEngineTypes>,
     Pool: TransactionPool + Unpin + 'static,
 {
     async fn spawn_payload_service(
@@ -38,7 +43,7 @@ where
             ctx.task_executor().clone(),
             payload_job_config,
             ctx.chain_spec().clone(),
-            reth_ethereum_payload_builder::EthereumPayloadBuilder::default(),
+            PayloadBuilder::default(),
         );
 
         let (payload_service, payload_builder) =

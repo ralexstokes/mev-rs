@@ -25,9 +25,10 @@ mev-rs = { path = "../mev-rs" }
 reth = { workspace = true }
 reth-db = { workspace = true }
 reth-node-ethereum = { workspace = true }
+reth-evm-ethereum = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
-reth-ethereum-payload-builder = { workspace = true }
 
+sha2 = { workspace = true }
 ethers = "2.0"
 eyre = { workspace = true }
 clap = { version = "4.1.4", features = ["derive", "env"] }

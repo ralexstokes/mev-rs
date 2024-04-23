@@ -18,6 +18,7 @@ use mev_rs::{
     BlindedBlockRelayer, Relay,
 };
 use reth::{
+    api::PayloadBuilderAttributes,
     payload::{EthBuiltPayload, PayloadId},
     tasks::TaskExecutor,
 };
@@ -39,7 +40,7 @@ fn prepare_submission(
 ) -> Result<SignedBidSubmission, Error> {
     let message = BidTrace {
         slot: auction_context.slot,
-        parent_hash: to_bytes32(auction_context.attributes.parent),
+        parent_hash: to_bytes32(auction_context.attributes.inner.parent),
         block_hash: to_bytes32(payload.block().hash()),
         builder_public_key: public_key.clone(),
         proposer_public_key: auction_context.proposer.public_key.clone(),

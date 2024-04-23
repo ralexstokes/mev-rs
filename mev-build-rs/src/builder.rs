@@ -2,6 +2,7 @@ use crate::{
     auction_schedule::{Proposals, Proposer},
     auctioneer::Message as AuctioneerMessage,
     bidder::AuctionContext,
+    payload::builder_attributes::BuilderPayloadBuilderAttributes,
     Error,
 };
 use ethereum_consensus::{
@@ -9,10 +10,7 @@ use ethereum_consensus::{
 };
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{
-        EthBuiltPayload, EthPayloadBuilderAttributes, Events, PayloadBuilderHandle, PayloadId,
-        PayloadStore,
-    },
+    payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId, PayloadStore},
     primitives::Address,
     rpc::{
         compat::engine::convert_withdrawal_to_standalone_withdraw, types::engine::PayloadAttributes,
@@ -29,15 +27,16 @@ use tokio_stream::StreamExt;
 use tracing::warn;
 
 fn make_attributes_for_proposer(
-    attributes: &EthPayloadBuilderAttributes,
+    attributes: &BuilderPayloadBuilderAttributes,
     builder_fee_recipient: Address,
-) -> EthPayloadBuilderAttributes {
+) -> BuilderPayloadBuilderAttributes {
     // TODO: extend attributes with gas limit and proposer fee recipient
-    let withdrawals = if attributes.withdrawals.is_empty() {
+    let withdrawals = if attributes.inner.withdrawals.is_empty() {
         None
     } else {
         Some(
             attributes
+                .inner
                 .withdrawals
                 .iter()
                 .cloned()
@@ -46,14 +45,14 @@ fn make_attributes_for_proposer(
         )
     };
     let payload_attributes = PayloadAttributes {
-        timestamp: attributes.timestamp,
-        prev_randao: attributes.prev_randao,
+        timestamp: attributes.inner.timestamp,
+        prev_randao: attributes.inner.prev_randao,
         suggested_fee_recipient: builder_fee_recipient,
         withdrawals,
-        parent_beacon_block_root: attributes.parent_beacon_block_root,
+        parent_beacon_block_root: attributes.inner.parent_beacon_block_root,
     };
 
-    EthPayloadBuilderAttributes::try_new(attributes.parent, payload_attributes)
+    BuilderPayloadBuilderAttributes::try_new(attributes.inner.parent, payload_attributes)
         .expect("conversion currently always succeeds")
 }
 
@@ -73,7 +72,7 @@ pub struct Config {
 
 pub struct Builder<
     Engine: EngineTypes<
-        PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
         BuiltPayload = EthBuiltPayload,
     >,
 > {
@@ -89,7 +88,7 @@ pub struct Builder<
 
 impl<
         Engine: EngineTypes<
-                PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+                PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
                 BuiltPayload = EthBuiltPayload,
             > + 'static,
     > Builder<Engine>
@@ -119,7 +118,7 @@ impl<
     pub async fn process_proposals(
         &self,
         slot: Slot,
-        attributes: EthPayloadBuilderAttributes,
+        attributes: BuilderPayloadBuilderAttributes,
         proposals: Option<Proposals>,
     ) -> Result<Vec<AuctionContext>, Error> {
         let mut new_auctions = vec![];
@@ -144,8 +143,8 @@ impl<
     async fn start_build(
         &self,
         _proposer: &Proposer,
-        attributes: &EthPayloadBuilderAttributes,
-    ) -> Option<EthPayloadBuilderAttributes> {
+        attributes: &BuilderPayloadBuilderAttributes,
+    ) -> Option<BuilderPayloadBuilderAttributes> {
         match self.payload_builder.new_payload(attributes.clone()).await {
             Ok(payload_id) => {
                 let attributes_payload_id = attributes.payload_id();
@@ -171,14 +170,14 @@ impl<
         });
     }
 
-    async fn on_payload_attributes(&self, attributes: EthPayloadBuilderAttributes) {
+    async fn on_payload_attributes(&self, attributes: BuilderPayloadBuilderAttributes) {
         // NOTE: the payload builder currently makes a job for the incoming `attributes`.
         // We want to customize the building logic and so we cancel this first job unconditionally.
         self.terminate_job(attributes.payload_id());
 
         // TODO: move slot calc to auctioneer?
         let slot = convert_timestamp_to_slot(
-            attributes.timestamp,
+            attributes.timestamp(),
             self.genesis_time,
             self.context.seconds_per_slot,
         )

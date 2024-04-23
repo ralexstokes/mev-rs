@@ -20,11 +20,12 @@ beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus",
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
 reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
 reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
-reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
 
 eyre = "0.6.8"
 futures-util = "0.3.30"
+sha2 = "0.10.8"
 
 [patch.crates-io]
 c-kzg = { git = "https://github.com/ethereum/c-kzg-4844", tag = "v1.0.1" }
