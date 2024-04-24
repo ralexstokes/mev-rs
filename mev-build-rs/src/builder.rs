@@ -5,6 +5,7 @@ use crate::{
     payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     Error,
 };
+use alloy_signer_wallet::{coins_bip39::English, LocalWallet, MnemonicBuilder};
 use ethereum_consensus::{
     clock::convert_timestamp_to_slot, primitives::Slot, state_transition::Context,
 };
@@ -25,10 +26,12 @@ use tracing::{error, warn};
 fn make_attributes_for_proposer(
     attributes: &BuilderPayloadBuilderAttributes,
     builder_fee_recipient: Address,
+    builder_signer: Arc<LocalWallet>,
     proposer: &Proposer,
 ) -> BuilderPayloadBuilderAttributes {
     let proposal = ProposalAttributes {
         builder_fee_recipient,
+        builder_signer,
         suggested_gas_limit: proposer.gas_limit,
         proposer_fee_recipient: proposer.fee_recipient,
     };
@@ -50,6 +53,7 @@ pub struct Config {
     pub fee_recipient: Address,
     pub genesis_time: Option<u64>,
     pub extra_data: Option<Bytes>,
+    pub execution_mnemonic: String,
 }
 
 pub struct Builder<
@@ -65,6 +69,7 @@ pub struct Builder<
     config: Config,
     context: Arc<Context>,
     genesis_time: u64,
+    signer: Arc<LocalWallet>,
 }
 
 impl<
@@ -83,7 +88,20 @@ impl<
         genesis_time: u64,
     ) -> Self {
         let payload_store = payload_builder.clone().into();
-        Self { msgs, auctioneer, payload_builder, payload_store, config, context, genesis_time }
+        let signer = MnemonicBuilder::<English>::default()
+            .phrase(&config.execution_mnemonic)
+            .build()
+            .expect("is valid");
+        Self {
+            msgs,
+            auctioneer,
+            payload_builder,
+            payload_store,
+            config,
+            context,
+            genesis_time,
+            signer: Arc::new(signer),
+        }
     }
 
     pub async fn process_proposals(
@@ -96,8 +114,12 @@ impl<
 
         if let Some(proposals) = proposals {
             for (proposer, relays) in proposals {
-                let attributes =
-                    make_attributes_for_proposer(&attributes, self.config.fee_recipient, &proposer);
+                let attributes = make_attributes_for_proposer(
+                    &attributes,
+                    self.config.fee_recipient,
+                    self.signer.clone(),
+                    &proposer,
+                );
 
                 if let Some(_) = self.start_build(&attributes).await {
                     // TODO: can likely skip full attributes in `AuctionContext`
@@ -154,17 +176,23 @@ impl<
     }
 
     async fn send_payload_to_auctioneer(&self, payload_id: PayloadId, _keep_alive: KeepAlive) {
-        // TODO: use signal from bidder to know if we should keep refining a given payload, or can
-        // extract the final build
-        match self.payload_store.best_payload(payload_id).await.expect("exists") {
-            Ok(payload) => self
-                .auctioneer
-                .send(AuctioneerMessage::BuiltPayload(payload))
-                .await
-                .expect("can send"),
-            Err(err) => {
-                warn!(%err, "could not get payload when requested")
+        // TODO: put into separate task?
+        // TODO: signal to payload job `_keep_alive` status
+        let maybe_payload = self.payload_store.resolve(payload_id).await;
+        if let Some(payload) = maybe_payload {
+            match payload {
+                // TODO: auctioneer can just listen for payload events instead
+                Ok(payload) => self
+                    .auctioneer
+                    .send(AuctioneerMessage::BuiltPayload(payload))
+                    .await
+                    .expect("can send"),
+                Err(err) => {
+                    warn!(%err, %payload_id, "error resolving payload")
+                }
             }
+        } else {
+            warn!(%payload_id, "could not resolve payload")
         }
     }
 

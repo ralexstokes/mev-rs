@@ -1,11 +1,17 @@
 use crate::{
-    payload::builder_attributes::BuilderPayloadBuilderAttributes,
+    payload::{
+        builder_attributes::BuilderPayloadBuilderAttributes,
+        resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
+    },
     utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload},
 };
 use futures_util::{Future, FutureExt};
 use reth::{
     api::BuiltPayload,
-    payload::{self, database::CachedReads, error::PayloadBuilderError, KeepPayloadJobAlive},
+    payload::{
+        self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload,
+        KeepPayloadJobAlive,
+    },
     providers::StateProviderFactory,
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
@@ -45,16 +51,21 @@ where
     Client: StateProviderFactory + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     Tasks: TaskSpawner + Clone + 'static,
-    Builder: PayloadBuilder<Pool, Client, Attributes = BuilderPayloadBuilderAttributes>
-        + Unpin
+    Builder: PayloadBuilder<
+            Pool,
+            Client,
+            Attributes = BuilderPayloadBuilderAttributes,
+            BuiltPayload = EthBuiltPayload,
+        > + Unpin
         + 'static,
     <Builder as PayloadBuilder<Pool, Client>>::Attributes: Unpin + Clone,
     <Builder as PayloadBuilder<Pool, Client>>::BuiltPayload: Unpin + Clone,
 {
     type PayloadAttributes = BuilderPayloadBuilderAttributes;
-    type ResolvePayloadFuture = ResolveBestPayload<Self::BuiltPayload>;
+    type ResolvePayloadFuture = ResolveBuilderPayload<EthBuiltPayload, Client, Pool>;
     type BuiltPayload = Builder::BuiltPayload;
 
+    // TODO: do we need to customize this? if not, use default impl in some way
     fn best_payload(&self) -> Result<Self::BuiltPayload, PayloadBuilderError> {
         if let Some(ref payload) = self.best_payload {
             return Ok(payload.clone())
@@ -116,7 +127,24 @@ where
 
         let fut = ResolveBestPayload { best_payload, maybe_better, empty_payload };
 
-        (fut, KeepPayloadJobAlive::No)
+        let config =
+            self.config.attributes.proposal.as_ref().map(|attributes| PayloadFinalizerConfig {
+                proposer_fee_recipient: attributes.proposer_fee_recipient,
+                signer: attributes.builder_signer.clone(),
+                sender: Default::default(),
+                parent_hash: self.config.parent_block.hash(),
+                chain_id: self.config.chain_spec.chain().id(),
+                cfg_env: self.config.initialized_cfg.clone(),
+                block_env: self.config.initialized_block_env.clone(),
+            });
+        let finalizer = PayloadFinalizer {
+            client: self.client.clone(),
+            _pool: self.pool.clone(),
+            payload_id: self.config.payload_id(),
+            config,
+        };
+
+        (ResolveBuilderPayload { resolution: fut, finalizer }, KeepPayloadJobAlive::No)
     }
 }
 

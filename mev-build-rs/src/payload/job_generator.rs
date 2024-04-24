@@ -4,7 +4,7 @@ use crate::{
 };
 use reth::{
     api::PayloadBuilderAttributes,
-    payload::{self, database::CachedReads, error::PayloadBuilderError},
+    payload::{self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload},
     primitives::{BlockNumberOrTag, Bytes, ChainSpec, B256},
     providers::{BlockReaderIdExt, BlockSource, CanonStateNotification, StateProviderFactory},
     tasks::TaskSpawner,
@@ -16,13 +16,13 @@ use std::{sync::Arc, time::Duration};
 #[derive(Debug, Clone)]
 pub struct PayloadJobGeneratorConfig {
     pub extradata: Bytes,
+    // TODO: remove or use?
     pub _max_gas_limit: u64,
     pub interval: Duration,
     pub deadline: Duration,
     pub max_payload_tasks: usize,
 }
 
-/// The generator type that creates new jobs that builds empty blocks.
 #[derive(Debug)]
 pub struct PayloadJobGenerator<Client, Pool, Tasks, Builder> {
     client: Client,
@@ -82,8 +82,12 @@ where
     Client: StateProviderFactory + BlockReaderIdExt + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     Tasks: TaskSpawner + Clone + Unpin + 'static,
-    Builder: PayloadBuilder<Pool, Client, Attributes = BuilderPayloadBuilderAttributes>
-        + Unpin
+    Builder: PayloadBuilder<
+            Pool,
+            Client,
+            Attributes = BuilderPayloadBuilderAttributes,
+            BuiltPayload = EthBuiltPayload,
+        > + Unpin
         + 'static,
     <Builder as PayloadBuilder<Pool, Client>>::Attributes: Unpin + Clone,
     <Builder as PayloadBuilder<Pool, Client>>::BuiltPayload: Unpin + Clone,

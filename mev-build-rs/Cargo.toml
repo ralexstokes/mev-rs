@@ -27,6 +27,8 @@ reth-db = { workspace = true }
 reth-node-ethereum = { workspace = true }
 reth-evm-ethereum = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
+alloy-signer = { workspace = true }
+alloy-signer-wallet = { workspace = true, features = ["mnemonic"] }
 
 sha2 = { workspace = true }
 ethers = "2.0"

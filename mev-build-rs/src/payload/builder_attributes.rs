@@ -1,3 +1,4 @@
+use alloy_signer_wallet::LocalWallet;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{EthPayloadBuilderAttributes, PayloadId},
@@ -11,7 +12,7 @@ use reth::{
     },
 };
 use sha2::Digest;
-use std::convert::Infallible;
+use std::{convert::Infallible, sync::Arc};
 
 pub fn payload_id_with_bytes(
     parent: &B256,
@@ -61,6 +62,7 @@ pub fn mix_proposal_into_payload_id(
 #[derive(Debug, Clone)]
 pub struct ProposalAttributes {
     pub builder_fee_recipient: Address,
+    pub builder_signer: Arc<LocalWallet>,
     pub suggested_gas_limit: u64,
     pub proposer_fee_recipient: Address,
 }

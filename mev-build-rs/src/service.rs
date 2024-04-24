@@ -33,12 +33,10 @@ pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    // TODO: move to payload builder
-    pub execution_mnemonic: String,
     // TODO: move to bidder
     // amount in milliseconds
     pub bidding_deadline_ms: u64,
-    // TODO: move to payload builder, or have as part of bidder config
+    // TODO: move to bidder
     // amount to bid as a fraction of the block's value
     pub bid_percent: Option<f64>,
     // TODO: move to bidder
