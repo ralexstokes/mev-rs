@@ -1,5 +1,5 @@
 use crate::{
-    payload::job::PayloadJob,
+    payload::{builder_attributes::BuilderPayloadBuilderAttributes, job::PayloadJob},
     utils::payload_job::{duration_until, PayloadTaskGuard},
 };
 use reth::{
@@ -82,7 +82,9 @@ where
     Client: StateProviderFactory + BlockReaderIdExt + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     Tasks: TaskSpawner + Clone + Unpin + 'static,
-    Builder: PayloadBuilder<Pool, Client> + Unpin + 'static,
+    Builder: PayloadBuilder<Pool, Client, Attributes = BuilderPayloadBuilderAttributes>
+        + Unpin
+        + 'static,
     <Builder as PayloadBuilder<Pool, Client>>::Attributes: Unpin + Clone,
     <Builder as PayloadBuilder<Pool, Client>>::BuiltPayload: Unpin + Clone,
 {
@@ -90,7 +92,7 @@ where
 
     fn new_payload_job(
         &self,
-        attributes: <Builder as PayloadBuilder<Pool, Client>>::Attributes,
+        attributes: <Self::Job as payload::PayloadJob>::PayloadAttributes,
     ) -> Result<Self::Job, PayloadBuilderError> {
         let parent_block = if attributes.parent().is_zero() {
             // use latest block if parent is zero: genesis block
@@ -108,15 +110,20 @@ where
             block.seal(attributes.parent())
         };
 
+        let until = if attributes.proposal.is_some() {
+            self.job_deadline(attributes.timestamp())
+        } else {
+            // If there is no attached proposal, then terminate the payload job immediately
+            tokio::time::Instant::now()
+        };
+        let deadline = Box::pin(tokio::time::sleep_until(until));
+
         let config = PayloadConfig::new(
             Arc::new(parent_block),
             self.config.extradata.clone(),
             attributes,
             Arc::clone(&self.chain_spec),
         );
-
-        let until = self.job_deadline(config.attributes.timestamp());
-        let deadline = Box::pin(tokio::time::sleep_until(until));
 
         let cached_reads = self.maybe_pre_cached(config.parent_block.hash());
 

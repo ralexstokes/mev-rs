@@ -9,12 +9,15 @@ use reth::{
     builder::{node::FullNodeTypes, BuilderContext},
     cli::config::PayloadBuilderConfig,
     payload::{PayloadBuilderHandle, PayloadBuilderService},
+    primitives::Bytes,
     providers::CanonStateSubscriptions,
     transaction_pool::TransactionPool,
 };
 
-#[derive(Debug, Clone, Copy, Default)]
-pub struct PayloadServiceBuilder;
+#[derive(Debug, Clone, Default)]
+pub struct PayloadServiceBuilder {
+    pub extra_data: Option<Bytes>,
+}
 
 impl<Node, Pool> reth::builder::components::PayloadServiceBuilder<Node, Pool>
     for PayloadServiceBuilder
@@ -29,8 +32,13 @@ where
     ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
         let conf = ctx.payload_builder_config();
 
+        let extradata = if let Some(extra_data) = self.extra_data {
+            extra_data
+        } else {
+            conf.extradata_bytes()
+        };
         let payload_job_config = PayloadJobGeneratorConfig {
-            extradata: conf.extradata_bytes(),
+            extradata,
             _max_gas_limit: conf.max_gas_limit(),
             interval: conf.interval(),
             deadline: conf.deadline(),

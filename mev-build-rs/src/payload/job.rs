@@ -1,4 +1,7 @@
-use crate::utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload};
+use crate::{
+    payload::builder_attributes::BuilderPayloadBuilderAttributes,
+    utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload},
+};
 use futures_util::{Future, FutureExt};
 use reth::{
     api::BuiltPayload,
@@ -42,11 +45,13 @@ where
     Client: StateProviderFactory + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     Tasks: TaskSpawner + Clone + 'static,
-    Builder: PayloadBuilder<Pool, Client> + Unpin + 'static,
+    Builder: PayloadBuilder<Pool, Client, Attributes = BuilderPayloadBuilderAttributes>
+        + Unpin
+        + 'static,
     <Builder as PayloadBuilder<Pool, Client>>::Attributes: Unpin + Clone,
     <Builder as PayloadBuilder<Pool, Client>>::BuiltPayload: Unpin + Clone,
 {
-    type PayloadAttributes = Builder::Attributes;
+    type PayloadAttributes = BuilderPayloadBuilderAttributes;
     type ResolvePayloadFuture = ResolveBestPayload<Self::BuiltPayload>;
     type BuiltPayload = Builder::BuiltPayload;
 
@@ -60,6 +65,7 @@ where
         // Note: it is assumed that this is unlikely to happen, as the payload job is started right
         // away and the first full block should have been built by the time CL is requesting the
         // payload.
+        // TODO: customize with proposer payment
         Builder::build_empty_payload(&self.client, self.config.clone())
     }
 
@@ -177,7 +183,6 @@ where
                         BuildOutcome::Better { payload, cached_reads } => {
                             this.cached_reads = Some(cached_reads);
                             debug!(target: "payload_builder", value = %payload.fees(), "built better payload");
-                            let payload = payload;
                             this.best_payload = Some(payload);
                         }
                         BuildOutcome::Aborted { fees, cached_reads } => {

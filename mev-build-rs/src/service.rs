@@ -2,7 +2,9 @@ use crate::{
     auctioneer::{Auctioneer, Config as AuctioneerConfig},
     builder::{Builder, Config as BuilderConfig},
     node::BuilderNode,
-    payload::builder_attributes::BuilderPayloadBuilderAttributes,
+    payload::{
+        builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+    },
 };
 use ethereum_consensus::{
     clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
@@ -12,7 +14,6 @@ use reth::{
     api::EngineTypes,
     builder::{InitState, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
-    primitives::Bytes,
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
@@ -32,8 +33,6 @@ pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    // TODO: move to payload builder
-    pub extra_data: Bytes,
     // TODO: move to payload builder
     pub execution_mnemonic: String,
     // TODO: move to bidder
@@ -91,7 +90,6 @@ pub async fn construct<
         builder_rx,
         auctioneer_tx,
         payload_builder,
-        task_executor.clone(),
         config.builder,
         context.clone(),
         genesis_time,
@@ -122,9 +120,11 @@ pub async fn launch(
 
     // TODO:  ability to just run reth
 
+    let payload_builder = PayloadServiceBuilder { extra_data: config.builder.extra_data.clone() };
+
     let handle = node_builder
         .with_types(BuilderNode::default())
-        .with_components(BuilderNode::components())
+        .with_components(BuilderNode::components().payload(payload_builder))
         .launch()
         .await?;
 

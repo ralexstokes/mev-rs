@@ -1,5 +1,6 @@
-use ethereum_consensus::primitives::{BlsPublicKey, ExecutionAddress, Slot};
+use ethereum_consensus::primitives::{BlsPublicKey, Slot};
 use mev_rs::{types::ProposerSchedule, Relay};
+use reth::primitives::Address;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -11,7 +12,7 @@ pub type Proposals = HashMap<Proposer, RelaySet>;
 #[derive(Debug, Default, Hash, PartialEq, Eq)]
 pub struct Proposer {
     pub public_key: BlsPublicKey,
-    pub fee_recipient: ExecutionAddress,
+    pub fee_recipient: Address,
     pub gas_limit: u64,
 }
 
@@ -37,7 +38,7 @@ impl AuctionSchedule {
             let registration = &entry.entry.message;
             let proposer = Proposer {
                 public_key: registration.public_key.clone(),
-                fee_recipient: registration.fee_recipient.clone(),
+                fee_recipient: Address::from_slice(registration.fee_recipient.as_ref()),
                 gas_limit: registration.gas_limit,
             };
             let relays = slot.entry(proposer).or_default();

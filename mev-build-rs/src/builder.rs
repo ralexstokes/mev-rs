@@ -2,7 +2,7 @@ use crate::{
     auction_schedule::{Proposals, Proposer},
     auctioneer::Message as AuctioneerMessage,
     bidder::AuctionContext,
-    payload::builder_attributes::BuilderPayloadBuilderAttributes,
+    payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     Error,
 };
 use ethereum_consensus::{
@@ -11,11 +11,7 @@ use ethereum_consensus::{
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
     payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId, PayloadStore},
-    primitives::Address,
-    rpc::{
-        compat::engine::convert_withdrawal_to_standalone_withdraw, types::engine::PayloadAttributes,
-    },
-    tasks::TaskExecutor,
+    primitives::{Address, Bytes},
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -24,36 +20,21 @@ use tokio::sync::{
     oneshot,
 };
 use tokio_stream::StreamExt;
-use tracing::warn;
+use tracing::{error, warn};
 
 fn make_attributes_for_proposer(
     attributes: &BuilderPayloadBuilderAttributes,
     builder_fee_recipient: Address,
+    proposer: &Proposer,
 ) -> BuilderPayloadBuilderAttributes {
-    // TODO: extend attributes with gas limit and proposer fee recipient
-    let withdrawals = if attributes.inner.withdrawals.is_empty() {
-        None
-    } else {
-        Some(
-            attributes
-                .inner
-                .withdrawals
-                .iter()
-                .cloned()
-                .map(convert_withdrawal_to_standalone_withdraw)
-                .collect(),
-        )
+    let proposal = ProposalAttributes {
+        builder_fee_recipient,
+        suggested_gas_limit: proposer.gas_limit,
+        proposer_fee_recipient: proposer.fee_recipient,
     };
-    let payload_attributes = PayloadAttributes {
-        timestamp: attributes.inner.timestamp,
-        prev_randao: attributes.inner.prev_randao,
-        suggested_fee_recipient: builder_fee_recipient,
-        withdrawals,
-        parent_beacon_block_root: attributes.inner.parent_beacon_block_root,
-    };
-
-    BuilderPayloadBuilderAttributes::try_new(attributes.inner.parent, payload_attributes)
-        .expect("conversion currently always succeeds")
+    let mut attributes = attributes.clone();
+    attributes.attach_proposal(proposal);
+    attributes
 }
 
 pub enum KeepAlive {
@@ -68,6 +49,7 @@ pub enum Message {
 pub struct Config {
     pub fee_recipient: Address,
     pub genesis_time: Option<u64>,
+    pub extra_data: Option<Bytes>,
 }
 
 pub struct Builder<
@@ -80,7 +62,6 @@ pub struct Builder<
     auctioneer: Sender<AuctioneerMessage>,
     payload_builder: PayloadBuilderHandle<Engine>,
     payload_store: PayloadStore<Engine>,
-    executor: TaskExecutor,
     config: Config,
     context: Arc<Context>,
     genesis_time: u64,
@@ -97,22 +78,12 @@ impl<
         msgs: Receiver<Message>,
         auctioneer: Sender<AuctioneerMessage>,
         payload_builder: PayloadBuilderHandle<Engine>,
-        executor: TaskExecutor,
         config: Config,
         context: Arc<Context>,
         genesis_time: u64,
     ) -> Self {
         let payload_store = payload_builder.clone().into();
-        Self {
-            msgs,
-            auctioneer,
-            payload_builder,
-            payload_store,
-            executor,
-            config,
-            context,
-            genesis_time,
-        }
+        Self { msgs, auctioneer, payload_builder, payload_store, config, context, genesis_time }
     }
 
     pub async fn process_proposals(
@@ -126,11 +97,10 @@ impl<
         if let Some(proposals) = proposals {
             for (proposer, relays) in proposals {
                 let attributes =
-                    make_attributes_for_proposer(&attributes, self.config.fee_recipient);
+                    make_attributes_for_proposer(&attributes, self.config.fee_recipient, &proposer);
 
-                if let Some(attributes) = self.start_build(&proposer, &attributes).await {
-                    // TODO: can likely skip full attributes in `AuctionContext`, can skip clone in
-                    // `start_build`
+                if let Some(_) = self.start_build(&attributes).await {
+                    // TODO: can likely skip full attributes in `AuctionContext`
                     let auction = AuctionContext { slot, attributes, proposer, relays };
                     new_auctions.push(auction);
                 }
@@ -140,40 +110,24 @@ impl<
     }
 
     // TODO: can likely skip returning attributes here...
-    async fn start_build(
-        &self,
-        _proposer: &Proposer,
-        attributes: &BuilderPayloadBuilderAttributes,
-    ) -> Option<BuilderPayloadBuilderAttributes> {
+    async fn start_build(&self, attributes: &BuilderPayloadBuilderAttributes) -> Option<PayloadId> {
         match self.payload_builder.new_payload(attributes.clone()).await {
             Ok(payload_id) => {
                 let attributes_payload_id = attributes.payload_id();
-                if payload_id == attributes_payload_id {
-                    Some(attributes.clone())
-                } else {
-                    warn!(%payload_id, %attributes_payload_id, "mismatch between computed payload id and the one returned by the payload builder");
-                    None
+                if payload_id != attributes_payload_id {
+                    error!(%payload_id, %attributes_payload_id, "mismatch between computed payload id and the one returned by the payload builder");
                 }
+                Some(payload_id)
             }
             Err(err) => {
-                warn!(%err, "bulder could not start build with payload builder");
+                warn!(%err, "builder could not start build with payload builder");
                 None
             }
         }
     }
 
-    fn terminate_job(&self, payload_id: PayloadId) {
-        let payload_store = self.payload_store.clone();
-        self.executor.spawn(async move {
-            // NOTE: terminate job and discard any built payload
-            let _ = payload_store.resolve(payload_id).await;
-        });
-    }
-
     async fn on_payload_attributes(&self, attributes: BuilderPayloadBuilderAttributes) {
-        // NOTE: the payload builder currently makes a job for the incoming `attributes`.
-        // We want to customize the building logic and so we cancel this first job unconditionally.
-        self.terminate_job(attributes.payload_id());
+        // TODO: ignore already processed attributes
 
         // TODO: move slot calc to auctioneer?
         let slot = convert_timestamp_to_slot(

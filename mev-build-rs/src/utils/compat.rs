@@ -13,7 +13,7 @@ pub fn to_bytes32(value: B256) -> Bytes32 {
     Bytes32::try_from(value.as_ref()).unwrap()
 }
 
-fn to_bytes20(value: Address) -> ExecutionAddress {
+pub fn to_bytes20(value: Address) -> ExecutionAddress {
     ExecutionAddress::try_from(value.as_ref()).unwrap()
 }
 
