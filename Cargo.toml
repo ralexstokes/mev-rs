@@ -14,8 +14,8 @@ default-members = ["bin/mev"]
 version = "0.3.0"
 
 [workspace.dependencies]
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "72800f5e4cc28ad384f9cc7639d19da8dab50fb0" }
-beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "72800f5e4cc28ad384f9cc7639d19da8dab50fb0" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "6c7305336397b1cfa1c780812a51c97bd025d052" }
+beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "6c7305336397b1cfa1c780812a51c97bd025d052" }
 
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
 reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "71f8e678aa53f75c2c35badaa5848262de594cdc" }
@@ -25,3 +25,6 @@ reth-ethereum-payload-builder = { git = "https://github.com/paradigmxyz/reth", r
 
 eyre = "0.6.8"
 futures-util = "0.3.30"
+
+[patch.crates-io]
+c-kzg = { git = "https://github.com/ethereum/c-kzg-4844", tag = "v1.0.1" }
