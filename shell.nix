@@ -15,5 +15,5 @@ mkShell {
     just
     mdbook
   ];
-  LIBCLANG_PATH = lib.optionals pkgs.stdenv.isLinux "${llvmPackages.libclang.lib}/lib";
+  LIBCLANG_PATH = "${llvmPackages.libclang.lib}/lib";
 }
