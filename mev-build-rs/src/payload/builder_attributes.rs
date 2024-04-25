@@ -41,7 +41,7 @@ pub fn payload_id_with_bytes(
 
     let out = hasher.finalize();
     let inner: [u8; 8] = out.as_slice()[..8].try_into().expect("sufficient length");
-    (PayloadId::new(inner.clone()), inner)
+    (PayloadId::new(inner), inner)
 }
 
 pub fn mix_proposal_into_payload_id(

@@ -2,7 +2,7 @@
 //! Takes a payload from the payload builder and "finalizes" the crafted payload to yield a valid
 //! block according to the auction rules.
 
-use crate::utils::payload_job::ResolveBestPayload;
+use crate::{payload::builder::PayloadBuilder, utils::payload_job::ResolveBestPayload};
 use alloy_signer::SignerSync;
 use alloy_signer_wallet::LocalWallet;
 use futures_util::FutureExt;
@@ -10,9 +10,9 @@ use reth::{
     api::BuiltPayload,
     payload::{error::PayloadBuilderError, EthBuiltPayload, PayloadId},
     primitives::{
-        proofs, revm::env::tx_env_with_recovered, Address, Block, ChainId, Receipt, Receipts,
-        SealedBlock, Signature, Transaction, TransactionKind, TransactionSigned,
-        TransactionSignedEcRecovered, TxEip1559, B256, U256,
+        proofs, revm::env::tx_env_with_recovered, Address, Block, ChainId, Receipt, SealedBlock,
+        Signature, Transaction, TransactionKind, TransactionSigned, TransactionSignedEcRecovered,
+        TxEip1559, B256, U256,
     },
     providers::{BundleStateWithReceipts, StateProviderFactory},
     revm::{
@@ -45,7 +45,7 @@ fn make_payment_transaction(
         // SAFETY: cast to bigger type always succeeds
         max_fee_per_gas,
         max_priority_fee_per_gas: 0,
-        to: TransactionKind::Call(config.sender),
+        to: TransactionKind::Call(config.proposer_fee_recipient),
         value,
         access_list: Default::default(),
         input: Default::default(),
@@ -66,10 +66,21 @@ fn append_payment<Client: StateProviderFactory>(
     block: SealedBlock,
     value: U256,
 ) -> Result<SealedBlock, PayloadBuilderError> {
+    // TODO: can we get some kind of pending state against `block.hash` here instead of replaying
+    // the bundle state?
     let state_provider = client.state_by_block_hash(config.parent_hash)?;
     let state = StateProviderDatabase::new(&state_provider);
+    let bundle_state_with_receipts = config
+        .builder
+        .get_build_state(config.payload_id)
+        .ok_or_else(|| PayloadBuilderError::Other("missing build state for payload".into()))?;
     // TODO: use cached reads
-    let mut db = State::builder().with_database_ref(state).with_bundle_update().build();
+    let mut db = State::builder()
+        .with_database_ref(state)
+        // TODO skip clone here...
+        .with_bundle_prestate(bundle_state_with_receipts.state().clone())
+        .with_bundle_update()
+        .build();
 
     let signer_account = db.load_cache_account(config.sender)?;
     // TODO handle option
@@ -80,7 +91,7 @@ fn append_payment<Client: StateProviderFactory>(
 
     // === Apply txn ===
 
-    // TODO: try to clone the envs less here...
+    // TODO: skip clones here
     let env = EnvWithHandlerCfg::new_with_cfg_env(
         config.cfg_env.clone(),
         config.block_env.clone(),
@@ -97,38 +108,28 @@ fn append_payment<Client: StateProviderFactory>(
     let Block { mut header, mut body, ommers, withdrawals } = block.unseal();
 
     // TODO: hold gas reserve so this always succeeds
-    let cumulative_gas_used = header.gas_used + result.gas_used();
     // TODO: sanity check we didn't go over gas limit
+    let cumulative_gas_used = header.gas_used + result.gas_used();
     let receipt = Receipt {
         tx_type: payment_tx.tx_type(),
         success: result.is_success(),
         cumulative_gas_used,
         logs: result.into_logs().into_iter().map(Into::into).collect(),
-        ..Default::default()
     };
+    // TODO skip clone here
+    let mut receipts = bundle_state_with_receipts.receipts().clone();
+    receipts.push(vec![Some(receipt)]);
 
     body.push(payment_tx.into_signed());
 
     db.merge_transitions(BundleRetention::PlainState);
 
     let block_number = header.number;
-    // TODO: this is broken bc we need to keep receipts...
-    // NOTE: need to either fetch receipts from DB, or just keep state and not build in two steps
-    // here...
-    // May want to pass bundle state from payload builder and then `extend` here instead...
-    let bundle = BundleStateWithReceipts::new(
-        db.take_bundle(),
-        Receipts::from_vec(vec![vec![Some(receipt)]]),
-        block_number,
-    );
+    let bundle = BundleStateWithReceipts::new(db.take_bundle(), receipts, block_number);
 
     let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
     let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
-
-    // calculate the state root
     let state_root = state_provider.state_root(bundle.state())?;
-
-    // create the block header
     let transactions_root = proofs::calculate_transaction_root(&body);
 
     header.state_root = state_root;
@@ -144,6 +145,7 @@ fn append_payment<Client: StateProviderFactory>(
 
 #[derive(Debug)]
 pub struct PayloadFinalizerConfig {
+    pub payload_id: PayloadId,
     pub proposer_fee_recipient: Address,
     pub signer: Arc<LocalWallet>,
     pub sender: Address,
@@ -151,6 +153,7 @@ pub struct PayloadFinalizerConfig {
     pub chain_id: ChainId,
     pub cfg_env: CfgEnvWithHandlerCfg,
     pub block_env: BlockEnv,
+    pub builder: PayloadBuilder,
 }
 
 #[derive(Debug)]
@@ -212,6 +215,7 @@ where
         let this = self.get_mut();
         let payload = ready!(this.resolution.poll_unpin(cx))?;
 
+        // TODO: consider making the payment addition `spawn_blocking`
         // TODO: save payload in the event we need to poll again?
 
         // TODO: we are dropping blobs....

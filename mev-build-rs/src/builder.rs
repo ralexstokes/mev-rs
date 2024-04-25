@@ -121,7 +121,7 @@ impl<
                     &proposer,
                 );
 
-                if let Some(_) = self.start_build(&attributes).await {
+                if self.start_build(&attributes).await.is_some() {
                     // TODO: can likely skip full attributes in `AuctionContext`
                     let auction = AuctionContext { slot, attributes, proposer, relays };
                     new_auctions.push(auction);

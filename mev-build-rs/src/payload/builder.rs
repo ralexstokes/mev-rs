@@ -1,7 +1,7 @@
 use crate::payload::builder_attributes::BuilderPayloadBuilderAttributes;
 use reth::{
     api::PayloadBuilderAttributes,
-    payload::{error::PayloadBuilderError, EthBuiltPayload},
+    payload::{error::PayloadBuilderError, EthBuiltPayload, PayloadId},
     primitives::{
         constants::{
             eip4844::MAX_DATA_GAS_PER_BLOCK, BEACON_NONCE, EMPTY_RECEIPTS, EMPTY_TRANSACTIONS,
@@ -25,10 +25,35 @@ use reth_basic_payload_builder::{
     commit_withdrawals, is_better_payload, pre_block_beacon_root_contract_call, BuildArguments,
     BuildOutcome, PayloadConfig, WithdrawalsOutcome,
 };
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use tracing::{debug, trace, warn};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PayloadBuilder;
+#[derive(Debug, Clone, Default)]
+pub struct PayloadBuilder(Arc<Inner>);
+
+impl Deref for PayloadBuilder {
+    type Target = Inner;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Inner {
+    states: Arc<Mutex<HashMap<PayloadId, BundleStateWithReceipts>>>,
+}
+
+impl Inner {
+    pub fn get_build_state(&self, payload_id: PayloadId) -> Option<BundleStateWithReceipts> {
+        let mut state = self.states.lock().expect("can lock");
+        state.remove(&payload_id)
+    }
+}
 
 impl<Pool, Client> reth_basic_payload_builder::PayloadBuilder<Pool, Client> for PayloadBuilder
 where
@@ -42,13 +67,21 @@ where
         &self,
         args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
     ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
-        default_ethereum_payload_builder(args)
+        let payload_id = args.config.payload_id();
+        let (outcome, bundle) = default_ethereum_payload_builder(args)?;
+        if let Some(bundle) = bundle {
+            let mut states = self.states.lock().expect("can lock");
+            states.insert(payload_id, bundle);
+        }
+        Ok(outcome)
     }
 
     fn build_empty_payload(
         client: &Client,
         config: PayloadConfig<Self::Attributes>,
     ) -> Result<Self::BuiltPayload, PayloadBuilderError> {
+        // TODO: this should also store bundle state for finalization -- do we need to keep it
+        // separate from the main driver?
         let extra_data = config.extra_data();
         let PayloadConfig {
             initialized_block_env,
@@ -159,7 +192,7 @@ where
 #[inline]
 pub fn default_ethereum_payload_builder<Pool, Client>(
     args: BuildArguments<Pool, Client, BuilderPayloadBuilderAttributes, EthBuiltPayload>,
-) -> Result<BuildOutcome<EthBuiltPayload>, PayloadBuilderError>
+) -> Result<(BuildOutcome<EthBuiltPayload>, Option<BundleStateWithReceipts>), PayloadBuilderError>
 where
     Client: StateProviderFactory,
     Pool: TransactionPool,
@@ -220,7 +253,7 @@ where
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok(BuildOutcome::Cancelled)
+            return Ok((BuildOutcome::Cancelled, None))
         }
 
         // convert tx to a signed transaction
@@ -319,7 +352,7 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
+        return Ok((BuildOutcome::Aborted { fees: total_fees, cached_reads }, None))
     }
 
     let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(
@@ -406,5 +439,5 @@ where
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
-    Ok(BuildOutcome::Better { payload, cached_reads })
+    Ok((BuildOutcome::Better { payload, cached_reads }, Some(bundle)))
 }

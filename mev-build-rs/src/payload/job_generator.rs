@@ -1,16 +1,16 @@
 use crate::{
-    payload::{builder_attributes::BuilderPayloadBuilderAttributes, job::PayloadJob},
+    payload::{builder::PayloadBuilder, job::PayloadJob},
     utils::payload_job::{duration_until, PayloadTaskGuard},
 };
 use reth::{
     api::PayloadBuilderAttributes,
-    payload::{self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload},
+    payload::{self, database::CachedReads, error::PayloadBuilderError},
     primitives::{BlockNumberOrTag, Bytes, ChainSpec, B256},
     providers::{BlockReaderIdExt, BlockSource, CanonStateNotification, StateProviderFactory},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
 };
-use reth_basic_payload_builder::{PayloadBuilder, PayloadConfig, PrecachedState};
+use reth_basic_payload_builder::{PayloadConfig, PrecachedState};
 use std::{sync::Arc, time::Duration};
 
 #[derive(Debug, Clone)]
@@ -24,25 +24,25 @@ pub struct PayloadJobGeneratorConfig {
 }
 
 #[derive(Debug)]
-pub struct PayloadJobGenerator<Client, Pool, Tasks, Builder> {
+pub struct PayloadJobGenerator<Client, Pool, Tasks> {
     client: Client,
     pool: Pool,
     executor: Tasks,
     config: PayloadJobGeneratorConfig,
     payload_task_guard: PayloadTaskGuard,
     chain_spec: Arc<ChainSpec>,
-    builder: Builder,
+    builder: PayloadBuilder,
     pre_cached: Option<PrecachedState>,
 }
 
-impl<Client, Pool, Tasks, Builder> PayloadJobGenerator<Client, Pool, Tasks, Builder> {
+impl<Client, Pool, Tasks> PayloadJobGenerator<Client, Pool, Tasks> {
     pub fn with_builder(
         client: Client,
         pool: Pool,
         executor: Tasks,
         config: PayloadJobGeneratorConfig,
         chain_spec: Arc<ChainSpec>,
-        builder: Builder,
+        builder: PayloadBuilder,
     ) -> Self {
         Self {
             client,
@@ -76,23 +76,13 @@ impl<Client, Pool, Tasks, Builder> PayloadJobGenerator<Client, Pool, Tasks, Buil
     }
 }
 
-impl<Client, Pool, Tasks, Builder> payload::PayloadJobGenerator
-    for PayloadJobGenerator<Client, Pool, Tasks, Builder>
+impl<Client, Pool, Tasks> payload::PayloadJobGenerator for PayloadJobGenerator<Client, Pool, Tasks>
 where
     Client: StateProviderFactory + BlockReaderIdExt + Clone + Unpin + 'static,
     Pool: TransactionPool + Unpin + 'static,
     Tasks: TaskSpawner + Clone + Unpin + 'static,
-    Builder: PayloadBuilder<
-            Pool,
-            Client,
-            Attributes = BuilderPayloadBuilderAttributes,
-            BuiltPayload = EthBuiltPayload,
-        > + Unpin
-        + 'static,
-    <Builder as PayloadBuilder<Pool, Client>>::Attributes: Unpin + Clone,
-    <Builder as PayloadBuilder<Pool, Client>>::BuiltPayload: Unpin + Clone,
 {
-    type Job = PayloadJob<Client, Pool, Tasks, Builder>;
+    type Job = PayloadJob<Client, Pool, Tasks>;
 
     fn new_payload_job(
         &self,

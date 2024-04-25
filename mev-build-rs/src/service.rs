@@ -121,7 +121,7 @@ pub async fn launch(
     let payload_builder = PayloadServiceBuilder { extra_data: config.builder.extra_data.clone() };
 
     let handle = node_builder
-        .with_types(BuilderNode::default())
+        .with_types(BuilderNode)
         .with_components(BuilderNode::components().payload(payload_builder))
         .launch()
         .await?;
