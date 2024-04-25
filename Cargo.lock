@@ -882,7 +882,7 @@ checksum = "8c3c1a368f70d6cf7302d78f8f7093da241fb8e8807c05cc9e51a125895a6d5b"
 [[package]]
 name = "beacon-api-client"
 version = "0.1.0"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=72800f5e4cc28ad384f9cc7639d19da8dab50fb0#72800f5e4cc28ad384f9cc7639d19da8dab50fb0"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=6c7305336397b1cfa1c780812a51c97bd025d052#6c7305336397b1cfa1c780812a51c97bd025d052"
 dependencies = [
  "clap",
  "ethereum-consensus",
@@ -1292,8 +1292,7 @@ dependencies = [
 [[package]]
 name = "c-kzg"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3130f3d8717cc02e668a896af24984d5d5d4e8bf12e278e982e0f1bd88a0f9af"
+source = "git+https://github.com/ethereum/c-kzg-4844?tag=v1.0.1#1ef67c17bf659547749750e6ebaaf09563e0149d"
 dependencies = [
  "blst",
  "cc",
@@ -2501,7 +2500,7 @@ dependencies = [
 [[package]]
 name = "ethereum-consensus"
 version = "0.1.1"
-source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=72800f5e4cc28ad384f9cc7639d19da8dab50fb0#72800f5e4cc28ad384f9cc7639d19da8dab50fb0"
+source = "git+https://github.com/ralexstokes/ethereum-consensus?rev=6c7305336397b1cfa1c780812a51c97bd025d052#6c7305336397b1cfa1c780812a51c97bd025d052"
 dependencies = [
  "blst",
  "bs58 0.4.0",
