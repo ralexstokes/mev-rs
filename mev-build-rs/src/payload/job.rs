@@ -51,7 +51,7 @@ where
     Tasks: TaskSpawner + Clone + 'static,
 {
     type PayloadAttributes = BuilderPayloadBuilderAttributes;
-    type ResolvePayloadFuture = ResolveBuilderPayload<EthBuiltPayload, Client, Pool>;
+    type ResolvePayloadFuture = ResolveBuilderPayload<Client, Pool>;
     type BuiltPayload = EthBuiltPayload;
 
     // TODO: do we need to customize this? if not, use default impl in some way

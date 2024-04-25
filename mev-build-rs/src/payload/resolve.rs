@@ -7,12 +7,14 @@ use alloy_signer::SignerSync;
 use alloy_signer_wallet::LocalWallet;
 use futures_util::FutureExt;
 use reth::{
-    api::BuiltPayload,
     payload::{error::PayloadBuilderError, EthBuiltPayload, PayloadId},
     primitives::{
-        proofs, revm::env::tx_env_with_recovered, Address, Block, ChainId, Receipt, SealedBlock,
-        Signature, Transaction, TransactionKind, TransactionSigned, TransactionSignedEcRecovered,
-        TxEip1559, B256, U256,
+        kzg::{Blob, Bytes48},
+        proofs,
+        revm::env::tx_env_with_recovered,
+        Address, BlobTransactionSidecar, Block, ChainId, Receipt, SealedBlock, Signature,
+        Transaction, TransactionKind, TransactionSigned, TransactionSignedEcRecovered, TxEip1559,
+        B256, U256,
     },
     providers::{BundleStateWithReceipts, StateProviderFactory},
     revm::{
@@ -22,6 +24,7 @@ use reth::{
         primitives::{BlockEnv, CfgEnvWithHandlerCfg, EnvWithHandlerCfg, ResultAndState},
         DatabaseCommit, State,
     },
+    rpc::types::engine::{BlobsBundleV1, ExecutionPayloadEnvelopeV3},
 };
 use std::{
     future::Future,
@@ -174,38 +177,38 @@ impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
 
     fn prepare(
         &self,
-        block: &SealedBlock,
+        block: SealedBlock,
         fees: U256,
         config: &PayloadFinalizerConfig,
     ) -> Result<EthBuiltPayload, PayloadBuilderError> {
         let payment_amount = self.determine_payment_amount(fees);
-        let block = append_payment(&self.client, config, block.clone(), payment_amount)?;
+        let block = append_payment(&self.client, config, block, payment_amount)?;
         // TODO: - track proposer payment, revenue
+        // TODO: ensure fees haven't changed
         Ok(EthBuiltPayload::new(self.payload_id, block, fees))
     }
 
     fn process(
         &mut self,
-        block: &SealedBlock,
+        block: SealedBlock,
         fees: U256,
     ) -> Result<EthBuiltPayload, PayloadBuilderError> {
         if let Some(config) = self.config.as_ref() {
             self.prepare(block, fees, config)
         } else {
-            Ok(EthBuiltPayload::new(self.payload_id, block.clone(), fees))
+            Ok(EthBuiltPayload::new(self.payload_id, block, fees))
         }
     }
 }
 
 #[derive(Debug)]
-pub struct ResolveBuilderPayload<Payload, Client, Pool> {
-    pub resolution: ResolveBestPayload<Payload>,
+pub struct ResolveBuilderPayload<Client, Pool> {
+    pub resolution: ResolveBestPayload<EthBuiltPayload>,
     pub finalizer: PayloadFinalizer<Client, Pool>,
 }
 
-impl<Payload, Client, Pool> Future for ResolveBuilderPayload<Payload, Client, Pool>
+impl<Client, Pool> Future for ResolveBuilderPayload<Client, Pool>
 where
-    Payload: BuiltPayload + Unpin,
     Client: StateProviderFactory + Unpin,
     Pool: Unpin,
 {
@@ -220,10 +223,33 @@ where
 
         // TODO: we are dropping blobs....
 
-        let block = payload.block();
+        let block = payload.block().clone();
         let fees = payload.fees();
 
-        let finalized_payload = this.finalizer.process(block, fees);
+        // TODO: move to custom type to skip copy on blobs
+        // NOTE: workaround, can move to our own type to skip all this copying
+        let execution_payload = ExecutionPayloadEnvelopeV3::from(payload);
+
+        let BlobsBundleV1 { commitments, proofs, blobs } = execution_payload.blobs_bundle;
+        let blob_sidecars = BlobTransactionSidecar {
+            blobs: blobs
+                .into_iter()
+                .map(|blob| Blob::from_bytes(blob.as_ref()).expect("is right size"))
+                .collect(),
+            commitments: commitments
+                .into_iter()
+                .map(|c| Bytes48::from_bytes(c.as_ref()).expect("is right size"))
+                .collect(),
+            proofs: proofs
+                .into_iter()
+                .map(|p| Bytes48::from_bytes(p.as_ref()).expect("is right size"))
+                .collect(),
+        };
+
+        let finalized_payload = this.finalizer.process(block, fees).map(|mut payload| {
+            payload.extend_sidecars(vec![blob_sidecars]);
+            payload
+        });
         Poll::Ready(finalized_payload)
     }
 }
