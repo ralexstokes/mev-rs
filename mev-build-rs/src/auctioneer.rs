@@ -10,11 +10,12 @@ use ethereum_consensus::{
     crypto::SecretKey,
     primitives::{BlsPublicKey, Epoch, Slot},
     state_transition::Context,
+    Fork,
 };
 use mev_rs::{
     relay::parse_relay_endpoints,
     signing::sign_builder_message,
-    types::{BidTrace, SignedBidSubmission},
+    types::{block_submission, BidTrace, SignedBidSubmission},
     BlindedBlockRelayer, Relay,
 };
 use reth::{
@@ -50,7 +51,25 @@ fn prepare_submission(
     };
     let execution_payload = to_execution_payload(payload.block());
     let signature = sign_builder_message(&message, signing_key, context)?;
-    Ok(SignedBidSubmission { message, execution_payload, signature })
+    let submission = match execution_payload.version() {
+        Fork::Bellatrix => {
+            SignedBidSubmission::Bellatrix(block_submission::bellatrix::SignedBidSubmission {
+                message,
+                execution_payload,
+                signature,
+            })
+        }
+        Fork::Capella => {
+            SignedBidSubmission::Capella(block_submission::capella::SignedBidSubmission {
+                message,
+                execution_payload,
+                signature,
+            })
+        }
+        Fork::Deneb => unimplemented!(),
+        other => unreachable!("fork {other} is not reachable from this type"),
+    };
+    Ok(submission)
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]

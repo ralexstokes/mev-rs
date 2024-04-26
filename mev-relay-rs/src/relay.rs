@@ -593,7 +593,7 @@ impl BlindedBlockRelayer for Relay {
 
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
         let (auction_request, value, builder_public_key) = {
-            let bid_trace = &signed_submission.message;
+            let bid_trace = signed_submission.message();
             let builder_public_key = &bid_trace.builder_public_key;
             self.validate_allowed_builder(builder_public_key)?;
 
@@ -604,20 +604,17 @@ impl BlindedBlockRelayer for Relay {
             };
             self.validate_auction_request(&auction_request)?;
 
-            self.validate_builder_submission_trusted(
-                bid_trace,
-                &signed_submission.execution_payload,
-            )?;
+            self.validate_builder_submission_trusted(bid_trace, signed_submission.payload())?;
             debug!(%auction_request, "validated builder submission");
             (auction_request, bid_trace.value, bid_trace.builder_public_key.clone())
         };
 
-        let message = &signed_submission.message;
-        let public_key = &signed_submission.message.builder_public_key;
-        let signature = &signed_submission.signature;
+        let message = signed_submission.message();
+        let public_key = &signed_submission.message().builder_public_key;
+        let signature = signed_submission.signature();
         verify_signed_builder_data(message, public_key, signature, &self.context)?;
 
-        let execution_payload = signed_submission.execution_payload.clone();
+        let execution_payload = signed_submission.payload().clone();
         // NOTE: this does _not_ respect cancellations
         // TODO: move to regime where we track best bid by builder
         // and also move logic to cursor best bid for auction off this API
