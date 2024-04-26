@@ -172,7 +172,8 @@ impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
         // TODO: get amount to bid from bidder
         // - amount from block fees
         // - including any subsidy
-        fees
+        // TODO: remove temporary hardcoded subsidy
+        fees.max(U256::from(1337))
     }
 
     fn prepare(
@@ -185,7 +186,7 @@ impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
         let block = append_payment(&self.client, config, block, payment_amount)?;
         // TODO: - track proposer payment, revenue
         // TODO: ensure fees haven't changed
-        Ok(EthBuiltPayload::new(self.payload_id, block, fees))
+        Ok(EthBuiltPayload::new(self.payload_id, block, payment_amount))
     }
 
     fn process(
