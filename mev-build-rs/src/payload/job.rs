@@ -124,7 +124,7 @@ where
                 payload_id: self.config.payload_id(),
                 proposer_fee_recipient: attributes.proposer_fee_recipient,
                 signer: attributes.builder_signer.clone(),
-                sender: Default::default(),
+                sender: attributes.builder_signer.address(),
                 parent_hash: self.config.attributes.parent(),
                 chain_id: self.config.chain_spec.chain().id(),
                 cfg_env: self.config.initialized_cfg.clone(),
