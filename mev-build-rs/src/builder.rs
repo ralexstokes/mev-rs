@@ -210,7 +210,16 @@ impl<
         loop {
             tokio::select! {
                 Some(message) = self.msgs.recv() => self.dispatch(message).await,
-                Some(Ok(Events::Attributes(attributes))) = payload_events.next() => self.on_payload_attributes(attributes).await,
+                Some(event) = payload_events.next() => match event {
+                    Ok(event) => {
+                        if let Events::Attributes(attributes) = event {
+                            self.on_payload_attributes(attributes).await;
+                        }
+                    }
+                    Err(err) => {
+                        warn!(%err, "error getting payload events");
+                    }
+                }
             }
         }
     }
