@@ -110,11 +110,7 @@ pub async fn launch(
     network: Network,
     config: Config,
 ) -> eyre::Result<()> {
-    let chain_spec = &node_builder.config().chain;
-    let chain_name = chain_spec.chain.to_string();
-    if chain_name != network.to_string() {
-        return Err(eyre::eyre!("configuration file did not match CLI"))
-    }
+    // TODO: verify network matches b/t reth and config?
 
     // TODO:  ability to just run reth
 
