@@ -114,6 +114,9 @@ pub async fn launch(
 
     // TODO:  ability to just run reth
 
+    // TODO: consider blocking until we are synced... seems to be causing some kind of race
+    // condition upon launch
+
     let payload_builder = PayloadServiceBuilder { extra_data: config.builder.extra_data.clone() };
 
     let handle = node_builder
