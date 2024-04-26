@@ -165,6 +165,7 @@ impl Auctioneer {
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
+        info!(?auction, ?payload, "submitting payload");
         // TODO: should convert to ExecutionPayloadV3 etc. for blobs etc.
         match prepare_submission(
             payload,
