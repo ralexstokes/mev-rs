@@ -21,7 +21,7 @@ pub mod deneb {
         ssz::prelude::*,
     };
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BlobsBundle {
         commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,

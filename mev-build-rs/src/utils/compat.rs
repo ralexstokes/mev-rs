@@ -1,5 +1,5 @@
 use ethereum_consensus::{
-    capella::mainnet as spec,
+    deneb::mainnet as spec,
     primitives::{Bytes32, ExecutionAddress},
     ssz::{
         prelude as ssz_rs,
@@ -21,6 +21,7 @@ fn to_byte_vector(value: Bloom) -> ByteVector<256> {
     ByteVector::<256>::try_from(value.as_ref()).unwrap()
 }
 
+// TODO: support multiple forks
 pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
     let hash = value.hash();
     let header = &value.header;
@@ -58,6 +59,8 @@ pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
         block_hash: to_bytes32(hash),
         transactions: TryFrom::try_from(transactions).unwrap(),
         withdrawals: TryFrom::try_from(withdrawals).unwrap(),
+        blob_gas_used: header.blob_gas_used.unwrap(),
+        excess_blob_gas: header.excess_blob_gas.unwrap(),
     };
-    ExecutionPayload::Capella(payload)
+    ExecutionPayload::Deneb(payload)
 }

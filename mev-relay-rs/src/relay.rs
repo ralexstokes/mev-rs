@@ -20,7 +20,7 @@ use mev_rs::{
         verify_signed_data,
     },
     types::{
-        builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
+        self, builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
         ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
         SignedBuilderBid, SignedValidatorRegistration,
     },
@@ -436,7 +436,13 @@ impl Relay {
                 value,
                 public_key: self.public_key.clone(),
             }),
-            Fork::Deneb => unimplemented!(),
+            Fork::Deneb => BuilderBid::Deneb(builder_bid::deneb::BuilderBid {
+                header,
+                // TODO: support blobs
+                blob_kzg_commitments: Default::default(),
+                value,
+                public_key: self.public_key.clone(),
+            }),
             _ => unreachable!("this fork is not reachable from this type"),
         };
         let signature = sign_builder_message(&bid, &self.secret_key, &self.context)?;
@@ -568,7 +574,11 @@ impl BlindedBlockProvider for Relay {
                     let auction_contents = match local_payload.version() {
                         Fork::Bellatrix => AuctionContents::Bellatrix(local_payload.clone()),
                         Fork::Capella => AuctionContents::Capella(local_payload.clone()),
-                        Fork::Deneb => unimplemented!(),
+                        Fork::Deneb => AuctionContents::Deneb(types::deneb::AuctionContents {
+                            execution_payload: local_payload.clone(),
+                            // TODO: support blobs
+                            blobs_bundle: Default::default(),
+                        }),
                         _ => unreachable!("fork not reachable from type"),
                     };
                     Ok(auction_contents)
