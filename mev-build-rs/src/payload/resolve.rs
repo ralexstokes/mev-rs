@@ -12,7 +12,7 @@ use reth::{
         kzg::{Blob, Bytes48},
         proofs,
         revm::env::tx_env_with_recovered,
-        Address, BlobTransactionSidecar, Block, ChainId, Receipt, SealedBlock, Signature,
+        Address, BlobTransactionSidecar, Block, ChainId, Receipt, Receipts, SealedBlock, Signature,
         Transaction, TransactionKind, TransactionSigned, TransactionSignedEcRecovered, TxEip1559,
         B256, U256,
     },
@@ -119,15 +119,18 @@ fn append_payment<Client: StateProviderFactory>(
         cumulative_gas_used,
         logs: result.into_logs().into_iter().map(Into::into).collect(),
     };
-    // TODO skip clone here
-    let mut receipts = bundle_state_with_receipts.receipts().clone();
-    receipts.push(vec![Some(receipt)]);
 
     body.push(payment_tx.into_signed());
 
     db.merge_transitions(BundleRetention::PlainState);
 
+    // TODO skip clone here
     let block_number = header.number;
+    let mut receipts = bundle_state_with_receipts.receipts_by_block(block_number).to_vec();
+    receipts.push(Some(receipt));
+
+    let receipts = Receipts::from_vec(vec![receipts]);
+
     let bundle = BundleStateWithReceipts::new(db.take_bundle(), receipts, block_number);
 
     let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
