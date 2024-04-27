@@ -19,10 +19,6 @@ accepted_builders = [
 ]
 
 [builder]
-# extra data to write into built execution payload
-extra_data = "0x68656C6C6F20776F726C640A" # "hello world"
-# wallet seed for builder to author payment transactions
-execution_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
 # number of milliseconds to submit bids ahead of the target slot
 bidding_deadline_ms = 1000
 # amount of value to bid as a fraction of the payload's revenue
@@ -39,4 +35,9 @@ relays = [
     "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net",
 ]
 [builder.builder]
+# address to collect transaction fees
 fee_recipient = "0x0000000000000000000000000000000000000000"
+# [optional] extra data to write into built execution payload
+extra_data = "0x68656C6C6F20776F726C640A" # "hello world"
+# wallet seed for builder to author payment transactions
+execution_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"

@@ -1,7 +1,10 @@
 use crate::{
     auctioneer::{Auctioneer, Config as AuctioneerConfig},
     builder::{Builder, Config as BuilderConfig},
-    payload::service_builder::PayloadServiceBuilder,
+    node::BuilderNode,
+    payload::{
+        builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+    },
 };
 use ethereum_consensus::{
     clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
@@ -10,12 +13,10 @@ use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
     builder::{InitState, WithLaunchContext},
-    payload::{EthBuiltPayload, EthPayloadBuilderAttributes, PayloadBuilderHandle},
-    primitives::Bytes,
+    payload::{EthBuiltPayload, PayloadBuilderHandle},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
-use reth_node_ethereum::EthereumNode;
 use serde::Deserialize;
 use std::sync::Arc;
 use tokio::{
@@ -32,14 +33,10 @@ pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    // TODO: move to payload builder
-    pub extra_data: Bytes,
-    // TODO: move to payload builder
-    pub execution_mnemonic: String,
     // TODO: move to bidder
     // amount in milliseconds
     pub bidding_deadline_ms: u64,
-    // TODO: move to payload builder, or have as part of bidder config
+    // TODO: move to bidder
     // amount to bid as a fraction of the block's value
     pub bid_percent: Option<f64>,
     // TODO: move to bidder
@@ -55,7 +52,7 @@ pub struct Config {
 
 pub struct Services<
     Engine: EngineTypes<
-        PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
         BuiltPayload = EthBuiltPayload,
     >,
 > {
@@ -68,7 +65,7 @@ pub struct Services<
 
 pub async fn construct<
     Engine: EngineTypes<
-            PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+            PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
             BuiltPayload = EthBuiltPayload,
         > + 'static,
 >(
@@ -91,7 +88,6 @@ pub async fn construct<
         builder_rx,
         auctioneer_tx,
         payload_builder,
-        task_executor.clone(),
         config.builder,
         context.clone(),
         genesis_time,
@@ -114,17 +110,18 @@ pub async fn launch(
     network: Network,
     config: Config,
 ) -> eyre::Result<()> {
-    let chain_spec = &node_builder.config().chain;
-    let chain_name = chain_spec.chain.to_string();
-    if chain_name != network.to_string() {
-        return Err(eyre::eyre!("configuration file did not match CLI"))
-    }
+    // TODO: verify network matches b/t reth and config?
 
     // TODO:  ability to just run reth
 
+    // TODO: consider blocking until we are synced... seems to be causing some kind of race
+    // condition upon launch
+
+    let payload_builder = PayloadServiceBuilder { extra_data: config.builder.extra_data.clone() };
+
     let handle = node_builder
-        .with_types(EthereumNode::default())
-        .with_components(EthereumNode::components().payload(PayloadServiceBuilder))
+        .with_types(BuilderNode)
+        .with_components(BuilderNode::components().payload(payload_builder))
         .launch()
         .await?;
 

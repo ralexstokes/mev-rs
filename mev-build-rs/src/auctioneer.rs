@@ -3,7 +3,7 @@ use crate::{
     bidder::{AuctionContext, BidRequest, DeadlineBidder},
     builder::{KeepAlive, Message as BuilderMessage},
     service::ClockMessage,
-    utils::compat::{to_bytes32, to_execution_payload},
+    utils::compat::{to_bytes20, to_bytes32, to_execution_payload},
     Error,
 };
 use ethereum_consensus::{
@@ -18,6 +18,7 @@ use mev_rs::{
     BlindedBlockRelayer, Relay,
 };
 use reth::{
+    api::PayloadBuilderAttributes,
     payload::{EthBuiltPayload, PayloadId},
     tasks::TaskExecutor,
 };
@@ -39,11 +40,11 @@ fn prepare_submission(
 ) -> Result<SignedBidSubmission, Error> {
     let message = BidTrace {
         slot: auction_context.slot,
-        parent_hash: to_bytes32(auction_context.attributes.parent),
+        parent_hash: to_bytes32(auction_context.attributes.inner.parent),
         block_hash: to_bytes32(payload.block().hash()),
         builder_public_key: public_key.clone(),
         proposer_public_key: auction_context.proposer.public_key.clone(),
-        proposer_fee_recipient: auction_context.proposer.fee_recipient.clone(),
+        proposer_fee_recipient: to_bytes20(auction_context.proposer.fee_recipient),
         gas_limit: payload.block().gas_limit,
         gas_used: payload.block().gas_used,
         value: payload.fees(),
@@ -113,7 +114,8 @@ impl Auctioneer {
         self.auction_schedule.take_matching_proposals(slot)
     }
 
-    fn process_new_auction(&mut self, payload_id: PayloadId, auction: AuctionContext) {
+    fn process_new_auction(&mut self, auction: AuctionContext) {
+        let payload_id = auction.attributes.payload_id();
         self.open_auctions.insert(payload_id, Arc::new(auction));
         let auction = self.open_auctions.get(&payload_id).unwrap().clone();
 
@@ -136,8 +138,7 @@ impl Auctioneer {
 
     fn process_new_auctions(&mut self, auctions: Vec<AuctionContext>) {
         for auction in auctions {
-            let payload_id = auction.attributes.payload_id();
-            self.process_new_auction(payload_id, auction);
+            self.process_new_auction(auction);
         }
     }
 
@@ -162,19 +163,35 @@ impl Auctioneer {
         self.open_auctions.retain(|_, auction| auction.slot >= slot);
     }
 
-    async fn dispatch_payload(&self, payload: EthBuiltPayload) {
+    async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
-        let signed_submission = prepare_submission(
+        info!(
+            slot = auction.slot,
+            block_number = payload.block().number,
+            block_hash = %payload.block().hash(),
+            value = %payload.fees(),
+            relays=?auction.relays,
+            "submitting payload"
+        );
+        // TODO: should convert to ExecutionPayloadV3 etc. for blobs etc.
+        match prepare_submission(
             payload,
             &self.config.secret_key,
             &self.config.public_key,
             auction,
             &self.context,
-        )
-        .expect("can prepare bid");
-        let relays = &auction.relays;
-        for relay in relays {
-            relay.submit_bid(&signed_submission).await.expect("was ok");
+        ) {
+            Ok(signed_submission) => {
+                let relays = &auction.relays;
+                for relay in relays {
+                    if let Err(err) = relay.submit_bid(&signed_submission).await {
+                        warn!(%err, ?relay, slot = auction.slot, "could not submit payload");
+                    }
+                }
+            }
+            Err(err) => {
+                warn!(%err, slot = auction.slot, "could not prepare submission")
+            }
         }
     }
 
@@ -185,12 +202,8 @@ impl Auctioneer {
                 let proposals = self.take_proposals(slot);
                 tx.send(proposals).expect("can send");
             }
-            NewAuctions(auctions) => {
-                self.process_new_auctions(auctions);
-            }
-            BuiltPayload(payload) => {
-                self.dispatch_payload(payload).await;
-            }
+            NewAuctions(auctions) => self.process_new_auctions(auctions),
+            BuiltPayload(payload) => self.submit_payload(payload).await,
         }
     }
 

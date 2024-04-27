@@ -3,6 +3,7 @@ mod auctioneer;
 mod bidder;
 mod builder;
 mod error;
+mod node;
 mod payload;
 mod service;
 mod utils;

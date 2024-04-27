@@ -1,16 +1,17 @@
 use crate::{
     auction_schedule::{Proposer, RelaySet},
+    payload::builder_attributes::BuilderPayloadBuilderAttributes,
     utils::payload_job::duration_until,
 };
 use ethereum_consensus::primitives::Slot;
-use reth::payload::{EthPayloadBuilderAttributes, PayloadId};
+use reth::{api::PayloadBuilderAttributes, payload::PayloadId};
 use std::time::Duration;
 use tokio::time::sleep;
 
 #[derive(Debug)]
 pub struct AuctionContext {
     pub slot: Slot,
-    pub attributes: EthPayloadBuilderAttributes,
+    pub attributes: BuilderPayloadBuilderAttributes,
     pub proposer: Proposer,
     pub relays: RelaySet,
 }
@@ -34,7 +35,7 @@ impl DeadlineBidder {
     }
 
     pub async fn make_bid(&self, auction: &AuctionContext) -> BidRequest {
-        let target = duration_until(auction.attributes.timestamp);
+        let target = duration_until(auction.attributes.timestamp());
         let duration = target.checked_sub(self.deadline).unwrap_or_default();
         sleep(duration).await;
         BidRequest::Ready(auction.attributes.payload_id())
