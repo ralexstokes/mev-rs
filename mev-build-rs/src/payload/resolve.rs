@@ -176,7 +176,7 @@ impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
         // - amount from block fees
         // - including any subsidy
         // TODO: remove temporary hardcoded subsidy
-        fees.max(U256::from(1337))
+        fees + U256::from(1337)
     }
 
     fn prepare(
