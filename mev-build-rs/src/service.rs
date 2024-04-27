@@ -9,16 +9,18 @@ use crate::{
 use ethereum_consensus::{
     clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
 };
+use eyre::OptionExt;
 use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
     builder::{InitState, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
+    primitives::NamedChain,
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{
     sync::{
         broadcast::{self, Sender},
@@ -105,12 +107,34 @@ pub async fn construct<
     Ok(Services { auctioneer, builder, clock, clock_tx, context })
 }
 
+fn custom_network_from_config_directory(path: PathBuf) -> Network {
+    let path = path.to_str().expect("is valid str").to_string();
+    warn!(%path, "no named chain found; attempting to load config from custom directory");
+    Network::Custom(path)
+}
+
 pub async fn launch(
     node_builder: WithLaunchContext<Arc<DatabaseEnv>, InitState>,
-    network: Network,
+    custom_chain_config_directory: Option<PathBuf>,
     config: Config,
 ) -> eyre::Result<()> {
-    // TODO: verify network matches b/t reth and config?
+    let chain = node_builder.config().chain.chain;
+    let network = if let Some(chain) = chain.named() {
+        match chain {
+            NamedChain::Mainnet => Network::Mainnet,
+            NamedChain::Sepolia => Network::Sepolia,
+            NamedChain::Holesky => Network::Holesky,
+            _ => {
+                let path = custom_chain_config_directory
+                    .ok_or_eyre("missing custom chain configuration when expected")?;
+                custom_network_from_config_directory(path)
+            }
+        }
+    } else {
+        let path = custom_chain_config_directory
+            .ok_or_eyre("missing custom chain configuration when expected")?;
+        custom_network_from_config_directory(path)
+    };
 
     // TODO:  ability to just run reth
 

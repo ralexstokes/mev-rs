@@ -1,8 +1,10 @@
 mod cmd;
 
-use clap::{Parser, Subcommand};
-use std::future::Future;
+use clap::{CommandFactory, Parser, Subcommand};
+use eyre::OptionExt;
+use std::{future::Future, path::PathBuf};
 use tokio::signal;
+use tracing::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[derive(Debug, Parser)]
@@ -51,7 +53,25 @@ fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> eyre::
         })
 }
 
+fn parse_custom_chain_config_directory() -> eyre::Result<Option<PathBuf>> {
+    let matches = Cli::command().get_matches();
+    let (_, matches) = matches.subcommand().ok_or_eyre("missing subcommand")?;
+    let iter = matches.try_get_raw("chain").transpose();
+
+    if let Some(Ok(mut iter)) = iter {
+        Ok(iter.next().and_then(|raw| {
+            raw.to_str().and_then(|s| {
+                let path = PathBuf::from(s);
+                path.parent().map(PathBuf::from)
+            })
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
 fn main() -> eyre::Result<()> {
+    let custom_chain_config_directory = parse_custom_chain_config_directory()?;
     let cli = Cli::parse();
 
     match cli.command {
@@ -60,13 +80,11 @@ fn main() -> eyre::Result<()> {
         #[cfg(feature = "build")]
         Commands::Build(cmd) => cmd.run(|node_builder, cli_args| async move {
             let config: cmd::config::Config = cli_args.try_into()?;
-            let network = config.network;
-
-            if let Some(config) = config.builder {
-                mev_build_rs::launch(node_builder, network, config).await
-            } else {
-                Err(eyre::eyre!("missing `builder` configuration"))
+            if let Some(network) = config.network {
+                warn!(%network, "`network` option provided in configuration but ignored in favor of `reth` configuration");
             }
+            let config = config.builder.ok_or_eyre("missing `builder` configuration")?;
+            mev_build_rs::launch(node_builder, custom_chain_config_directory,  config).await
         }),
         #[cfg(feature = "relay")]
         Commands::Relay(cmd) => run_task_until_signal(cmd.execute()),
