@@ -131,7 +131,6 @@ impl<
         Ok(new_auctions)
     }
 
-    // TODO: can likely skip returning attributes here...
     async fn start_build(&self, attributes: &BuilderPayloadBuilderAttributes) -> Option<PayloadId> {
         match self.payload_builder.new_payload(attributes.clone()).await {
             Ok(payload_id) => {
@@ -176,12 +175,9 @@ impl<
     }
 
     async fn send_payload_to_auctioneer(&self, payload_id: PayloadId, _keep_alive: KeepAlive) {
-        // TODO: put into separate task?
-        // TODO: signal to payload job `_keep_alive` status
         let maybe_payload = self.payload_store.resolve(payload_id).await;
         if let Some(payload) = maybe_payload {
             match payload {
-                // TODO: auctioneer can just listen for payload events instead
                 Ok(payload) => self
                     .auctioneer
                     .send(AuctioneerMessage::BuiltPayload(payload))

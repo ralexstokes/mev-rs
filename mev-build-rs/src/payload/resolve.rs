@@ -45,7 +45,6 @@ fn make_payment_transaction(
         chain_id: config.chain_id,
         nonce,
         gas_limit: BASE_TX_GAS_LIMIT,
-        // SAFETY: cast to bigger type always succeeds
         max_fee_per_gas,
         max_priority_fee_per_gas: 0,
         to: TransactionKind::Call(config.proposer_fee_recipient),
@@ -53,7 +52,6 @@ fn make_payment_transaction(
         access_list: Default::default(),
         input: Default::default(),
     });
-    // TODO: verify we are signing correctly...
     let signature_hash = tx.signature_hash();
     let signature = config.signer.sign_hash_sync(&signature_hash).expect("can sign");
     let signed_transaction = TransactionSigned::from_transaction_and_signature(
@@ -69,8 +67,6 @@ fn append_payment<Client: StateProviderFactory>(
     block: SealedBlock,
     value: U256,
 ) -> Result<SealedBlock, PayloadBuilderError> {
-    // TODO: can we get some kind of pending state against `block.hash` here instead of replaying
-    // the bundle state?
     let state_provider = client.state_by_block_hash(config.parent_hash)?;
     let state = StateProviderDatabase::new(&state_provider);
     let bundle_state_with_receipts = config
@@ -89,10 +85,9 @@ fn append_payment<Client: StateProviderFactory>(
     // TODO handle option
     let nonce = signer_account.account_info().expect("account exists").nonce;
     // TODO handle option
+    // SAFETY: cast to bigger type always succeeds
     let max_fee_per_gas = block.header().base_fee_per_gas.expect("exists") as u128;
     let payment_tx = make_payment_transaction(config, nonce, max_fee_per_gas, value)?;
-
-    // === Apply txn ===
 
     // TODO: skip clones here
     let env = EnvWithHandlerCfg::new_with_cfg_env(
@@ -124,8 +119,8 @@ fn append_payment<Client: StateProviderFactory>(
 
     db.merge_transitions(BundleRetention::PlainState);
 
-    // TODO skip clone here
     let block_number = header.number;
+    // TODO skip clone here
     let mut receipts = bundle_state_with_receipts.receipts_by_block(block_number).to_vec();
     receipts.push(Some(receipt));
 
@@ -172,9 +167,6 @@ pub struct PayloadFinalizer<Client, Pool> {
 
 impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
     fn determine_payment_amount(&self, fees: U256) -> U256 {
-        // TODO: get amount to bid from bidder
-        // - amount from block fees
-        // - including any subsidy
         // TODO: remove temporary hardcoded subsidy
         fees + U256::from(1337)
     }
@@ -188,7 +180,6 @@ impl<Client: StateProviderFactory, Pool> PayloadFinalizer<Client, Pool> {
         let payment_amount = self.determine_payment_amount(fees);
         let block = append_payment(&self.client, config, block, payment_amount)?;
         // TODO: - track proposer payment, revenue
-        // TODO: ensure fees haven't changed
         Ok(EthBuiltPayload::new(self.payload_id, block, payment_amount))
     }
 
@@ -229,6 +220,11 @@ where
 
         let block = payload.block().clone();
         let fees = payload.fees();
+
+        // TODO: get amount to bid from bidder
+        // TODO: add channel send here to dispatch fees, wait for bidder response
+        // - amount from block fees
+        // - including any subsidy
 
         // TODO: move to custom type to skip copy on blobs
         // NOTE: workaround, can move to our own type to skip all this copying

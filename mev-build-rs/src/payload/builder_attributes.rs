@@ -61,8 +61,11 @@ pub fn mix_proposal_into_payload_id(
 
 #[derive(Debug, Clone)]
 pub struct ProposalAttributes {
+    // TODO: move to payload builder
     pub builder_fee_recipient: Address,
+    // TODO: move to payload builder
     pub builder_signer: Arc<LocalWallet>,
+    // TODO: ensure this is being used, and mapped to correct value
     pub suggested_gas_limit: u64,
     pub proposer_fee_recipient: Address,
 }

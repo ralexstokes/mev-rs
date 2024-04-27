@@ -41,6 +41,7 @@ pub struct PayloadJob<Client, Pool, Tasks> {
     pub pending_block: Option<PendingPayload<EthBuiltPayload>>,
     pub payload_task_guard: PayloadTaskGuard,
     pub cached_reads: Option<CachedReads>,
+    // TODO: consider moving shared state here, rather than builder
     pub builder: PayloadBuilder,
 }
 

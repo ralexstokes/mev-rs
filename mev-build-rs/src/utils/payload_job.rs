@@ -11,6 +11,7 @@ use std::{
 use tokio::sync::{oneshot, Semaphore};
 use tracing::{debug, warn};
 
+// TODO: refactor into `ethereum_consensus::clock`
 pub fn duration_until(unix_timestamp_secs: u64) -> Duration {
     let unix_now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     let timestamp = Duration::from_secs(unix_timestamp_secs);
