@@ -1,9 +1,8 @@
 use crate::{
     auction_schedule::{Proposer, RelaySet},
     payload::builder_attributes::BuilderPayloadBuilderAttributes,
-    utils::payload_job::duration_until,
 };
-use ethereum_consensus::primitives::Slot;
+use ethereum_consensus::{clock::duration_until, primitives::Slot};
 use reth::{api::PayloadBuilderAttributes, payload::PayloadId};
 use std::time::Duration;
 use tokio::time::sleep;

@@ -6,17 +6,9 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
-    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::{oneshot, Semaphore};
 use tracing::{debug, warn};
-
-// TODO: refactor into `ethereum_consensus::clock`
-pub fn duration_until(unix_timestamp_secs: u64) -> Duration {
-    let unix_now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
-    let timestamp = Duration::from_secs(unix_timestamp_secs);
-    timestamp.saturating_sub(unix_now)
-}
 
 #[derive(Debug, Clone)]
 pub struct PayloadTaskGuard(pub Arc<Semaphore>);

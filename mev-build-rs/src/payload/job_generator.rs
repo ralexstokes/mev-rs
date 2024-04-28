@@ -1,7 +1,8 @@
 use crate::{
     payload::{builder::PayloadBuilder, job::PayloadJob},
-    utils::payload_job::{duration_until, PayloadTaskGuard},
+    utils::payload_job::PayloadTaskGuard,
 };
+use ethereum_consensus::clock::duration_until;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{self, database::CachedReads, error::PayloadBuilderError},
