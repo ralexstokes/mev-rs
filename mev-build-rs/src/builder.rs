@@ -32,7 +32,7 @@ fn make_attributes_for_proposer(
     let proposal = ProposalAttributes {
         builder_fee_recipient,
         builder_signer,
-        suggested_gas_limit: proposer.gas_limit,
+        proposer_gas_limit: proposer.gas_limit,
         proposer_fee_recipient: proposer.fee_recipient,
     };
     let mut attributes = attributes.clone();

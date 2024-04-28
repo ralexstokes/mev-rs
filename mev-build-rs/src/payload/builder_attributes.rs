@@ -35,7 +35,7 @@ pub fn payload_id_with_bytes(
     }
 
     if let Some(proposal) = proposal {
-        hasher.update(proposal.suggested_gas_limit.to_be_bytes());
+        hasher.update(proposal.proposer_gas_limit.to_be_bytes());
         hasher.update(proposal.proposer_fee_recipient.as_slice());
     }
 
@@ -52,7 +52,7 @@ pub fn mix_proposal_into_payload_id(
     hasher.update(payload_id);
 
     hasher.update(proposal.builder_fee_recipient.as_slice());
-    hasher.update(proposal.suggested_gas_limit.to_be_bytes());
+    hasher.update(proposal.proposer_gas_limit.to_be_bytes());
     hasher.update(proposal.proposer_fee_recipient.as_slice());
 
     let out = hasher.finalize();
@@ -65,8 +65,7 @@ pub struct ProposalAttributes {
     pub builder_fee_recipient: Address,
     // TODO: move to payload builder
     pub builder_signer: Arc<LocalWallet>,
-    // TODO: ensure this is being used, and mapped to correct value
-    pub suggested_gas_limit: u64,
+    pub proposer_gas_limit: u64,
     pub proposer_fee_recipient: Address,
 }
 
