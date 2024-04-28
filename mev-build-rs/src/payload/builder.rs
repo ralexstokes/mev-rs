@@ -1,4 +1,8 @@
-use crate::payload::builder_attributes::BuilderPayloadBuilderAttributes;
+use crate::payload::{
+    builder_attributes::BuilderPayloadBuilderAttributes, resolve::PayloadFinalizerConfig,
+};
+use alloy_signer::SignerSync;
+use alloy_signer_wallet::LocalWallet;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{error::PayloadBuilderError, EthBuiltPayload, PayloadId},
@@ -9,7 +13,9 @@ use reth::{
         eip4844::calculate_excess_blob_gas,
         proofs,
         revm::env::tx_env_with_recovered,
-        Block, Header, IntoRecoveredTransaction, Receipt, Receipts, EMPTY_OMMER_ROOT_HASH, U256,
+        Address, Block, ChainId, Header, IntoRecoveredTransaction, Receipt, Receipts, SealedBlock,
+        Signature, Transaction, TransactionKind, TransactionSigned, TransactionSignedEcRecovered,
+        TxEip1559, EMPTY_OMMER_ROOT_HASH, U256,
     },
     providers::{BundleStateWithReceipts, StateProviderFactory},
     revm::{
@@ -32,7 +38,120 @@ use std::{
 };
 use tracing::{debug, trace, warn};
 
-#[derive(Debug, Clone, Default)]
+pub const BASE_TX_GAS_LIMIT: u64 = 21000;
+
+fn make_payment_transaction(
+    signer: &LocalWallet,
+    config: &PayloadFinalizerConfig,
+    chain_id: ChainId,
+    nonce: u64,
+    max_fee_per_gas: u128,
+    value: U256,
+) -> Result<TransactionSignedEcRecovered, PayloadBuilderError> {
+    let tx = Transaction::Eip1559(TxEip1559 {
+        chain_id,
+        nonce,
+        gas_limit: BASE_TX_GAS_LIMIT,
+        max_fee_per_gas,
+        max_priority_fee_per_gas: 0,
+        to: TransactionKind::Call(config.proposer_fee_recipient),
+        value,
+        access_list: Default::default(),
+        input: Default::default(),
+    });
+    let signature_hash = tx.signature_hash();
+    let signature = signer.sign_hash_sync(&signature_hash).expect("can sign");
+    let signed_transaction = TransactionSigned::from_transaction_and_signature(
+        tx,
+        Signature { r: signature.r(), s: signature.s(), odd_y_parity: signature.v().y_parity() },
+    );
+    Ok(TransactionSignedEcRecovered::from_signed_transaction(signed_transaction, signer.address()))
+}
+
+fn append_payment<Client: StateProviderFactory>(
+    client: Client,
+    bundle_state_with_receipts: BundleStateWithReceipts,
+    signer: &LocalWallet,
+    config: &PayloadFinalizerConfig,
+    chain_id: ChainId,
+    block: SealedBlock,
+    value: U256,
+) -> Result<SealedBlock, PayloadBuilderError> {
+    let state_provider = client.state_by_block_hash(config.parent_hash)?;
+    let state = StateProviderDatabase::new(&state_provider);
+    // TODO: use cached reads
+    let mut db = State::builder()
+        .with_database_ref(state)
+        // TODO skip clone here...
+        .with_bundle_prestate(bundle_state_with_receipts.state().clone())
+        .with_bundle_update()
+        .build();
+
+    let signer_account = db.load_cache_account(signer.address())?;
+    // TODO handle option
+    let nonce = signer_account.account_info().expect("account exists").nonce;
+    // TODO handle option
+    // SAFETY: cast to bigger type always succeeds
+    let max_fee_per_gas = block.header().base_fee_per_gas.expect("exists") as u128;
+    let payment_tx =
+        make_payment_transaction(signer, config, chain_id, nonce, max_fee_per_gas, value)?;
+
+    // TODO: skip clones here
+    let env = EnvWithHandlerCfg::new_with_cfg_env(
+        config.cfg_env.clone(),
+        config.block_env.clone(),
+        tx_env_with_recovered(&payment_tx),
+    );
+    let mut evm = revm::Evm::builder().with_db(&mut db).with_env_with_handler_cfg(env).build();
+
+    let ResultAndState { result, state } =
+        evm.transact().map_err(PayloadBuilderError::EvmExecutionError)?;
+
+    drop(evm);
+    db.commit(state);
+
+    let Block { mut header, mut body, ommers, withdrawals } = block.unseal();
+
+    // TODO: hold gas reserve so this always succeeds
+    // TODO: sanity check we didn't go over gas limit
+    let cumulative_gas_used = header.gas_used + result.gas_used();
+    let receipt = Receipt {
+        tx_type: payment_tx.tx_type(),
+        success: result.is_success(),
+        cumulative_gas_used,
+        logs: result.into_logs().into_iter().map(Into::into).collect(),
+    };
+
+    body.push(payment_tx.into_signed());
+
+    db.merge_transitions(BundleRetention::PlainState);
+
+    let block_number = header.number;
+    // TODO skip clone here
+    let mut receipts = bundle_state_with_receipts.receipts_by_block(block_number).to_vec();
+    receipts.push(Some(receipt));
+
+    let receipts = Receipts::from_vec(vec![receipts]);
+
+    let bundle = BundleStateWithReceipts::new(db.take_bundle(), receipts, block_number);
+
+    let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
+    let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
+    let state_root = state_provider.state_root(bundle.state())?;
+    let transactions_root = proofs::calculate_transaction_root(&body);
+
+    header.state_root = state_root;
+    header.transactions_root = transactions_root;
+    header.receipts_root = receipts_root;
+    header.logs_bloom = logs_bloom;
+    header.gas_used = cumulative_gas_used;
+
+    let block = Block { header, body, ommers, withdrawals };
+
+    Ok(block.seal_slow())
+}
+
+#[derive(Debug, Clone)]
 pub struct PayloadBuilder(Arc<Inner>);
 
 impl Deref for PayloadBuilder {
@@ -43,15 +162,52 @@ impl Deref for PayloadBuilder {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Inner {
-    states: Arc<Mutex<HashMap<PayloadId, BundleStateWithReceipts>>>,
+    pub signer: LocalWallet,
+    pub fee_recipient: Address,
+    pub chain_id: ChainId,
+    pub states: Mutex<HashMap<PayloadId, BundleStateWithReceipts>>,
 }
 
-impl Inner {
+impl PayloadBuilder {
+    pub fn new(signer: LocalWallet, fee_recipient: Address, chain_id: ChainId) -> Self {
+        let inner = Inner { signer, fee_recipient, chain_id, states: Default::default() };
+        Self(Arc::new(inner))
+    }
+
     pub fn get_build_state(&self, payload_id: PayloadId) -> Option<BundleStateWithReceipts> {
         let mut state = self.states.lock().expect("can lock");
         state.remove(&payload_id)
+    }
+
+    fn determine_payment_amount(&self, fees: U256) -> U256 {
+        // TODO: remove temporary hardcoded subsidy
+        fees + U256::from(1337)
+    }
+
+    pub fn finalize_payload<Client: StateProviderFactory>(
+        &self,
+        payload_id: PayloadId,
+        client: Client,
+        block: SealedBlock,
+        fees: U256,
+        config: &PayloadFinalizerConfig,
+    ) -> Result<EthBuiltPayload, PayloadBuilderError> {
+        let payment_amount = self.determine_payment_amount(fees);
+        let bundle_state_with_receipts = self
+            .get_build_state(payload_id)
+            .ok_or_else(|| PayloadBuilderError::Other("missing build state for payload".into()))?;
+        let block = append_payment(
+            client,
+            bundle_state_with_receipts,
+            &self.signer,
+            config,
+            self.chain_id,
+            block,
+            payment_amount,
+        )?;
+        Ok(EthBuiltPayload::new(payload_id, block, payment_amount))
     }
 }
 

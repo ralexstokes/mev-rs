@@ -122,20 +122,16 @@ where
 
         let config =
             self.config.attributes.proposal.as_ref().map(|attributes| PayloadFinalizerConfig {
-                payload_id: self.config.payload_id(),
                 proposer_fee_recipient: attributes.proposer_fee_recipient,
-                signer: attributes.builder_signer.clone(),
-                sender: attributes.builder_signer.address(),
                 parent_hash: self.config.attributes.parent(),
-                chain_id: self.config.chain_spec.chain().id(),
                 cfg_env: self.config.initialized_cfg.clone(),
                 block_env: self.config.initialized_block_env.clone(),
-                builder: self.builder.clone(),
             });
         let finalizer = PayloadFinalizer {
             client: self.client.clone(),
             _pool: self.pool.clone(),
             payload_id: self.config.payload_id(),
+            builder: self.builder.clone(),
             config,
         };
 

@@ -1,4 +1,3 @@
-use alloy_signer_wallet::LocalWallet;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{EthPayloadBuilderAttributes, PayloadId},
@@ -12,7 +11,7 @@ use reth::{
     },
 };
 use sha2::Digest;
-use std::{convert::Infallible, sync::Arc};
+use std::convert::Infallible;
 
 pub fn payload_id_with_bytes(
     parent: &B256,
@@ -51,7 +50,6 @@ pub fn mix_proposal_into_payload_id(
     let mut hasher = sha2::Sha256::new();
     hasher.update(payload_id);
 
-    hasher.update(proposal.builder_fee_recipient.as_slice());
     hasher.update(proposal.proposer_gas_limit.to_be_bytes());
     hasher.update(proposal.proposer_fee_recipient.as_slice());
 
@@ -61,10 +59,6 @@ pub fn mix_proposal_into_payload_id(
 
 #[derive(Debug, Clone)]
 pub struct ProposalAttributes {
-    // TODO: move to payload builder
-    pub builder_fee_recipient: Address,
-    // TODO: move to payload builder
-    pub builder_signer: Arc<LocalWallet>,
     pub proposer_gas_limit: u64,
     pub proposer_fee_recipient: Address,
 }
@@ -108,8 +102,6 @@ impl BuilderPayloadBuilderAttributes {
         if let Some(payload_id) = self.payload_id.take() {
             let id = mix_proposal_into_payload_id(payload_id, &proposal);
             self.inner.id = id;
-            // NOTE: direct all fee payments to builder
-            self.inner.suggested_fee_recipient = proposal.builder_fee_recipient;
             self.proposal = Some(proposal);
         }
     }

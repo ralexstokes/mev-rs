@@ -5,7 +5,6 @@ use crate::{
     payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     Error,
 };
-use alloy_signer_wallet::{coins_bip39::English, LocalWallet, MnemonicBuilder};
 use ethereum_consensus::{
     clock::convert_timestamp_to_slot, primitives::Slot, state_transition::Context,
 };
@@ -25,13 +24,9 @@ use tracing::{error, warn};
 
 fn make_attributes_for_proposer(
     attributes: &BuilderPayloadBuilderAttributes,
-    builder_fee_recipient: Address,
-    builder_signer: Arc<LocalWallet>,
     proposer: &Proposer,
 ) -> BuilderPayloadBuilderAttributes {
     let proposal = ProposalAttributes {
-        builder_fee_recipient,
-        builder_signer,
         proposer_gas_limit: proposer.gas_limit,
         proposer_fee_recipient: proposer.fee_recipient,
     };
@@ -50,7 +45,7 @@ pub enum Message {
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    pub fee_recipient: Address,
+    pub fee_recipient: Option<Address>,
     pub genesis_time: Option<u64>,
     pub extra_data: Option<Bytes>,
     pub execution_mnemonic: String,
@@ -66,10 +61,8 @@ pub struct Builder<
     auctioneer: Sender<AuctioneerMessage>,
     payload_builder: PayloadBuilderHandle<Engine>,
     payload_store: PayloadStore<Engine>,
-    config: Config,
     context: Arc<Context>,
     genesis_time: u64,
-    signer: Arc<LocalWallet>,
 }
 
 impl<
@@ -83,25 +76,11 @@ impl<
         msgs: Receiver<Message>,
         auctioneer: Sender<AuctioneerMessage>,
         payload_builder: PayloadBuilderHandle<Engine>,
-        config: Config,
         context: Arc<Context>,
         genesis_time: u64,
     ) -> Self {
         let payload_store = payload_builder.clone().into();
-        let signer = MnemonicBuilder::<English>::default()
-            .phrase(&config.execution_mnemonic)
-            .build()
-            .expect("is valid");
-        Self {
-            msgs,
-            auctioneer,
-            payload_builder,
-            payload_store,
-            config,
-            context,
-            genesis_time,
-            signer: Arc::new(signer),
-        }
+        Self { msgs, auctioneer, payload_builder, payload_store, context, genesis_time }
     }
 
     pub async fn process_proposals(
@@ -114,12 +93,7 @@ impl<
 
         if let Some(proposals) = proposals {
             for (proposer, relays) in proposals {
-                let attributes = make_attributes_for_proposer(
-                    &attributes,
-                    self.config.fee_recipient,
-                    self.signer.clone(),
-                    &proposer,
-                );
+                let attributes = make_attributes_for_proposer(&attributes, &proposer);
 
                 if self.start_build(&attributes).await.is_some() {
                     // TODO: can likely skip full attributes in `AuctionContext`

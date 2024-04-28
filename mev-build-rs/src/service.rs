@@ -86,14 +86,8 @@ pub async fn construct<
     let (builder_tx, builder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
     let (auctioneer_tx, auctioneer_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
 
-    let builder = Builder::new(
-        builder_rx,
-        auctioneer_tx,
-        payload_builder,
-        config.builder,
-        context.clone(),
-        genesis_time,
-    );
+    let builder =
+        Builder::new(builder_rx, auctioneer_tx, payload_builder, context.clone(), genesis_time);
 
     let auctioneer = Auctioneer::new(
         auctioneer_rx,
@@ -136,11 +130,11 @@ pub async fn launch(
         custom_network_from_config_directory(path)
     };
 
-    let payload_builder = PayloadServiceBuilder { extra_data: config.builder.extra_data.clone() };
+    let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
 
     let handle = node_builder
         .with_types(BuilderNode)
-        .with_components(BuilderNode::components().payload(payload_builder))
+        .with_components(BuilderNode::components_with(payload_builder))
         .launch()
         .await?;
 

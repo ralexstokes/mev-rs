@@ -7,7 +7,7 @@ use mev_rs::compute_preferred_gas_limit;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{self, database::CachedReads, error::PayloadBuilderError},
-    primitives::{BlockNumberOrTag, Bytes, ChainSpec, B256, U256},
+    primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256},
     providers::{BlockReaderIdExt, BlockSource, CanonStateNotification, StateProviderFactory},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
@@ -17,6 +17,10 @@ use std::{sync::Arc, time::Duration};
 
 fn apply_gas_limit<P>(config: &mut PayloadConfig<P>, gas_limit: u64) {
     config.initialized_block_env.gas_limit = U256::from(gas_limit);
+}
+
+fn apply_fee_recipient<P>(config: &mut PayloadConfig<P>, fee_recipient: Address) {
+    config.initialized_block_env.coinbase = fee_recipient;
 }
 
 #[derive(Debug, Clone)]
@@ -132,6 +136,7 @@ where
         if let Some(gas_limit) = gas_limit {
             apply_gas_limit(&mut config, gas_limit);
         }
+        apply_fee_recipient(&mut config, self.builder.fee_recipient);
 
         let cached_reads = self.maybe_pre_cached(config.parent_block.hash());
 
