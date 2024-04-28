@@ -33,6 +33,7 @@ impl<P> Future for PendingPayload<P> {
         Poll::Ready(res.map_err(Into::into).and_then(|res| res))
     }
 }
+
 #[derive(Debug)]
 pub struct ResolveBestPayload<Payload> {
     pub best_payload: Option<Payload>,
