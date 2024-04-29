@@ -1,7 +1,7 @@
 use crate::{
     payload::{
+        attributes::BuilderPayloadBuilderAttributes,
         builder::PayloadBuilder,
-        builder_attributes::BuilderPayloadBuilderAttributes,
         resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
     },
     utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload},

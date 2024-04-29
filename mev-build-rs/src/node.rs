@@ -1,7 +1,7 @@
 //! Customized types for the builder to configuring reth
 
 use crate::payload::{
-    builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+    attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
 };
 use reth::{
     api::{

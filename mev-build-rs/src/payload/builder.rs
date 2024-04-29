@@ -1,5 +1,5 @@
 use crate::payload::{
-    builder_attributes::BuilderPayloadBuilderAttributes, resolve::PayloadFinalizerConfig,
+    attributes::BuilderPayloadBuilderAttributes, resolve::PayloadFinalizerConfig,
 };
 use alloy_signer::SignerSync;
 use alloy_signer_wallet::LocalWallet;

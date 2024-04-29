@@ -1,7 +1,7 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
     bidder::{BidStatus, Message as BidderMessage},
-    payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
+    payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     utils::compat::{to_bytes20, to_bytes32, to_execution_payload},
     Error,

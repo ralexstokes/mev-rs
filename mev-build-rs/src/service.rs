@@ -3,7 +3,7 @@ use crate::{
     bidder::{Config as BidderConfig, Service as Bidder},
     node::BuilderNode,
     payload::{
-        builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+        attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
     },
 };
 use ethereum_consensus::{
