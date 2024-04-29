@@ -1,8 +1,8 @@
 use crate::{
-    auction_schedule::{AuctionSchedule, Proposals, Proposer},
-    bidder::{AuctionContext, BidRequest, DeadlineBidder, Message as BidderMessage},
+    auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
+    bidder::{BidStatus, Message as BidderMessage},
     payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
-    service::{ClockMessage, DEFAULT_COMPONENT_CHANNEL_SIZE},
+    service::ClockMessage,
     utils::compat::{to_bytes20, to_bytes32, to_execution_payload},
     Error,
 };
@@ -21,13 +21,12 @@ use mev_rs::{
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
     payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId, PayloadStore},
-    tasks::TaskExecutor,
 };
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::{
     broadcast,
-    mpsc::{self, Receiver, Sender},
+    mpsc::{Receiver, Sender},
 };
 use tokio_stream::StreamExt;
 use tracing::{error, info, warn};
@@ -68,6 +67,14 @@ fn prepare_submission(
     Ok(SignedBidSubmission { message, execution_payload, signature })
 }
 
+#[derive(Debug)]
+pub struct AuctionContext {
+    pub slot: Slot,
+    pub attributes: BuilderPayloadBuilderAttributes,
+    pub proposer: Proposer,
+    pub relays: RelaySet,
+}
+
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
     /// Secret key used to sign builder messages to relay
@@ -89,13 +96,12 @@ pub struct Auctioneer<
     builder: PayloadBuilderHandle<Engine>,
     payload_store: PayloadStore<Engine>,
     relays: Vec<Arc<Relay>>,
-    executor: TaskExecutor,
     config: Config,
     context: Arc<Context>,
     // TODO consolidate this somewhere...
     genesis_time: u64,
-    bidder_tx: Sender<BidderMessage>,
-    bidder: Receiver<BidderMessage>,
+    bidder: Sender<BidderMessage>,
+    bid_dispatch: Receiver<BidStatus>,
 
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
@@ -111,7 +117,8 @@ impl<
     pub fn new(
         clock: broadcast::Receiver<ClockMessage>,
         builder: PayloadBuilderHandle<Engine>,
-        executor: TaskExecutor,
+        bidder: Sender<BidderMessage>,
+        bid_dispatch: Receiver<BidStatus>,
         mut config: Config,
         context: Arc<Context>,
         genesis_time: u64,
@@ -125,19 +132,16 @@ impl<
 
         let payload_store = builder.clone().into();
 
-        let (bidder_tx, bidder) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-
         Self {
             clock,
             builder,
             payload_store,
             relays,
-            executor,
             config,
             context,
             genesis_time,
-            bidder_tx,
             bidder,
+            bid_dispatch,
             auction_schedule: Default::default(),
             open_auctions: Default::default(),
         }
@@ -206,24 +210,12 @@ impl<
         }
     }
 
-    fn process_new_auction(&mut self, auction: AuctionContext) {
+    async fn process_new_auction(&mut self, auction: AuctionContext) {
         let payload_id = auction.attributes.payload_id();
         // TODO: consider data layout in `open_auctions`
         let auction = self.open_auctions.entry(payload_id).or_insert_with(|| Arc::new(auction));
 
-        // TODO refactor into independent actor
-        // this works for now, but want bidding to happen on separate thread
-        let auctioneer = self.bidder_tx.clone();
-        let auction = auction.clone();
-        self.executor.spawn_blocking(async move {
-            let deadline = Duration::from_secs(1);
-            let bidder = DeadlineBidder::new(deadline);
-            match bidder.make_bid(&auction).await {
-                BidRequest::Ready(payload_id, keep_alive) => {
-                    auctioneer.send((payload_id, keep_alive)).await.expect("can send");
-                }
-            }
-        });
+        self.bidder.send(BidderMessage::NewAuction(auction.clone())).await.expect("can send");
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
@@ -239,13 +231,16 @@ impl<
         if let Some(proposals) = self.take_proposals(slot) {
             let auctions = self.process_proposals(slot, attributes, proposals).await;
             for auction in auctions {
-                self.process_new_auction(auction);
+                self.process_new_auction(auction).await;
             }
         }
     }
 
-    async fn process_bid(&mut self, (payload_id, _keep_alive): BidderMessage) {
+    async fn process_bid_update(&mut self, message: BidStatus) {
+        let BidStatus::Dispatch(payload_id, _keep_alive) = message;
         // TODO: may want to keep payload job running...
+        // NOTE: move back to builder interface over payload builder, that can also do this on its
+        // own thread?
         if let Some(payload) = self.payload_store.resolve(payload_id).await {
             match payload {
                 Ok(payload) => self.submit_payload(payload).await,
@@ -321,7 +316,7 @@ impl<
                     Ok(event) =>  self.dispatch_payload_event(event).await,
                     Err(err) => warn!(%err, "error getting payload event"),
                 },
-                Some(message) = self.bidder.recv() => self.process_bid(message).await,
+                Some(message) = self.bid_dispatch.recv() => self.process_bid_update(message).await,
             }
         }
     }

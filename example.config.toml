@@ -19,14 +19,6 @@ accepted_builders = [
 ]
 
 [builder]
-# number of milliseconds to submit bids ahead of the target slot
-bidding_deadline_ms = 1000
-# amount of value to bid as a fraction of the payload's revenue
-bid_percent = 0.9
-# amount to add to the bid on top of the payload's revenue,
-# currently sourced from the builder's wallet authoring the payment transaction
-subsidy_gwei = 100000000 # 0.1 eth
-
 [builder.auctioneer]
 # builder BLS secret key
 secret_key = "0x14b6e79cbc6267c6e527b4bf7a71747d42a58b10279366cf0c7bb4e2aa455901"
@@ -34,6 +26,7 @@ secret_key = "0x14b6e79cbc6267c6e527b4bf7a71747d42a58b10279366cf0c7bb4e2aa455901
 relays = [
     "https://0x845bd072b7cd566f02faeb0a4033ce9399e42839ced64e8b2adcfc859ed1e8e1a5a293336a49feac6d9a5edb779be53a@boost-relay-sepolia.flashbots.net",
 ]
+
 [builder.builder]
 # [optional] address to collect transaction fees
 # if missing, sender from `execution_mnemonic` is used
@@ -42,3 +35,12 @@ fee_recipient = "0x9858EfFD232B4033E47d90003D41EC34EcaEda94"
 extra_data = "0x68656C6C6F20776F726C640A" # "hello world"
 # wallet seed for builder to author payment transactions
 execution_mnemonic = "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+
+[builder.bidder]
+# number of milliseconds to submit bids ahead of the target slot
+bidding_deadline_ms = 1000
+# amount of value to bid as a fraction of the payload's revenue
+bid_percent = 0.9
+# amount to add to the bid on top of the payload's revenue,
+# currently sourced from the builder's wallet authoring the payment transaction
+subsidy_wei = "0x0000000000000000000000000000000000000000000000000000000000000001"

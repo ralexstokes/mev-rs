@@ -1,5 +1,6 @@
 use crate::{
     auctioneer::{Auctioneer, Config as AuctioneerConfig},
+    bidder::{Config as BidderConfig, Service as Bidder},
     node::BuilderNode,
     payload::{
         builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
@@ -21,7 +22,10 @@ use reth_db::DatabaseEnv;
 use serde::Deserialize;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{
-    sync::broadcast::{self, Sender},
+    sync::{
+        broadcast::{self, Sender},
+        mpsc,
+    },
     time::sleep,
 };
 use tokio_stream::StreamExt;
@@ -39,18 +43,9 @@ pub struct BuilderConfig {
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    // TODO: move to bidder
-    // amount in milliseconds
-    pub bidding_deadline_ms: u64,
-    // TODO: move to bidder
-    // amount to bid as a fraction of the block's value
-    pub bid_percent: Option<f64>,
-    // TODO: move to bidder
-    // amount to add from the builder's wallet as a subsidy to the auction bid
-    pub subsidy_gwei: Option<u64>,
-
     pub auctioneer: AuctioneerConfig,
     pub builder: BuilderConfig,
+    pub bidder: BidderConfig,
 
     // Used to get genesis time, if one can't be found without a network call
     pub beacon_node_url: Option<String>,
@@ -63,6 +58,7 @@ pub struct Services<
     >,
 > {
     pub auctioneer: Auctioneer<Engine>,
+    pub bidder: Bidder,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
     pub context: Arc<Context>,
@@ -86,16 +82,22 @@ pub async fn construct<
     let clock = context.clock_at(genesis_time);
 
     let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let (bidder_tx, bidder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let (bid_dispatch_tx, bid_dispatch_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+
     let auctioneer = Auctioneer::new(
         clock_rx,
         payload_builder,
-        task_executor,
+        bidder_tx,
+        bid_dispatch_rx,
         config.auctioneer,
         context.clone(),
         genesis_time,
     );
 
-    Ok(Services { auctioneer, clock, clock_tx, context })
+    let bidder = Bidder::new(bidder_rx, bid_dispatch_tx, task_executor, config.bidder);
+
+    Ok(Services { auctioneer, bidder, clock, clock_tx, context })
 }
 
 fn custom_network_from_config_directory(path: PathBuf) -> Network {
@@ -137,10 +139,11 @@ pub async fn launch(
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, clock, clock_tx, context } =
+    let Services { auctioneer, bidder, clock, clock_tx, context } =
         construct(network, config, task_executor, payload_builder).await?;
 
-    handle.node.task_executor.spawn_critical("mev-builder/auctioneer", auctioneer.spawn());
+    handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
+    handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
         if clock.before_genesis() {
             let duration = clock.duration_until_next_slot();

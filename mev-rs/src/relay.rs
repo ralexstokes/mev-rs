@@ -114,6 +114,7 @@ impl BlindedBlockRelayer for Relay {
     }
 
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
+        // TODO: retry on error
         self.relayer.submit_bid(signed_submission).await
     }
 }
