@@ -7,6 +7,13 @@ use reth::{api::PayloadBuilderAttributes, payload::PayloadId};
 use std::time::Duration;
 use tokio::time::sleep;
 
+pub type Message = (PayloadId, KeepAlive);
+
+#[derive(Debug)]
+pub enum KeepAlive {
+    No,
+}
+
 #[derive(Debug)]
 pub struct AuctionContext {
     pub slot: Slot,
@@ -25,7 +32,7 @@ pub struct DeadlineBidder {
 }
 
 pub enum BidRequest {
-    Ready(PayloadId),
+    Ready(PayloadId, KeepAlive),
 }
 
 impl DeadlineBidder {
@@ -37,6 +44,6 @@ impl DeadlineBidder {
         let target = duration_until(auction.attributes.timestamp());
         let duration = target.checked_sub(self.deadline).unwrap_or_default();
         sleep(duration).await;
-        BidRequest::Ready(auction.attributes.payload_id())
+        BidRequest::Ready(auction.attributes.payload_id(), KeepAlive::No)
     }
 }

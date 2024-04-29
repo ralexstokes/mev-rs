@@ -1,6 +1,5 @@
 use crate::{
     auctioneer::{Auctioneer, Config as AuctioneerConfig},
-    builder::{Builder, Config as BuilderConfig},
     node::BuilderNode,
     payload::{
         builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
@@ -15,23 +14,28 @@ use reth::{
     api::EngineTypes,
     builder::{InitState, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
-    primitives::NamedChain,
+    primitives::{Address, Bytes, NamedChain},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
 use serde::Deserialize;
 use std::{path::PathBuf, sync::Arc};
 use tokio::{
-    sync::{
-        broadcast::{self, Sender},
-        mpsc,
-    },
+    sync::broadcast::{self, Sender},
     time::sleep,
 };
 use tokio_stream::StreamExt;
 use tracing::warn;
 
 pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
+
+#[derive(Deserialize, Debug, Default, Clone)]
+pub struct BuilderConfig {
+    pub fee_recipient: Option<Address>,
+    pub genesis_time: Option<u64>,
+    pub extra_data: Option<Bytes>,
+    pub execution_mnemonic: String,
+}
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
@@ -58,8 +62,7 @@ pub struct Services<
         BuiltPayload = EthBuiltPayload,
     >,
 > {
-    pub auctioneer: Auctioneer,
-    pub builder: Builder<Engine>,
+    pub auctioneer: Auctioneer<Engine>,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
     pub context: Arc<Context>,
@@ -76,29 +79,23 @@ pub async fn construct<
     task_executor: TaskExecutor,
     payload_builder: PayloadBuilderHandle<Engine>,
 ) -> Result<Services<Engine>, Error> {
-    let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
     let context = Arc::new(Context::try_from(network)?);
 
     let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
 
     let clock = context.clock_at(genesis_time);
 
-    let (builder_tx, builder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-    let (auctioneer_tx, auctioneer_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-
-    let builder =
-        Builder::new(builder_rx, auctioneer_tx, payload_builder, context.clone(), genesis_time);
-
+    let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
     let auctioneer = Auctioneer::new(
-        auctioneer_rx,
         clock_rx,
-        builder_tx,
+        payload_builder,
         task_executor,
         config.auctioneer,
         context.clone(),
+        genesis_time,
     );
 
-    Ok(Services { auctioneer, builder, clock, clock_tx, context })
+    Ok(Services { auctioneer, clock, clock_tx, context })
 }
 
 fn custom_network_from_config_directory(path: PathBuf) -> Network {
@@ -140,11 +137,10 @@ pub async fn launch(
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, builder, clock, clock_tx, context } =
+    let Services { auctioneer, clock, clock_tx, context } =
         construct(network, config, task_executor, payload_builder).await?;
 
     handle.node.task_executor.spawn_critical("mev-builder/auctioneer", auctioneer.spawn());
-    handle.node.task_executor.spawn_critical("mev-builder/builder", builder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
         if clock.before_genesis() {
             let duration = clock.duration_until_next_slot();
@@ -152,15 +148,13 @@ pub async fn launch(
             sleep(duration).await;
         }
 
+        // TODO: block on sync here to avoid spurious first PA?
+
         let mut current_epoch = clock.current_epoch().expect("past genesis");
         clock_tx.send(ClockMessage::NewEpoch(current_epoch)).expect("can send");
 
         let mut slots = clock.into_stream();
         while let Some(slot) = slots.next().await {
-            if let Err(err) = clock_tx.send(ClockMessage::NewSlot) {
-                let msg = err.0;
-                warn!(?msg, "could not update receivers with new slot")
-            }
             let epoch = slot / context.slots_per_epoch;
             if epoch > current_epoch {
                 current_epoch = epoch;
@@ -177,6 +171,5 @@ pub async fn launch(
 
 #[derive(Debug, Clone)]
 pub enum ClockMessage {
-    NewSlot,
     NewEpoch(Epoch),
 }

@@ -1,10 +1,10 @@
 use crate::{
-    builder::Config,
     node::BuilderEngineTypes,
     payload::{
         builder::PayloadBuilder,
         job_generator::{PayloadJobGenerator, PayloadJobGeneratorConfig},
     },
+    service::BuilderConfig as Config,
     Error,
 };
 use alloy_signer_wallet::{coins_bip39::English, LocalWallet, MnemonicBuilder};
