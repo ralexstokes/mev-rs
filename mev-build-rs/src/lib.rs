@@ -1,4 +1,3 @@
-mod auction_schedule;
 mod auctioneer;
 mod bidder;
 mod error;

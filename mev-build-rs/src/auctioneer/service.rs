@@ -1,5 +1,5 @@
 use crate::{
-    auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
+    auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
     bidder::{BidStatus, Message as BidderMessage},
     payload::builder_attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
@@ -86,7 +86,7 @@ pub struct Config {
     pub relays: Vec<String>,
 }
 
-pub struct Auctioneer<
+pub struct Service<
     Engine: EngineTypes<
         PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
         BuiltPayload = EthBuiltPayload,
@@ -112,7 +112,7 @@ impl<
                 PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
                 BuiltPayload = EthBuiltPayload,
             > + 'static,
-    > Auctioneer<Engine>
+    > Service<Engine>
 {
     pub fn new(
         clock: broadcast::Receiver<ClockMessage>,

@@ -1,5 +1,5 @@
 use crate::{
-    auctioneer::{Auctioneer, Config as AuctioneerConfig},
+    auctioneer::{Config as AuctioneerConfig, Service as Auctioneer},
     bidder::{Config as BidderConfig, Service as Bidder},
     node::BuilderNode,
     payload::{
@@ -64,7 +64,7 @@ pub struct Services<
     pub context: Arc<Context>,
 }
 
-pub async fn construct<
+pub async fn construct_services<
     Engine: EngineTypes<
             PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
             BuiltPayload = EthBuiltPayload,
@@ -140,7 +140,7 @@ pub async fn launch(
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
     let Services { auctioneer, bidder, clock, clock_tx, context } =
-        construct(network, config, task_executor, payload_builder).await?;
+        construct_services(network, config, task_executor, payload_builder).await?;
 
     handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
     handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
