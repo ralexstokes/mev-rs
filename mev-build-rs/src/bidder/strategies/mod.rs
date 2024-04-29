@@ -1,3 +1,3 @@
 mod deadline;
 
-pub use deadline::DeadlineBidder;
+pub use deadline::{Config, DeadlineBidder};

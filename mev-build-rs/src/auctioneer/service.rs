@@ -1,6 +1,6 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
-    bidder::{BidStatus, Message as BidderMessage},
+    bidder::Message as BidderMessage,
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     utils::compat::{to_bytes20, to_bytes32, to_execution_payload},
@@ -101,7 +101,7 @@ pub struct Service<
     // TODO consolidate this somewhere...
     genesis_time: u64,
     bidder: Sender<BidderMessage>,
-    bid_dispatch: Receiver<BidStatus>,
+    bid_dispatch: Receiver<BidderMessage>,
 
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
@@ -118,7 +118,7 @@ impl<
         clock: broadcast::Receiver<ClockMessage>,
         builder: PayloadBuilderHandle<Engine>,
         bidder: Sender<BidderMessage>,
-        bid_dispatch: Receiver<BidStatus>,
+        bid_dispatch: Receiver<BidderMessage>,
         mut config: Config,
         context: Arc<Context>,
         genesis_time: u64,
@@ -236,18 +236,19 @@ impl<
         }
     }
 
-    async fn process_bid_update(&mut self, message: BidStatus) {
-        let BidStatus::Dispatch(payload_id, _keep_alive) = message;
-        // TODO: may want to keep payload job running...
-        // NOTE: move back to builder interface over payload builder, that can also do this on its
-        // own thread?
-        if let Some(payload) = self.payload_store.resolve(payload_id).await {
-            match payload {
-                Ok(payload) => self.submit_payload(payload).await,
-                Err(err) => warn!(%err, "payload resolution failed"),
+    async fn process_bid_update(&mut self, message: BidderMessage) {
+        if let BidderMessage::Dispatch(payload_id, _keep_alive) = message {
+            // TODO: may want to keep payload job running...
+            // NOTE: move back to builder interface over payload builder, that can also do this on
+            // its own thread?
+            if let Some(payload) = self.payload_store.resolve(payload_id).await {
+                match payload {
+                    Ok(payload) => self.submit_payload(payload).await,
+                    Err(err) => warn!(%err, "payload resolution failed"),
+                }
+            } else {
+                warn!(%payload_id, "no payload could be retrieved from payload store for bid")
             }
-        } else {
-            warn!(%payload_id, "no payload could be retrieved from payload store for bid")
         }
     }
 

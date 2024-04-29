@@ -1,4 +1,6 @@
 mod service;
 pub mod strategies;
 
-pub use service::{BidStatus, Config, KeepAlive, Message, Service};
+pub use strategies::Config;
+
+pub use service::{BidStatus, KeepAlive, Message, Service};
