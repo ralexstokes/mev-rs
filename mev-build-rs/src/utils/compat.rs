@@ -1,13 +1,14 @@
 use ethereum_consensus::{
     capella::mainnet as spec,
+    deneb::Blob,
     primitives::{Bytes32, ExecutionAddress},
-    ssz::{
-        prelude as ssz_rs,
-        prelude::{ByteList, ByteVector},
-    },
+    ssz::prelude::{self as ssz_rs, ByteList, ByteVector, List},
 };
-use mev_rs::types::ExecutionPayload;
-use reth::primitives::{Address, Bloom, SealedBlock, B256};
+use mev_rs::types::{BlobsBundle, ExecutionPayload};
+use reth::{
+    primitives::{Address, Bloom, SealedBlock, B256},
+    rpc::types::engine::BlobsBundleV1,
+};
 
 pub fn to_bytes32(value: B256) -> Bytes32 {
     Bytes32::try_from(value.as_ref()).unwrap()
@@ -60,4 +61,23 @@ pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
         withdrawals: TryFrom::try_from(withdrawals).unwrap(),
     };
     ExecutionPayload::Capella(payload)
+}
+
+pub fn to_blobs_bundle(bundle: BlobsBundleV1) -> BlobsBundle {
+    let commitments: Vec<_> = bundle
+        .commitments
+        .into_iter()
+        .map(|c| ByteVector::<48>::try_from(c.as_ref()).unwrap())
+        .collect();
+    let commitments = List::try_from(commitments).unwrap();
+    let proofs: Vec<_> = bundle
+        .proofs
+        .into_iter()
+        .map(|p| ByteVector::<48>::try_from(p.as_ref()).unwrap())
+        .collect();
+    let proofs = List::try_from(proofs).unwrap();
+    let blobs: Vec<_> =
+        bundle.blobs.into_iter().map(|b| Blob::try_from(b.as_ref()).unwrap()).collect();
+    let blobs = List::try_from(blobs).unwrap();
+    BlobsBundle { commitments, proofs, blobs }
 }

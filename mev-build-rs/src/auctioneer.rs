@@ -3,7 +3,7 @@ use crate::{
     bidder::{AuctionContext, BidRequest, DeadlineBidder},
     builder::{KeepAlive, Message as BuilderMessage},
     service::ClockMessage,
-    utils::compat::{to_bytes32, to_execution_payload},
+    utils::compat::{to_blobs_bundle, to_bytes32, to_execution_payload},
     Error,
 };
 use ethereum_consensus::{
@@ -20,6 +20,7 @@ use mev_rs::{
 };
 use reth::{
     payload::{EthBuiltPayload, PayloadId},
+    rpc::types::engine::ExecutionPayloadEnvelopeV3,
     tasks::TaskExecutor,
 };
 use serde::Deserialize;
@@ -50,6 +51,7 @@ fn prepare_submission(
         value: payload.fees(),
     };
     let execution_payload = to_execution_payload(payload.block());
+    let payload_envelope = ExecutionPayloadEnvelopeV3::from(payload);
     let signature = sign_builder_message(&message, signing_key, context)?;
     let submission = match execution_payload.version() {
         Fork::Bellatrix => {
@@ -66,7 +68,12 @@ fn prepare_submission(
                 signature,
             })
         }
-        Fork::Deneb => unimplemented!(),
+        Fork::Deneb => SignedBidSubmission::Deneb(block_submission::deneb::SignedBidSubmission {
+            message,
+            execution_payload,
+            blobs_bundle: to_blobs_bundle(payload_envelope.blobs_bundle),
+            signature,
+        }),
         other => unreachable!("fork {other} is not reachable from this type"),
     };
     Ok(submission)

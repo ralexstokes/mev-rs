@@ -24,9 +24,9 @@ pub mod deneb {
     #[derive(Clone, Debug, Serializable, HashTreeRoot)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BlobsBundle {
-        commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
-        proofs: List<KzgProof, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
-        blobs: List<Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+        pub commitments: List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+        pub proofs: List<KzgProof, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
+        pub blobs: List<Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK>,
     }
 
     #[derive(Debug)]

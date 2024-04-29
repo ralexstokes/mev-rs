@@ -4,7 +4,7 @@ pub mod block_submission;
 pub mod builder_bid;
 mod proposer_schedule;
 
-pub use auction_contents::AuctionContents;
+pub use auction_contents::{deneb::BlobsBundle, AuctionContents};
 pub use auction_request::*;
 pub use block_submission::{BidTrace, SignedBidSubmission};
 pub use builder_bid::{BuilderBid, SignedBuilderBid};
