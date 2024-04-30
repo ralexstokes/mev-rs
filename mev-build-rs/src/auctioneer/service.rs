@@ -282,7 +282,6 @@ impl<
             relays=?auction.relays,
             "submitting payload"
         );
-        // TODO: should convert to ExecutionPayloadV3 etc. for blobs etc.
         match prepare_submission(
             payload,
             &self.config.secret_key,

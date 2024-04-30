@@ -13,7 +13,7 @@ use eyre::OptionExt;
 use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
-    builder::{InitState, WithLaunchContext},
+    builder::{NodeBuilder, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
     primitives::{Address, Bytes, NamedChain},
     tasks::TaskExecutor,
@@ -107,11 +107,19 @@ fn custom_network_from_config_directory(path: PathBuf) -> Network {
 }
 
 pub async fn launch(
-    node_builder: WithLaunchContext<Arc<DatabaseEnv>, InitState>,
+    node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>>>,
     custom_chain_config_directory: Option<PathBuf>,
     config: Config,
 ) -> eyre::Result<()> {
-    let chain = node_builder.config().chain.chain;
+    let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
+
+    let handle = node_builder
+        .with_types(BuilderNode)
+        .with_components(BuilderNode::components_with(payload_builder))
+        .launch()
+        .await?;
+
+    let chain = handle.node.config.chain.chain;
     let network = if let Some(chain) = chain.named() {
         match chain {
             NamedChain::Mainnet => Network::Mainnet,
@@ -128,14 +136,6 @@ pub async fn launch(
             .ok_or_eyre("missing custom chain configuration when expected")?;
         custom_network_from_config_directory(path)
     };
-
-    let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
-
-    let handle = node_builder
-        .with_types(BuilderNode)
-        .with_components(BuilderNode::components_with(payload_builder))
-        .launch()
-        .await?;
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();

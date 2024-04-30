@@ -4,7 +4,7 @@ use crate::{
         builder::PayloadBuilder,
         resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
     },
-    utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload},
+    utils::payload_job::PayloadTaskGuard,
 };
 use futures_util::{Future, FutureExt};
 use reth::{
@@ -18,7 +18,8 @@ use reth::{
     transaction_pool::TransactionPool,
 };
 use reth_basic_payload_builder::{
-    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig,
+    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig, PendingPayload,
+    ResolveBestPayload,
 };
 use std::{
     pin::Pin,
@@ -185,7 +186,7 @@ where
                     let _ = tx.send(result);
                 }));
 
-                this.pending_block = Some(PendingPayload { _cancel, payload: rx });
+                this.pending_block = Some(PendingPayload::new(_cancel, rx));
             }
         }
 

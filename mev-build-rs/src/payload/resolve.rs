@@ -2,18 +2,15 @@
 //! Takes a payload from the payload builder and "finalizes" the crafted payload to yield a valid
 //! block according to the auction rules.
 
-use crate::{payload::builder::PayloadBuilder, utils::payload_job::ResolveBestPayload};
+use crate::payload::builder::PayloadBuilder;
 use futures_util::FutureExt;
 use reth::{
     payload::{error::PayloadBuilderError, EthBuiltPayload, PayloadId},
-    primitives::{
-        kzg::{Blob, Bytes48},
-        Address, BlobTransactionSidecar, SealedBlock, B256, U256,
-    },
+    primitives::{Address, SealedBlock, B256, U256},
     providers::StateProviderFactory,
     revm::primitives::{BlockEnv, CfgEnvWithHandlerCfg},
-    rpc::types::engine::{BlobsBundleV1, ExecutionPayloadEnvelopeV3},
 };
+use reth_basic_payload_builder::ResolveBestPayload;
 use std::{
     future::Future,
     pin::Pin,
@@ -87,32 +84,13 @@ where
 
         let block = payload.block().clone();
         let fees = payload.fees();
+        let blob_sidecars = payload.sidecars().to_vec();
 
         // TODO: get amount to bid from bidder
         // TODO: add channel send here to dispatch fees, wait for bidder response
 
-        // TODO: move to custom type to skip copy on blobs
-        // NOTE: workaround, can move to our own type to skip all this copying
-        let execution_payload = ExecutionPayloadEnvelopeV3::from(payload);
-
-        let BlobsBundleV1 { commitments, proofs, blobs } = execution_payload.blobs_bundle;
-        let blob_sidecars = BlobTransactionSidecar {
-            blobs: blobs
-                .into_iter()
-                .map(|blob| Blob::from_bytes(blob.as_ref()).expect("is right size"))
-                .collect(),
-            commitments: commitments
-                .into_iter()
-                .map(|c| Bytes48::from_bytes(c.as_ref()).expect("is right size"))
-                .collect(),
-            proofs: proofs
-                .into_iter()
-                .map(|p| Bytes48::from_bytes(p.as_ref()).expect("is right size"))
-                .collect(),
-        };
-
         let finalized_payload = this.finalizer.process(block, fees).map(|mut payload| {
-            payload.extend_sidecars(vec![blob_sidecars]);
+            payload.extend_sidecars(blob_sidecars);
             payload
         });
         Poll::Ready(finalized_payload)

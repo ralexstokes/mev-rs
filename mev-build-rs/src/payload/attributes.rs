@@ -6,9 +6,7 @@ use reth::{
         revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
         Address, ChainSpec, Header, Withdrawals, B256,
     },
-    rpc::{
-        compat::engine::convert_standalone_withdraw_to_withdrawal, types::engine::PayloadAttributes,
-    },
+    rpc::types::engine::PayloadAttributes,
 };
 use sha2::Digest;
 use std::convert::Infallible;
@@ -76,22 +74,13 @@ impl BuilderPayloadBuilderAttributes {
     pub fn new(parent: B256, attributes: PayloadAttributes) -> Self {
         let (id, id_bytes) = payload_id_with_bytes(&parent, &attributes, None);
 
-        let withdraw = attributes.withdrawals.map(|withdrawals| {
-            Withdrawals::new(
-                withdrawals
-                    .into_iter()
-                    .map(convert_standalone_withdraw_to_withdrawal) // Removed the parentheses here
-                    .collect(),
-            )
-        });
-
         let inner = EthPayloadBuilderAttributes {
             id,
             parent,
             timestamp: attributes.timestamp,
             suggested_fee_recipient: attributes.suggested_fee_recipient,
             prev_randao: attributes.prev_randao,
-            withdrawals: withdraw.unwrap_or_default(),
+            withdrawals: attributes.withdrawals.unwrap_or_default().into(),
             parent_beacon_block_root: attributes.parent_beacon_block_root,
         };
         Self { inner, payload_id: Some(id_bytes), proposal: None }
