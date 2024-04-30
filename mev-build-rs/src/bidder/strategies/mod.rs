@@ -1,3 +1,3 @@
-mod deadline;
+mod basic;
 
-pub use deadline::{Config, DeadlineBidder};
+pub use basic::{BasicStrategy, Config};

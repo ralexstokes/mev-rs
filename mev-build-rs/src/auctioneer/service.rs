@@ -100,8 +100,8 @@ pub struct Service<
     context: Arc<Context>,
     // TODO consolidate this somewhere...
     genesis_time: u64,
-    bidder: Sender<BidderMessage>,
-    bid_dispatch: Receiver<BidderMessage>,
+    bidder_tx: Sender<BidderMessage>,
+    bidder_rx: Receiver<BidderMessage>,
 
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
@@ -117,8 +117,8 @@ impl<
     pub fn new(
         clock: broadcast::Receiver<ClockMessage>,
         builder: PayloadBuilderHandle<Engine>,
-        bidder: Sender<BidderMessage>,
-        bid_dispatch: Receiver<BidderMessage>,
+        bidder_tx: Sender<BidderMessage>,
+        bidder_rx: Receiver<BidderMessage>,
         mut config: Config,
         context: Arc<Context>,
         genesis_time: u64,
@@ -140,8 +140,8 @@ impl<
             config,
             context,
             genesis_time,
-            bidder,
-            bid_dispatch,
+            bidder_tx,
+            bidder_rx,
             auction_schedule: Default::default(),
             open_auctions: Default::default(),
         }
@@ -215,7 +215,7 @@ impl<
         // TODO: consider data layout in `open_auctions`
         let auction = self.open_auctions.entry(payload_id).or_insert_with(|| Arc::new(auction));
 
-        self.bidder.send(BidderMessage::NewAuction(auction.clone())).await.expect("can send");
+        self.bidder_tx.send(BidderMessage::NewAuction(auction.clone())).await.expect("can send");
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
@@ -237,18 +237,38 @@ impl<
     }
 
     async fn process_bid_update(&mut self, message: BidderMessage) {
-        if let BidderMessage::Dispatch(payload_id, _keep_alive) = message {
-            // TODO: may want to keep payload job running...
-            // NOTE: move back to builder interface over payload builder, that can also do this on
-            // its own thread?
-            if let Some(payload) = self.payload_store.resolve(payload_id).await {
-                match payload {
-                    Ok(payload) => self.submit_payload(payload).await,
-                    Err(err) => warn!(%err, "payload resolution failed"),
+        match message {
+            BidderMessage::RevenueQuery(payload_id, tx) => {
+                // TODO: store this payload (by hash) so that the bid that returns targets something
+                // stable...
+                if let Some(payload) = self.payload_store.best_payload(payload_id).await {
+                    match payload {
+                        Ok(payload) => {
+                            // TODO: send more dynamic updates
+                            // by the time the bidder submits a value the best payload may have
+                            // already changed
+                            tx.send(Ok(payload.fees())).expect("can send");
+                            return
+                        }
+                        Err(err) => warn!(%err, "could not get best payload from payload store"),
+                    }
                 }
-            } else {
-                warn!(%payload_id, "no payload could be retrieved from payload store for bid")
+                // fallback
+                tx.send(Err(Error::MissingPayload(payload_id))).expect("can send");
             }
+            BidderMessage::Dispatch { payload_id, value: _value, keep_alive: _keep_alive } => {
+                // TODO: forward keep alive signal to builder
+                // TODO: sort out streaming comms to builder
+                if let Some(payload) = self.payload_store.resolve(payload_id).await {
+                    match payload {
+                        Ok(payload) => self.submit_payload(payload).await,
+                        Err(err) => warn!(%err, "payload resolution failed"),
+                    }
+                } else {
+                    warn!(%payload_id, "no payload could be retrieved from payload store for bid")
+                }
+            }
+            _ => {}
         }
     }
 
@@ -285,12 +305,12 @@ impl<
         }
     }
 
-    async fn dispatch_clock(&mut self, message: ClockMessage) {
+    async fn process_clock(&mut self, message: ClockMessage) {
         let ClockMessage::NewEpoch(epoch) = message;
         self.on_epoch(epoch).await;
     }
 
-    async fn dispatch_payload_event(&mut self, event: Events<Engine>) {
+    async fn process_payload_event(&mut self, event: Events<Engine>) {
         if let Events::Attributes(attributes) = event {
             self.on_payload_attributes(attributes).await;
         }
@@ -312,12 +332,12 @@ impl<
 
         loop {
             tokio::select! {
-                Ok(message) = self.clock.recv() => self.dispatch_clock(message).await,
+                Ok(message) = self.clock.recv() => self.process_clock(message).await,
                 Some(event) = payload_events.next() => match event {
-                    Ok(event) =>  self.dispatch_payload_event(event).await,
+                    Ok(event) =>  self.process_payload_event(event).await,
                     Err(err) => warn!(%err, "error getting payload event"),
                 },
-                Some(message) = self.bid_dispatch.recv() => self.process_bid_update(message).await,
+                Some(message) = self.bidder_rx.recv() => self.process_bid_update(message).await,
             }
         }
     }

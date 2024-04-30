@@ -1,23 +1,24 @@
 use crate::{
     auctioneer::AuctionContext,
-    bidder::{BidStatus, KeepAlive},
+    bidder::{Bid, KeepAlive},
 };
 use ethereum_consensus::clock::duration_until;
 use reth::{api::PayloadBuilderAttributes, primitives::U256};
 use serde::Deserialize;
 use std::time::Duration;
-use tokio::time::sleep;
+use tokio::time::{interval, Interval};
+
+pub const DEFAULT_BID_INTERVAL: u64 = 1;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
-    // amount in milliseconds
-    pub bidding_deadline_ms: u64,
+    // amount in milliseconds of time to wait until submitting bids
+    pub wait_until_ms: u64,
     // amount to bid as a fraction of the block's value
     // if missing, default to 100%
-    // TODO: use to price bid
     pub bid_percent: Option<f64>,
     // amount to add from the builder's wallet as a subsidy to the auction bid
-    // TODO: use to adjust bid
+    // if missing, defaults to 0
     pub subsidy_wei: Option<U256>,
 }
 
@@ -26,17 +27,20 @@ pub struct Config {
 ///
 /// For example, if the `deadline` is 1 second, then the bidder will return
 /// a value to bid one second before the start of the build's target slot.
-pub struct DeadlineBidder {
-    deadline: Duration,
+pub struct BasicStrategy {
+    wait_until: Duration,
+    bid_interval: Interval,
     bid_percent: f64,
     subsidy_wei: U256,
 }
 
-impl DeadlineBidder {
+impl BasicStrategy {
     pub fn new(config: &Config) -> Self {
-        let deadline = Duration::from_millis(config.bidding_deadline_ms);
+        let wait_until = Duration::from_millis(config.wait_until_ms);
+        let bid_interval = interval(Duration::from_secs(DEFAULT_BID_INTERVAL));
         Self {
-            deadline,
+            wait_until,
+            bid_interval,
             bid_percent: config.bid_percent.unwrap_or(1.0).clamp(0.0, 1.0),
             subsidy_wei: config.subsidy_wei.unwrap_or(U256::ZERO),
         }
@@ -48,11 +52,19 @@ impl DeadlineBidder {
         value
     }
 
-    pub async fn run(&mut self, auction: &AuctionContext, current_revenue: U256) -> BidStatus {
-        let value = self.compute_value(current_revenue);
+    pub async fn run(&mut self, auction: &AuctionContext, current_revenue: U256) -> Bid {
+        // First, we wait until we are near the auction deadline
         let target = duration_until(auction.attributes.timestamp());
-        let duration = target.checked_sub(self.deadline).unwrap_or_default();
-        sleep(duration).await;
-        BidStatus::Submit { value, keep_alive: KeepAlive::No }
+        let wait_until = target.checked_sub(self.wait_until).unwrap_or_default();
+        if !wait_until.is_zero() {
+            return Bid::Wait(wait_until)
+        }
+
+        // If we are near the auction deadline, start submitting bids
+        // with one bid per tick of the interval
+        self.bid_interval.tick().await;
+
+        let value = self.compute_value(current_revenue);
+        Bid::Submit { value, keep_alive: KeepAlive::Yes }
     }
 }
