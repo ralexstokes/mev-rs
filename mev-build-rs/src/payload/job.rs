@@ -66,7 +66,6 @@ where
         // Note: it is assumed that this is unlikely to happen, as the payload job is started right
         // away and the first full block should have been built by the time CL is requesting the
         // payload.
-        // TODO: customize with proposer payment
         <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.client, self.config.clone())
     }
 

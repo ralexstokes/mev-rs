@@ -55,12 +55,8 @@ impl<Client: StateProviderFactory + Clone, Pool> PayloadFinalizer<Client, Pool> 
         block: SealedBlock,
         fees: U256,
     ) -> Result<EthBuiltPayload, PayloadBuilderError> {
-        if let Some(config) = self.config.as_ref() {
-            self.prepare(block, fees, config)
-        } else {
-            // TODO: avoid rebuilding here in this case?
-            Ok(EthBuiltPayload::new(self.payload_id, block, fees))
-        }
+        let config = self.config.as_ref().expect("always exists");
+        self.prepare(block, fees, config)
     }
 }
 
@@ -81,18 +77,19 @@ where
         let this = self.get_mut();
         let payload = ready!(this.resolution.poll_unpin(cx))?;
 
-        // TODO: consider making the payment addition `spawn_blocking`
-        // TODO: save payload in the event we need to poll again?
+        if this.finalizer.config.is_none() {
+            // This should never be the case, but if it is, then just return the (ineligible)
+            // payload
+            return Poll::Ready(Ok(payload))
+        }
 
-        // TODO: we are dropping blobs....
+        // TODO: consider making the payment addition `spawn_blocking`
 
         let block = payload.block().clone();
         let fees = payload.fees();
 
         // TODO: get amount to bid from bidder
         // TODO: add channel send here to dispatch fees, wait for bidder response
-        // - amount from block fees
-        // - including any subsidy
 
         // TODO: move to custom type to skip copy on blobs
         // NOTE: workaround, can move to our own type to skip all this copying
