@@ -3,7 +3,7 @@ use crate::{
     bidder::Message as BidderMessage,
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
-    utils::compat::{to_bytes20, to_bytes32, to_execution_payload},
+    utils::compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
     Error,
 };
 use ethereum_consensus::{
@@ -11,11 +11,12 @@ use ethereum_consensus::{
     crypto::SecretKey,
     primitives::{BlsPublicKey, Epoch, Slot},
     state_transition::Context,
+    Fork,
 };
 use mev_rs::{
     relay::parse_relay_endpoints,
     signing::sign_builder_message,
-    types::{BidTrace, SignedBidSubmission},
+    types::{block_submission, BidTrace, SignedBidSubmission},
     BlindedBlockRelayer, Relay,
 };
 use reth::{
@@ -64,7 +65,30 @@ fn prepare_submission(
     };
     let execution_payload = to_execution_payload(payload.block());
     let signature = sign_builder_message(&message, signing_key, context)?;
-    Ok(SignedBidSubmission { message, execution_payload, signature })
+    let submission = match execution_payload.version() {
+        Fork::Bellatrix => {
+            SignedBidSubmission::Bellatrix(block_submission::bellatrix::SignedBidSubmission {
+                message,
+                execution_payload,
+                signature,
+            })
+        }
+        Fork::Capella => {
+            SignedBidSubmission::Capella(block_submission::capella::SignedBidSubmission {
+                message,
+                execution_payload,
+                signature,
+            })
+        }
+        Fork::Deneb => SignedBidSubmission::Deneb(block_submission::deneb::SignedBidSubmission {
+            message,
+            execution_payload,
+            blobs_bundle: to_blobs_bundle(payload.sidecars()),
+            signature,
+        }),
+        other => unreachable!("fork {other} is not reachable from this type"),
+    };
+    Ok(submission)
 }
 
 #[derive(Debug)]
