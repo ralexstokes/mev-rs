@@ -31,3 +31,4 @@ sha2 = "0.10.8"
 
 [patch.crates-io]
 c-kzg = { git = "https://github.com/ethereum/c-kzg-4844", tag = "v1.0.1" }
+libffi-sys = { git = "https://github.com/tov/libffi-rs", rev = "d0704d634b6f3ffef5b6fc7e07fe965a1cff5c7b" }
