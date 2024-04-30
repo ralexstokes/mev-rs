@@ -36,7 +36,14 @@ use std::{
     ops::Deref,
     sync::{Arc, Mutex},
 };
+use thiserror::Error;
 use tracing::{debug, trace, warn};
+
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error("block gas used {gas_used} exceeded block gas limit {gas_limit}")]
+    BlockGasLimitExceeded { gas_used: u64, gas_limit: u64 },
+}
 
 pub const BASE_TX_GAS_LIMIT: u64 = 21000;
 
@@ -97,11 +104,13 @@ fn append_payment<Client: StateProviderFactory>(
         make_payment_transaction(signer, config, chain_id, nonce, max_fee_per_gas, value)?;
 
     // TODO: skip clones here
-    let env = EnvWithHandlerCfg::new_with_cfg_env(
+    let mut env: EnvWithHandlerCfg = EnvWithHandlerCfg::new_with_cfg_env(
         config.cfg_env.clone(),
         config.block_env.clone(),
         tx_env_with_recovered(&payment_tx),
     );
+    // NOTE: adjust gas limit to allow for payment transaction
+    env.block.gas_limit += U256::from(BASE_TX_GAS_LIMIT);
     let mut evm = revm::Evm::builder().with_db(&mut db).with_env_with_handler_cfg(env).build();
 
     let ResultAndState { result, state } =
@@ -112,9 +121,15 @@ fn append_payment<Client: StateProviderFactory>(
 
     let Block { mut header, mut body, ommers, withdrawals } = block.unseal();
 
-    // TODO: hold gas reserve so this always succeeds
-    // TODO: sanity check we didn't go over gas limit
+    // Verify we reserved the correct amount of gas for the payment transaction
+    let gas_limit = header.gas_limit + result.gas_used();
     let cumulative_gas_used = header.gas_used + result.gas_used();
+    if cumulative_gas_used > gas_limit {
+        return Err(PayloadBuilderError::Other(Box::new(Error::BlockGasLimitExceeded {
+            gas_used: cumulative_gas_used,
+            gas_limit: header.gas_limit,
+        })))
+    }
     let receipt = Receipt {
         tx_type: payment_tx.tx_type(),
         success: result.is_success(),
@@ -145,6 +160,7 @@ fn append_payment<Client: StateProviderFactory>(
     header.receipts_root = receipts_root;
     header.logs_bloom = logs_bloom;
     header.gas_used = cumulative_gas_used;
+    header.gas_limit = gas_limit;
 
     let block = Block { header, body, ommers, withdrawals };
 

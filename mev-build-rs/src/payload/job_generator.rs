@@ -1,5 +1,8 @@
 use crate::{
-    payload::{builder::PayloadBuilder, job::PayloadJob},
+    payload::{
+        builder::{PayloadBuilder, BASE_TX_GAS_LIMIT},
+        job::PayloadJob,
+    },
     utils::payload_job::PayloadTaskGuard,
 };
 use ethereum_consensus::clock::duration_until;
@@ -16,7 +19,8 @@ use reth_basic_payload_builder::{PayloadConfig, PrecachedState};
 use std::{sync::Arc, time::Duration};
 
 fn apply_gas_limit<P>(config: &mut PayloadConfig<P>, gas_limit: u64) {
-    config.initialized_block_env.gas_limit = U256::from(gas_limit);
+    // NOTE: reserve enough gas for the final payment transaction
+    config.initialized_block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
 }
 
 fn apply_fee_recipient<P>(config: &mut PayloadConfig<P>, fee_recipient: Address) {
