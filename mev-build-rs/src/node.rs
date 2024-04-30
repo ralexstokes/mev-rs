@@ -1,7 +1,7 @@
 //! Customized types for the builder to configuring reth
 
 use crate::payload::{
-    builder_attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+    attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
 };
 use reth::{
     api::{
@@ -27,7 +27,8 @@ pub struct BuilderNode;
 
 impl BuilderNode {
     /// Returns a [ComponentsBuilder] configured for a regular Ethereum node.
-    pub fn components<Node>(
+    pub fn components_with<Node>(
+        payload_service_builder: PayloadServiceBuilder,
     ) -> ComponentsBuilder<Node, EthereumPoolBuilder, PayloadServiceBuilder, EthereumNetworkBuilder>
     where
         Node: FullNodeTypes<Engine = BuilderEngineTypes>,
@@ -35,7 +36,7 @@ impl BuilderNode {
         ComponentsBuilder::default()
             .node_types::<Node>()
             .pool(EthereumPoolBuilder::default())
-            .payload(PayloadServiceBuilder::default())
+            .payload(payload_service_builder)
             .network(EthereumNetworkBuilder::default())
     }
 }

@@ -1,11 +1,16 @@
 use crate::{
-    payload::{builder::PayloadBuilder, job::PayloadJob},
-    utils::payload_job::{duration_until, PayloadTaskGuard},
+    payload::{
+        builder::{PayloadBuilder, BASE_TX_GAS_LIMIT},
+        job::PayloadJob,
+    },
+    utils::payload_job::PayloadTaskGuard,
 };
+use ethereum_consensus::clock::duration_until;
+use mev_rs::compute_preferred_gas_limit;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{self, database::CachedReads, error::PayloadBuilderError},
-    primitives::{BlockNumberOrTag, Bytes, ChainSpec, B256},
+    primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256},
     providers::{BlockReaderIdExt, BlockSource, CanonStateNotification, StateProviderFactory},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
@@ -13,10 +18,19 @@ use reth::{
 use reth_basic_payload_builder::{PayloadConfig, PrecachedState};
 use std::{sync::Arc, time::Duration};
 
+fn apply_gas_limit<P>(config: &mut PayloadConfig<P>, gas_limit: u64) {
+    // NOTE: reserve enough gas for the final payment transaction
+    config.initialized_block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
+}
+
+fn apply_fee_recipient<P>(config: &mut PayloadConfig<P>, fee_recipient: Address) {
+    config.initialized_block_env.coinbase = fee_recipient;
+}
+
 #[derive(Debug, Clone)]
 pub struct PayloadJobGeneratorConfig {
     pub extradata: Bytes,
-    // TODO: remove or use?
+    // NOTE: currently ignored, see: https://github.com/paradigmxyz/reth/issues/7948
     pub _max_gas_limit: u64,
     pub interval: Duration,
     pub deadline: Duration,
@@ -104,20 +118,29 @@ where
             block.seal(attributes.parent())
         };
 
-        let until = if attributes.proposal.is_some() {
-            self.job_deadline(attributes.timestamp())
+        let (until, gas_limit) = if let Some(proposal) = attributes.proposal.as_ref() {
+            let until = self.job_deadline(attributes.timestamp());
+            let gas_limit =
+                compute_preferred_gas_limit(proposal.proposer_gas_limit, parent_block.gas_limit);
+            (until, Some(gas_limit))
         } else {
             // If there is no attached proposal, then terminate the payload job immediately
-            tokio::time::Instant::now()
+            let until = tokio::time::Instant::now();
+            (until, None)
         };
         let deadline = Box::pin(tokio::time::sleep_until(until));
 
-        let config = PayloadConfig::new(
+        let mut config = PayloadConfig::new(
             Arc::new(parent_block),
             self.config.extradata.clone(),
             attributes,
             Arc::clone(&self.chain_spec),
         );
+
+        if let Some(gas_limit) = gas_limit {
+            apply_gas_limit(&mut config, gas_limit);
+        }
+        apply_fee_recipient(&mut config, self.builder.fee_recipient);
 
         let cached_reads = self.maybe_pre_cached(config.parent_block.hash());
 

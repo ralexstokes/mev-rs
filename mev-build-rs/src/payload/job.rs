@@ -1,10 +1,10 @@
 use crate::{
     payload::{
+        attributes::BuilderPayloadBuilderAttributes,
         builder::PayloadBuilder,
-        builder_attributes::BuilderPayloadBuilderAttributes,
         resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
     },
-    utils::payload_job::{PayloadTaskGuard, PendingPayload, ResolveBestPayload},
+    utils::payload_job::PayloadTaskGuard,
 };
 use futures_util::{Future, FutureExt};
 use reth::{
@@ -18,7 +18,8 @@ use reth::{
     transaction_pool::TransactionPool,
 };
 use reth_basic_payload_builder::{
-    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig,
+    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig, PendingPayload,
+    ResolveBestPayload,
 };
 use std::{
     pin::Pin,
@@ -41,6 +42,7 @@ pub struct PayloadJob<Client, Pool, Tasks> {
     pub pending_block: Option<PendingPayload<EthBuiltPayload>>,
     pub payload_task_guard: PayloadTaskGuard,
     pub cached_reads: Option<CachedReads>,
+    // TODO: consider moving shared state here, rather than builder
     pub builder: PayloadBuilder,
 }
 
@@ -65,7 +67,6 @@ where
         // Note: it is assumed that this is unlikely to happen, as the payload job is started right
         // away and the first full block should have been built by the time CL is requesting the
         // payload.
-        // TODO: customize with proposer payment
         <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.client, self.config.clone())
     }
 
@@ -121,20 +122,16 @@ where
 
         let config =
             self.config.attributes.proposal.as_ref().map(|attributes| PayloadFinalizerConfig {
-                payload_id: self.config.payload_id(),
                 proposer_fee_recipient: attributes.proposer_fee_recipient,
-                signer: attributes.builder_signer.clone(),
-                sender: attributes.builder_signer.address(),
                 parent_hash: self.config.attributes.parent(),
-                chain_id: self.config.chain_spec.chain().id(),
                 cfg_env: self.config.initialized_cfg.clone(),
                 block_env: self.config.initialized_block_env.clone(),
-                builder: self.builder.clone(),
             });
         let finalizer = PayloadFinalizer {
             client: self.client.clone(),
             _pool: self.pool.clone(),
             payload_id: self.config.payload_id(),
+            builder: self.builder.clone(),
             config,
         };
 
@@ -189,7 +186,7 @@ where
                     let _ = tx.send(result);
                 }));
 
-                this.pending_block = Some(PendingPayload { _cancel, payload: rx });
+                this.pending_block = Some(PendingPayload::new(_cancel, rx));
             }
         }
 

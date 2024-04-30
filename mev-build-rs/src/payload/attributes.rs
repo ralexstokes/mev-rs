@@ -1,4 +1,3 @@
-use alloy_signer_wallet::LocalWallet;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{EthPayloadBuilderAttributes, PayloadId},
@@ -7,12 +6,10 @@ use reth::{
         revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
         Address, ChainSpec, Header, Withdrawals, B256,
     },
-    rpc::{
-        compat::engine::convert_standalone_withdraw_to_withdrawal, types::engine::PayloadAttributes,
-    },
+    rpc::types::engine::PayloadAttributes,
 };
 use sha2::Digest;
-use std::{convert::Infallible, sync::Arc};
+use std::convert::Infallible;
 
 pub fn payload_id_with_bytes(
     parent: &B256,
@@ -35,7 +32,7 @@ pub fn payload_id_with_bytes(
     }
 
     if let Some(proposal) = proposal {
-        hasher.update(proposal.suggested_gas_limit.to_be_bytes());
+        hasher.update(proposal.proposer_gas_limit.to_be_bytes());
         hasher.update(proposal.proposer_fee_recipient.as_slice());
     }
 
@@ -51,8 +48,7 @@ pub fn mix_proposal_into_payload_id(
     let mut hasher = sha2::Sha256::new();
     hasher.update(payload_id);
 
-    hasher.update(proposal.builder_fee_recipient.as_slice());
-    hasher.update(proposal.suggested_gas_limit.to_be_bytes());
+    hasher.update(proposal.proposer_gas_limit.to_be_bytes());
     hasher.update(proposal.proposer_fee_recipient.as_slice());
 
     let out = hasher.finalize();
@@ -61,9 +57,7 @@ pub fn mix_proposal_into_payload_id(
 
 #[derive(Debug, Clone)]
 pub struct ProposalAttributes {
-    pub builder_fee_recipient: Address,
-    pub builder_signer: Arc<LocalWallet>,
-    pub suggested_gas_limit: u64,
+    pub proposer_gas_limit: u64,
     pub proposer_fee_recipient: Address,
 }
 
@@ -80,22 +74,13 @@ impl BuilderPayloadBuilderAttributes {
     pub fn new(parent: B256, attributes: PayloadAttributes) -> Self {
         let (id, id_bytes) = payload_id_with_bytes(&parent, &attributes, None);
 
-        let withdraw = attributes.withdrawals.map(|withdrawals| {
-            Withdrawals::new(
-                withdrawals
-                    .into_iter()
-                    .map(convert_standalone_withdraw_to_withdrawal) // Removed the parentheses here
-                    .collect(),
-            )
-        });
-
         let inner = EthPayloadBuilderAttributes {
             id,
             parent,
             timestamp: attributes.timestamp,
             suggested_fee_recipient: attributes.suggested_fee_recipient,
             prev_randao: attributes.prev_randao,
-            withdrawals: withdraw.unwrap_or_default(),
+            withdrawals: attributes.withdrawals.unwrap_or_default().into(),
             parent_beacon_block_root: attributes.parent_beacon_block_root,
         };
         Self { inner, payload_id: Some(id_bytes), proposal: None }
@@ -106,8 +91,6 @@ impl BuilderPayloadBuilderAttributes {
         if let Some(payload_id) = self.payload_id.take() {
             let id = mix_proposal_into_payload_id(payload_id, &proposal);
             self.inner.id = id;
-            // NOTE: direct all fee payments to builder
-            self.inner.suggested_fee_recipient = proposal.builder_fee_recipient;
             self.proposal = Some(proposal);
         }
     }

@@ -1,7 +1,5 @@
-mod auction_schedule;
 mod auctioneer;
 mod bidder;
-mod builder;
 mod error;
 mod node;
 mod payload;

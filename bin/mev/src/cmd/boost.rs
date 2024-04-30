@@ -1,5 +1,6 @@
 use crate::cmd::config::Config;
 use clap::Args;
+use eyre::OptionExt;
 use mev_boost_rs::Service;
 use tracing::info;
 
@@ -16,7 +17,7 @@ impl Command {
 
         let config = Config::from_toml_file(config_file)?;
 
-        let network = config.network;
+        let network = config.network.ok_or_eyre("missing `network` from configuration)")?;
         info!("configured for `{network}`");
 
         if let Some(config) = config.boost {
