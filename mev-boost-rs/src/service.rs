@@ -66,7 +66,10 @@ impl Service {
         let relay_task = tokio::spawn(async move {
             let relay_mux = relay_mux_clone;
             let mut slots = clock.clone().into_stream();
-            let mut current_epoch = clock.current_epoch().expect("after genesis");
+
+            // NOTE: this will block until genesis if we are before the genesis time
+            let current_slot = slots.next().await.expect("some next slot");
+            let mut current_epoch = clock.epoch_for(current_slot);
 
             while let Some(slot) = slots.next().await {
                 relay_mux.on_slot(slot);

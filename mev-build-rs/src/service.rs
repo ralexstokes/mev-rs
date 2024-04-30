@@ -21,12 +21,9 @@ use reth::{
 use reth_db::DatabaseEnv;
 use serde::Deserialize;
 use std::{path::PathBuf, sync::Arc};
-use tokio::{
-    sync::{
-        broadcast::{self, Sender},
-        mpsc,
-    },
-    time::sleep,
+use tokio::sync::{
+    broadcast::{self, Sender},
+    mpsc,
 };
 use tokio_stream::StreamExt;
 use tracing::warn;
@@ -61,7 +58,6 @@ pub struct Services<
     pub bidder: Bidder,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
-    pub context: Arc<Context>,
 }
 
 pub async fn construct_services<
@@ -91,13 +87,13 @@ pub async fn construct_services<
         bidder_tx,
         bid_dispatch_rx,
         config.auctioneer,
-        context.clone(),
+        context,
         genesis_time,
     );
 
     let bidder = Bidder::new(bidder_rx, bid_dispatch_tx, task_executor, config.bidder);
 
-    Ok(Services { auctioneer, bidder, clock, clock_tx, context })
+    Ok(Services { auctioneer, bidder, clock, clock_tx })
 }
 
 fn custom_network_from_config_directory(path: PathBuf) -> Network {
@@ -139,26 +135,27 @@ pub async fn launch(
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, bidder, clock, clock_tx, context } =
+    let Services { auctioneer, bidder, clock, clock_tx } =
         construct_services(network, config, task_executor, payload_builder).await?;
 
     handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
     handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
-        if clock.before_genesis() {
-            let duration = clock.duration_until_next_slot();
-            warn!(?duration, "waiting until genesis");
-            sleep(duration).await;
-        }
+        let mut slots = clock.clone().into_stream();
+
+        // NOTE: this will block until genesis if we are before the genesis time
+        let current_slot = slots.next().await.expect("some next slot");
+        let mut current_epoch = clock.epoch_for(current_slot);
 
         // TODO: block on sync here to avoid spurious first PA?
 
-        let mut current_epoch = clock.current_epoch().expect("past genesis");
-        clock_tx.send(ClockMessage::NewEpoch(current_epoch)).expect("can send");
+        if let Err(err) = clock_tx.send(ClockMessage::NewEpoch(current_epoch)) {
+            let msg = err.0;
+            warn!(?msg, "could not update receivers with new epoch");
+        }
 
-        let mut slots = clock.into_stream();
         while let Some(slot) = slots.next().await {
-            let epoch = slot / context.slots_per_epoch;
+            let epoch = clock.epoch_for(slot);
             if epoch > current_epoch {
                 current_epoch = epoch;
                 if let Err(err) = clock_tx.send(ClockMessage::NewEpoch(epoch)) {
