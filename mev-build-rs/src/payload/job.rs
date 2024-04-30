@@ -1,10 +1,7 @@
-use crate::{
-    payload::{
-        attributes::BuilderPayloadBuilderAttributes,
-        builder::PayloadBuilder,
-        resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
-    },
-    utils::payload_job::PayloadTaskGuard,
+use crate::payload::{
+    attributes::BuilderPayloadBuilderAttributes,
+    builder::PayloadBuilder,
+    resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
 };
 use futures_util::{Future, FutureExt};
 use reth::{
@@ -18,8 +15,8 @@ use reth::{
     transaction_pool::TransactionPool,
 };
 use reth_basic_payload_builder::{
-    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig, PendingPayload,
-    ResolveBestPayload,
+    BuildArguments, BuildOutcome, Cancelled, PayloadBuilder as _, PayloadConfig, PayloadTaskGuard,
+    PendingPayload, ResolveBestPayload,
 };
 use std::{
     pin::Pin,
@@ -173,7 +170,7 @@ where
                 let builder = this.builder.clone();
                 this.executor.spawn_blocking(Box::pin(async move {
                     // acquire the permit for executing the task
-                    let _permit = guard.0.acquire().await;
+                    let _permit = guard.acquire().await;
                     let args = BuildArguments {
                         client,
                         pool,

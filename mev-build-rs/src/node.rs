@@ -19,8 +19,9 @@ use reth::{
         ExecutionPayloadV1,
     },
 };
-use reth_evm_ethereum::EthEvmConfig;
-use reth_node_ethereum::node::{EthereumNetworkBuilder, EthereumPoolBuilder};
+use reth_node_ethereum::node::{
+    EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
+};
 
 #[derive(Debug, Default, Clone, Copy)]
 pub struct BuilderNode;
@@ -29,7 +30,13 @@ impl BuilderNode {
     /// Returns a [ComponentsBuilder] configured for a regular Ethereum node.
     pub fn components_with<Node>(
         payload_service_builder: PayloadServiceBuilder,
-    ) -> ComponentsBuilder<Node, EthereumPoolBuilder, PayloadServiceBuilder, EthereumNetworkBuilder>
+    ) -> ComponentsBuilder<
+        Node,
+        EthereumPoolBuilder,
+        PayloadServiceBuilder,
+        EthereumNetworkBuilder,
+        EthereumExecutorBuilder,
+    >
     where
         Node: FullNodeTypes<Engine = BuilderEngineTypes>,
     {
@@ -38,17 +45,13 @@ impl BuilderNode {
             .pool(EthereumPoolBuilder::default())
             .payload(payload_service_builder)
             .network(EthereumNetworkBuilder::default())
+            .executor(EthereumExecutorBuilder::default())
     }
 }
 
 impl NodeTypes for BuilderNode {
     type Primitives = ();
     type Engine = BuilderEngineTypes;
-    type Evm = EthEvmConfig;
-
-    fn evm_config(&self) -> Self::Evm {
-        EthEvmConfig::default()
-    }
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]

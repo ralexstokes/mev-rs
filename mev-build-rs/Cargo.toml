@@ -25,7 +25,6 @@ mev-rs = { path = "../mev-rs" }
 reth = { workspace = true }
 reth-db = { workspace = true }
 reth-node-ethereum = { workspace = true }
-reth-evm-ethereum = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
 alloy-signer = { workspace = true }
 alloy-signer-wallet = { workspace = true, features = ["mnemonic"] }
