@@ -1,9 +1,6 @@
-use crate::{
-    payload::{
-        builder::{PayloadBuilder, BASE_TX_GAS_LIMIT},
-        job::PayloadJob,
-    },
-    utils::payload_job::PayloadTaskGuard,
+use crate::payload::{
+    builder::{PayloadBuilder, BASE_TX_GAS_LIMIT},
+    job::PayloadJob,
 };
 use ethereum_consensus::clock::duration_until;
 use mev_rs::compute_preferred_gas_limit;
@@ -15,7 +12,7 @@ use reth::{
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
 };
-use reth_basic_payload_builder::{PayloadConfig, PrecachedState};
+use reth_basic_payload_builder::{PayloadConfig, PayloadTaskGuard, PrecachedState};
 use std::{sync::Arc, time::Duration};
 
 fn apply_gas_limit<P>(config: &mut PayloadConfig<P>, gas_limit: u64) {
