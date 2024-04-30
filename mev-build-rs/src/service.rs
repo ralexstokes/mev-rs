@@ -114,7 +114,7 @@ pub async fn launch(
     let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
 
     let handle = node_builder
-        .with_types(BuilderNode)
+        .with_types::<BuilderNode>()
         .with_components(BuilderNode::components_with(payload_builder))
         .launch()
         .await?;

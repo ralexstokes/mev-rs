@@ -20,7 +20,6 @@ beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus",
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "8e65cb3" }
 reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "8e65cb3" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8e65cb3" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8e65cb3" }
 reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "8e65cb3" }
 alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "ca54552" }
 alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "ca54552" }
