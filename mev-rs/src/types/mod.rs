@@ -1,4 +1,4 @@
-mod auction_contents;
+pub mod auction_contents;
 mod auction_request;
 pub mod block_submission;
 pub mod builder_bid;

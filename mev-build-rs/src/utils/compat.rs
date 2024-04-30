@@ -1,20 +1,20 @@
 use ethereum_consensus::{
-    capella::mainnet as spec,
-    deneb::Blob,
+    deneb::{
+        mainnet as spec,
+        polynomial_commitments::{KzgCommitment, KzgProof},
+        Blob,
+    },
     primitives::{Bytes32, ExecutionAddress},
     ssz::prelude::{self as ssz_rs, ByteList, ByteVector, List},
 };
 use mev_rs::types::{BlobsBundle, ExecutionPayload};
-use reth::{
-    primitives::{Address, Bloom, SealedBlock, B256},
-    rpc::types::engine::BlobsBundleV1,
-};
+use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
 
 pub fn to_bytes32(value: B256) -> Bytes32 {
     Bytes32::try_from(value.as_ref()).unwrap()
 }
 
-fn to_bytes20(value: Address) -> ExecutionAddress {
+pub fn to_bytes20(value: Address) -> ExecutionAddress {
     ExecutionAddress::try_from(value.as_ref()).unwrap()
 }
 
@@ -22,6 +22,7 @@ fn to_byte_vector(value: Bloom) -> ByteVector<256> {
     ByteVector::<256>::try_from(value.as_ref()).unwrap()
 }
 
+// TODO: support multiple forks
 pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
     let hash = value.hash();
     let header = &value.header;
@@ -59,25 +60,32 @@ pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
         block_hash: to_bytes32(hash),
         transactions: TryFrom::try_from(transactions).unwrap(),
         withdrawals: TryFrom::try_from(withdrawals).unwrap(),
+        blob_gas_used: header.blob_gas_used.unwrap(),
+        excess_blob_gas: header.excess_blob_gas.unwrap(),
     };
-    ExecutionPayload::Capella(payload)
+    ExecutionPayload::Deneb(payload)
 }
 
-pub fn to_blobs_bundle(bundle: BlobsBundleV1) -> BlobsBundle {
-    let commitments: Vec<_> = bundle
-        .commitments
-        .into_iter()
-        .map(|c| ByteVector::<48>::try_from(c.as_ref()).unwrap())
-        .collect();
-    let commitments = List::try_from(commitments).unwrap();
-    let proofs: Vec<_> = bundle
-        .proofs
-        .into_iter()
-        .map(|p| ByteVector::<48>::try_from(p.as_ref()).unwrap())
-        .collect();
-    let proofs = List::try_from(proofs).unwrap();
-    let blobs: Vec<_> =
-        bundle.blobs.into_iter().map(|b| Blob::try_from(b.as_ref()).unwrap()).collect();
-    let blobs = List::try_from(blobs).unwrap();
+pub fn to_blobs_bundle(sidecars: &[BlobTransactionSidecar]) -> BlobsBundle {
+    let mut commitments = List::default();
+    let mut proofs = List::default();
+    let mut blobs = List::default();
+
+    // TODO: perform length checks to avoid panic on `push`
+    for sidecar in sidecars {
+        for commitment in &sidecar.commitments {
+            let commitment = KzgCommitment::try_from(commitment.as_slice()).unwrap();
+            commitments.push(commitment);
+        }
+        for proof in &sidecar.proofs {
+            let proof = KzgProof::try_from(proof.as_slice()).unwrap();
+            proofs.push(proof);
+        }
+        for blob in &sidecar.blobs {
+            let blob = Blob::try_from(blob.as_ref()).unwrap();
+            blobs.push(blob);
+        }
+    }
+
     BlobsBundle { commitments, proofs, blobs }
 }

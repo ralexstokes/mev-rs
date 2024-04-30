@@ -14,7 +14,7 @@ use tracing::{info, trace};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
-    pub network: Network,
+    pub network: Option<Network>,
     #[cfg(feature = "boost")]
     pub boost: Option<BoostConfig>,
     #[cfg(feature = "build")]

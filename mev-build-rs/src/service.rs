@@ -1,23 +1,26 @@
 use crate::{
-    auctioneer::{Auctioneer, Config as AuctioneerConfig},
-    builder::{Builder, Config as BuilderConfig},
-    payload::service_builder::PayloadServiceBuilder,
+    auctioneer::{Config as AuctioneerConfig, Service as Auctioneer},
+    bidder::{Config as BidderConfig, Service as Bidder},
+    node::BuilderNode,
+    payload::{
+        attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
+    },
 };
 use ethereum_consensus::{
     clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
 };
+use eyre::OptionExt;
 use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
-    builder::{InitState, WithLaunchContext},
-    payload::{EthBuiltPayload, EthPayloadBuilderAttributes, PayloadBuilderHandle},
-    primitives::Bytes,
+    builder::{NodeBuilder, WithLaunchContext},
+    payload::{EthBuiltPayload, PayloadBuilderHandle},
+    primitives::{Address, Bytes, NamedChain},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
-use reth_node_ethereum::EthereumNode;
 use serde::Deserialize;
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 use tokio::{
     sync::{
         broadcast::{self, Sender},
@@ -31,23 +34,18 @@ use tracing::warn;
 pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 
 #[derive(Deserialize, Debug, Default, Clone)]
-pub struct Config {
-    // TODO: move to payload builder
-    pub extra_data: Bytes,
-    // TODO: move to payload builder
+pub struct BuilderConfig {
+    pub fee_recipient: Option<Address>,
+    pub genesis_time: Option<u64>,
+    pub extra_data: Option<Bytes>,
     pub execution_mnemonic: String,
-    // TODO: move to bidder
-    // amount in milliseconds
-    pub bidding_deadline_ms: u64,
-    // TODO: move to payload builder, or have as part of bidder config
-    // amount to bid as a fraction of the block's value
-    pub bid_percent: Option<f64>,
-    // TODO: move to bidder
-    // amount to add from the builder's wallet as a subsidy to the auction bid
-    pub subsidy_gwei: Option<u64>,
+}
 
+#[derive(Deserialize, Debug, Default, Clone)]
+pub struct Config {
     pub auctioneer: AuctioneerConfig,
     pub builder: BuilderConfig,
+    pub bidder: BidderConfig,
 
     // Used to get genesis time, if one can't be found without a network call
     pub beacon_node_url: Option<String>,
@@ -55,20 +53,20 @@ pub struct Config {
 
 pub struct Services<
     Engine: EngineTypes<
-        PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+        PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
         BuiltPayload = EthBuiltPayload,
     >,
 > {
-    pub auctioneer: Auctioneer,
-    pub builder: Builder<Engine>,
+    pub auctioneer: Auctioneer<Engine>,
+    pub bidder: Bidder,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
     pub context: Arc<Context>,
 }
 
-pub async fn construct<
+pub async fn construct_services<
     Engine: EngineTypes<
-            PayloadBuilderAttributes = EthPayloadBuilderAttributes,
+            PayloadBuilderAttributes = BuilderPayloadBuilderAttributes,
             BuiltPayload = EthBuiltPayload,
         > + 'static,
 >(
@@ -77,80 +75,89 @@ pub async fn construct<
     task_executor: TaskExecutor,
     payload_builder: PayloadBuilderHandle<Engine>,
 ) -> Result<Services<Engine>, Error> {
-    let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
     let context = Arc::new(Context::try_from(network)?);
 
     let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
 
     let clock = context.clock_at(genesis_time);
 
-    let (builder_tx, builder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-    let (auctioneer_tx, auctioneer_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let (bidder_tx, bidder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let (bid_dispatch_tx, bid_dispatch_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
 
-    let builder = Builder::new(
-        builder_rx,
-        auctioneer_tx,
+    let auctioneer = Auctioneer::new(
+        clock_rx,
         payload_builder,
-        task_executor.clone(),
-        config.builder,
+        bidder_tx,
+        bid_dispatch_rx,
+        config.auctioneer,
         context.clone(),
         genesis_time,
     );
 
-    let auctioneer = Auctioneer::new(
-        auctioneer_rx,
-        clock_rx,
-        builder_tx,
-        task_executor,
-        config.auctioneer,
-        context.clone(),
-    );
+    let bidder = Bidder::new(bidder_rx, bid_dispatch_tx, task_executor, config.bidder);
 
-    Ok(Services { auctioneer, builder, clock, clock_tx, context })
+    Ok(Services { auctioneer, bidder, clock, clock_tx, context })
+}
+
+fn custom_network_from_config_directory(path: PathBuf) -> Network {
+    let path = path.to_str().expect("is valid str").to_string();
+    warn!(%path, "no named chain found; attempting to load config from custom directory");
+    Network::Custom(path)
 }
 
 pub async fn launch(
-    node_builder: WithLaunchContext<Arc<DatabaseEnv>, InitState>,
-    network: Network,
+    node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>>>,
+    custom_chain_config_directory: Option<PathBuf>,
     config: Config,
 ) -> eyre::Result<()> {
-    let chain_spec = &node_builder.config().chain;
-    let chain_name = chain_spec.chain.to_string();
-    if chain_name != network.to_string() {
-        return Err(eyre::eyre!("configuration file did not match CLI"))
-    }
-
-    // TODO:  ability to just run reth
+    let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
 
     let handle = node_builder
-        .with_types(EthereumNode::default())
-        .with_components(EthereumNode::components().payload(PayloadServiceBuilder))
+        .with_types(BuilderNode)
+        .with_components(BuilderNode::components_with(payload_builder))
         .launch()
         .await?;
 
+    let chain = handle.node.config.chain.chain;
+    let network = if let Some(chain) = chain.named() {
+        match chain {
+            NamedChain::Mainnet => Network::Mainnet,
+            NamedChain::Sepolia => Network::Sepolia,
+            NamedChain::Holesky => Network::Holesky,
+            _ => {
+                let path = custom_chain_config_directory
+                    .ok_or_eyre("missing custom chain configuration when expected")?;
+                custom_network_from_config_directory(path)
+            }
+        }
+    } else {
+        let path = custom_chain_config_directory
+            .ok_or_eyre("missing custom chain configuration when expected")?;
+        custom_network_from_config_directory(path)
+    };
+
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, builder, clock, clock_tx, context } =
-        construct(network, config, task_executor, payload_builder).await?;
+    let Services { auctioneer, bidder, clock, clock_tx, context } =
+        construct_services(network, config, task_executor, payload_builder).await?;
 
-    handle.node.task_executor.spawn_critical("mev-builder/auctioneer", auctioneer.spawn());
-    handle.node.task_executor.spawn_critical("mev-builder/builder", builder.spawn());
+    handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
+    handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
         if clock.before_genesis() {
             let duration = clock.duration_until_next_slot();
-            warn!(?duration, "scheduler waiting until genesis");
+            warn!(?duration, "waiting until genesis");
             sleep(duration).await;
         }
+
+        // TODO: block on sync here to avoid spurious first PA?
 
         let mut current_epoch = clock.current_epoch().expect("past genesis");
         clock_tx.send(ClockMessage::NewEpoch(current_epoch)).expect("can send");
 
         let mut slots = clock.into_stream();
         while let Some(slot) = slots.next().await {
-            if let Err(err) = clock_tx.send(ClockMessage::NewSlot) {
-                let msg = err.0;
-                warn!(?msg, "could not update receivers with new slot")
-            }
             let epoch = slot / context.slots_per_epoch;
             if epoch > current_epoch {
                 current_epoch = epoch;
@@ -167,6 +174,5 @@ pub async fn launch(
 
 #[derive(Debug, Clone)]
 pub enum ClockMessage {
-    NewSlot,
     NewEpoch(Epoch),
 }
