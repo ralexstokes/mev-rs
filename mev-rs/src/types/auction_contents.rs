@@ -14,12 +14,14 @@ pub mod capella {
 pub mod deneb {
     use super::ExecutionPayload;
     use ethereum_consensus::{
-        deneb::{
-            mainnet::{Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK},
-            polynomial_commitments::{KzgCommitment, KzgProof},
-        },
+        deneb::polynomial_commitments::{KzgCommitment, KzgProof},
         ssz::prelude::*,
     };
+
+    #[cfg(not(feature = "minimal-preset"))]
+    use ethereum_consensus::deneb::mainnet::{Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK};
+    #[cfg(feature = "minimal-preset")]
+    use ethereum_consensus::deneb::minimal::{Blob, MAX_BLOB_COMMITMENTS_PER_BLOCK};
 
     #[derive(Clone, Debug, Default, Serializable, HashTreeRoot)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

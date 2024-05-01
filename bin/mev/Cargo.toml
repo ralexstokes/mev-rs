@@ -11,6 +11,13 @@ default = ["boost", "build", "relay"]
 boost = ["mev-boost-rs"]
 build = ["mev-build-rs", "reth"]
 relay = ["mev-relay-rs"]
+# enable to use `minimal` preset instead of `mainnet`
+minimal-preset = [
+    "mev-boost-rs/minimal-preset",
+    "mev-build-rs/minimal-preset",
+    "mev-relay-rs/minimal-preset",
+    "mev-rs/minimal-preset",
+]
 
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }

@@ -3,13 +3,18 @@ use crate::{
     types::ExecutionPayloadHeader,
 };
 use ethereum_consensus::{
-    deneb::{mainnet::MAX_BLOB_COMMITMENTS_PER_BLOCK, polynomial_commitments::KzgCommitment},
+    deneb::polynomial_commitments::KzgCommitment,
     primitives::{BlsPublicKey, BlsSignature},
     ssz::prelude::*,
     state_transition::Context,
     Error, Fork,
 };
 use std::fmt;
+
+#[cfg(not(feature = "minimal-preset"))]
+use ethereum_consensus::deneb::mainnet::MAX_BLOB_COMMITMENTS_PER_BLOCK;
+#[cfg(feature = "minimal-preset")]
+use ethereum_consensus::deneb::minimal::MAX_BLOB_COMMITMENTS_PER_BLOCK;
 
 pub mod bellatrix {
     use super::ExecutionPayloadHeader;

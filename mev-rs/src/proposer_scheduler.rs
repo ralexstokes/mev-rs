@@ -1,9 +1,14 @@
 use crate::{types::ProposerSchedule, validator_registry::ValidatorRegistry};
-use beacon_api_client::{mainnet::Client, Error as ApiError, ProposerDuty};
+use beacon_api_client::{Error as ApiError, ProposerDuty};
 use ethereum_consensus::primitives::{Epoch, Slot};
 use parking_lot::Mutex;
 use thiserror::Error;
 use tracing::warn;
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client;
 
 #[derive(Debug, Error)]
 pub enum Error {

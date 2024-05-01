@@ -2,12 +2,10 @@ mod identity_builder;
 
 use beacon_api_client::Client as ApiClient;
 use ethereum_consensus::{
-    bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
-    capella::mainnet as capella,
     crypto::SecretKey,
     networks::Network,
-    phase0::mainnet::{compute_domain, Validator},
+    phase0::{compute_domain, Validator},
     primitives::{DomainType, ExecutionAddress, Hash32, Root},
     signing::sign_with_domain,
     state_transition::Context,
@@ -26,6 +24,11 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 use url::Url;
+
+#[cfg(not(feature = "minimal-preset"))]
+use ethereum_consensus::{bellatrix::mainnet as bellatrix, capella::mainnet as capella};
+#[cfg(feature = "minimal-preset")]
+use ethereum_consensus::{bellatrix::minimal as bellatrix, capella::minimal as capella};
 
 fn setup_logging() {
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
