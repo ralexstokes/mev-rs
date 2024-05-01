@@ -1,3 +1,5 @@
+use crate::auction_context::AuctionContext;
+
 use async_trait::async_trait;
 use beacon_api_client::{
     mainnet::Client as ApiClient, BroadcastValidation, PayloadAttributesEvent,
@@ -20,9 +22,9 @@ use mev_rs::{
         verify_signed_data,
     },
     types::{
-        auction_contents, builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid,
-        ExecutionPayload, ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission,
-        SignedBlindedBeaconBlock, SignedBuilderBid, SignedValidatorRegistration,
+        builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
+        ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
+        SignedBuilderBid, SignedValidatorRegistration,
     },
     BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, RelayError,
     ValidatorRegistry,
@@ -207,14 +209,6 @@ pub struct Inner {
     context: Context,
     state: Mutex<State>,
     genesis_validators_root: Root,
-}
-
-#[derive(Debug)]
-struct AuctionContext {
-    builder_public_key: BlsPublicKey,
-    signed_builder_bid: SignedBuilderBid,
-    execution_payload: ExecutionPayload,
-    value: U256,
 }
 
 #[derive(Debug, Default)]
@@ -411,51 +405,53 @@ impl Relay {
         Ok(())
     }
 
+    // NOTE: we assume that `auction_request` and `signed_submission` have been validated.
     fn insert_bid_if_greater(
         &self,
         auction_request: AuctionRequest,
-        execution_payload: ExecutionPayload,
+        signed_submission: &SignedBidSubmission,
         value: U256,
-        builder_public_key: BlsPublicKey,
     ) -> Result<(), Error> {
+        let builder_public_key = auction_request.public_key.clone();
         if let Some(bid) = self.get_auction_context(&auction_request) {
-            if bid.value > value {
+            if bid.value() > value {
                 info!(%auction_request, %builder_public_key, "block submission was not greater in value; ignoring");
                 return Ok(())
             }
         }
+        let execution_payload = signed_submission.payload().clone();
         let header = to_header(&execution_payload)?;
-        let bid = match header.version() {
-            Fork::Bellatrix => BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
-                header,
-                value,
-                public_key: self.public_key.clone(),
-            }),
-            Fork::Capella => BuilderBid::Capella(builder_bid::capella::BuilderBid {
-                header,
-                value,
-                public_key: self.public_key.clone(),
-            }),
-            Fork::Deneb => BuilderBid::Deneb(builder_bid::deneb::BuilderBid {
-                header,
-                // TODO: support blobs
-                blob_kzg_commitments: Default::default(),
-                value,
-                public_key: self.public_key.clone(),
-            }),
-            _ => unreachable!("this fork is not reachable from this type"),
+        let bid = match signed_submission {
+            SignedBidSubmission::Bellatrix(_) => {
+                BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
+                    header,
+                    value,
+                    public_key: self.public_key.clone(),
+                })
+            }
+            SignedBidSubmission::Capella(_) => {
+                BuilderBid::Capella(builder_bid::capella::BuilderBid {
+                    header,
+                    value,
+                    public_key: self.public_key.clone(),
+                })
+            }
+            SignedBidSubmission::Deneb(submission) => {
+                BuilderBid::Deneb(builder_bid::deneb::BuilderBid {
+                    header,
+                    blob_kzg_commitments: submission.blobs_bundle.commitments.clone(),
+                    value,
+                    public_key: self.public_key.clone(),
+                })
+            }
         };
         let signature = sign_builder_message(&bid, &self.secret_key, &self.context)?;
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 
         let block_hash = execution_payload.block_hash().clone();
-        let auction_context = Arc::new(AuctionContext {
-            builder_public_key,
-            signed_builder_bid,
-            execution_payload,
-            value,
-        });
-        info!(%auction_request, builder_public_key = %auction_context.builder_public_key, %block_hash, "inserting new bid");
+        let auction_context =
+            Arc::new(AuctionContext::new(signed_builder_bid, signed_submission.clone()));
+        info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, "inserting new bid");
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
         Ok(())
@@ -501,7 +497,7 @@ impl BlindedBlockProvider for Relay {
         let auction_context = self
             .get_auction_context(auction_request)
             .ok_or_else(|| Error::NoBidPrepared(auction_request.clone()))?;
-        let signed_builder_bid = &auction_context.signed_builder_bid;
+        let signed_builder_bid = auction_context.signed_builder_bid();
         info!(%auction_request, %signed_builder_bid, "serving bid");
         Ok(signed_builder_bid.clone())
     }
@@ -534,7 +530,7 @@ impl BlindedBlockProvider for Relay {
             let block = signed_block.message();
             let body = block.body();
             let execution_payload_header = body.execution_payload_header();
-            let local_header = auction_context.signed_builder_bid.message.header();
+            let local_header = auction_context.signed_builder_bid().message.header();
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
                 return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
@@ -551,7 +547,7 @@ impl BlindedBlockProvider for Relay {
             return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
         }
 
-        match unblind_block(signed_block, &auction_context.execution_payload) {
+        match unblind_block(signed_block, auction_context.execution_payload()) {
             Ok(signed_block) => {
                 let version = signed_block.version();
                 let block_root =
@@ -568,21 +564,9 @@ impl BlindedBlockProvider for Relay {
                     warn!(%err, %auction_request, %block_root, "block failed beacon node validation");
                     Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
                 } else {
-                    let local_payload = &auction_context.execution_payload;
-                    let block_hash = local_payload.block_hash();
+                    let block_hash = auction_context.execution_payload().block_hash();
                     info!(%auction_request, %block_root, %block_hash, "returning local payload");
-                    let auction_contents = match local_payload.version() {
-                        Fork::Bellatrix => AuctionContents::Bellatrix(local_payload.clone()),
-                        Fork::Capella => AuctionContents::Capella(local_payload.clone()),
-                        Fork::Deneb => {
-                            AuctionContents::Deneb(auction_contents::deneb::AuctionContents {
-                                execution_payload: local_payload.clone(),
-                                // TODO: support blobs
-                                blobs_bundle: Default::default(),
-                            })
-                        }
-                        _ => unreachable!("fork not reachable from type"),
-                    };
+                    let auction_contents = auction_context.to_auction_contents();
                     Ok(auction_contents)
                 }
             }
@@ -604,7 +588,7 @@ impl BlindedBlockRelayer for Relay {
     }
 
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
-        let (auction_request, value, builder_public_key) = {
+        let (auction_request, value) = {
             let bid_trace = signed_submission.message();
             let builder_public_key = &bid_trace.builder_public_key;
             self.validate_allowed_builder(builder_public_key)?;
@@ -618,7 +602,7 @@ impl BlindedBlockRelayer for Relay {
 
             self.validate_builder_submission_trusted(bid_trace, signed_submission.payload())?;
             debug!(%auction_request, "validated builder submission");
-            (auction_request, bid_trace.value, bid_trace.builder_public_key.clone())
+            (auction_request, bid_trace.value)
         };
 
         let message = signed_submission.message();
@@ -626,11 +610,10 @@ impl BlindedBlockRelayer for Relay {
         let signature = signed_submission.signature();
         verify_signed_builder_data(message, public_key, signature, &self.context)?;
 
-        let execution_payload = signed_submission.payload().clone();
         // NOTE: this does _not_ respect cancellations
         // TODO: move to regime where we track best bid by builder
         // and also move logic to cursor best bid for auction off this API
-        self.insert_bid_if_greater(auction_request, execution_payload, value, builder_public_key)?;
+        self.insert_bid_if_greater(auction_request, signed_submission, value)?;
 
         Ok(())
     }

@@ -1,3 +1,4 @@
+mod auction_context;
 mod relay;
 mod service;
 
