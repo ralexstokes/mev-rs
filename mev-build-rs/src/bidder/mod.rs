@@ -10,6 +10,7 @@ pub use strategies::Config;
 /// Do we expect to submit more bids or not?
 #[derive(Debug, Clone, Copy)]
 pub enum KeepAlive {
+    No,
     Yes,
 }
 

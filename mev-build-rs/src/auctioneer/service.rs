@@ -271,14 +271,16 @@ impl<
                             // TODO: send more dynamic updates
                             // by the time the bidder submits a value the best payload may have
                             // already changed
-                            tx.send(Ok(payload.fees())).expect("can send");
+                            tx.send(Some(payload.fees())).expect("can send");
                             return
                         }
                         Err(err) => warn!(%err, "could not get best payload from payload store"),
                     }
                 }
-                // fallback
-                tx.send(Err(Error::MissingPayload(payload_id))).expect("can send");
+                // NOTE: if no payload was found, the auction has been terminated
+                if let Err(err) = tx.send(None) {
+                    warn!(?err, "could not send after failure to retrieve payload");
+                }
             }
             BidderMessage::Dispatch { payload_id, value: _value, keep_alive: _keep_alive } => {
                 // TODO: forward keep alive signal to builder

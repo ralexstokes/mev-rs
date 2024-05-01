@@ -1,7 +1,6 @@
 use crate::{
     auctioneer::AuctionContext,
     bidder::{strategies::BasicStrategy, Bid, Config, KeepAlive},
-    Error,
 };
 use ethereum_consensus::clock::duration_until;
 use reth::{
@@ -15,7 +14,6 @@ use tokio::{
     },
     time::{sleep, timeout},
 };
-use tracing::debug;
 
 /// All bidding routines stop this many seconds *after* the timestamp of the proposal
 /// regardless of what the bidding strategy suggests
@@ -24,7 +22,7 @@ pub const DEFAULT_BIDDING_DEADLINE_AFTER_SLOT: u64 = 1;
 pub enum Message {
     NewAuction(Arc<AuctionContext>),
     Dispatch { payload_id: PayloadId, value: U256, keep_alive: KeepAlive },
-    RevenueQuery(PayloadId, oneshot::Sender<Result<U256, Error>>),
+    RevenueQuery(PayloadId, oneshot::Sender<Option<U256>>),
 }
 
 pub struct Service {
@@ -64,14 +62,10 @@ impl Service {
                     let message = Message::RevenueQuery(payload_id, tx);
                     auctioneer.send(message).await.expect("can send");
                     let current_revenue = match rx.await.expect("can recv") {
-                        Ok(fees) => fees,
-                        Err(err) => {
-                            // NOTE: if there was an error, try to fetch
-                            // again without running a strategy
-                            // TODO: handle case when the auction has terminated and we should
-                            // also terminate
-                            debug!(%err, "could not get current revenue; trying again");
-                            continue
+                        Some(fees) => fees,
+                        None => {
+                            // auction has ended
+                            break
                         }
                     };
 
