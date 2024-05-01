@@ -200,7 +200,6 @@ impl BlindedBlockProvider for RelayMux {
             return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
-        // TODO: change `value` so it does the copy internally
         let mut best_bid_indices =
             select_best_bids(bids.iter().map(|(_, bid)| bid.message.value()).enumerate());
 
