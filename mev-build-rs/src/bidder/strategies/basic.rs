@@ -6,9 +6,6 @@ use ethereum_consensus::clock::duration_until;
 use reth::{api::PayloadBuilderAttributes, primitives::U256};
 use serde::Deserialize;
 use std::time::Duration;
-use tokio::time::{interval, Interval};
-
-pub const DEFAULT_BID_INTERVAL: u64 = 1;
 
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct Config {
@@ -22,14 +19,10 @@ pub struct Config {
     pub subsidy_wei: Option<U256>,
 }
 
-/// `DeadlineBidder` submits the best payload *once* at the `deadline`
-/// expressed as a `Duration` *before* the start of the build's target slot.
-///
-/// For example, if the `deadline` is 1 second, then the bidder will return
-/// a value to bid one second before the start of the build's target slot.
+/// `BasicStrategy` submits a bid once, waiting until a duration of `wait_until`
+/// before the start of the target slot.
 pub struct BasicStrategy {
     wait_until: Duration,
-    bid_interval: Interval,
     bid_percent: f64,
     subsidy_wei: U256,
 }
@@ -37,10 +30,8 @@ pub struct BasicStrategy {
 impl BasicStrategy {
     pub fn new(config: &Config) -> Self {
         let wait_until = Duration::from_millis(config.wait_until_ms);
-        let bid_interval = interval(Duration::from_secs(DEFAULT_BID_INTERVAL));
         Self {
             wait_until,
-            bid_interval,
             bid_percent: config.bid_percent.unwrap_or(1.0).clamp(0.0, 1.0),
             subsidy_wei: config.subsidy_wei.unwrap_or(U256::ZERO),
         }
@@ -60,11 +51,8 @@ impl BasicStrategy {
             return Bid::Wait(wait_until)
         }
 
-        // If we are near the auction deadline, start submitting bids
-        // with one bid per tick of the interval
-        self.bid_interval.tick().await;
-
+        // Then, we submit our bid
         let value = self.compute_value(current_revenue);
-        Bid::Submit { value, keep_alive: KeepAlive::Yes }
+        Bid::Submit { value, keep_alive: KeepAlive::No }
     }
 }
