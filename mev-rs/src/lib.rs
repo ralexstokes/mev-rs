@@ -12,6 +12,9 @@ pub mod signing;
 pub mod types;
 mod validator_registry;
 
+#[cfg(feature = "test-utils")]
+pub mod test_utils;
+
 pub use blinded_block_provider::BlindedBlockProvider;
 pub use blinded_block_relayer::BlindedBlockRelayer;
 
