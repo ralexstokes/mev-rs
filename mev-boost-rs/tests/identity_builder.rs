@@ -1,8 +1,6 @@
 use async_trait::async_trait;
 use ethereum_consensus::{
-    bellatrix::mainnet as bellatrix,
     builder::{SignedValidatorRegistration, ValidatorRegistration},
-    capella::mainnet as capella,
     crypto::SecretKey,
     primitives::{BlsPublicKey, Slot, U256},
     state_transition::Context,
@@ -21,6 +19,11 @@ use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
 };
+
+#[cfg(not(feature = "minimal-preset"))]
+use ethereum_consensus::{bellatrix::mainnet as bellatrix, capella::mainnet as capella};
+#[cfg(feature = "minimal-preset")]
+use ethereum_consensus::{bellatrix::minimal as bellatrix, capella::minimal as capella};
 
 #[derive(Clone)]
 pub struct IdentityBuilder {

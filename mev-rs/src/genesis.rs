@@ -1,7 +1,11 @@
-use beacon_api_client::mainnet::Client;
 use ethereum_consensus::{networks::typical_genesis_time, state_transition::Context};
 use tracing::warn;
 use url::Url;
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client;
 
 pub async fn get_genesis_time(
     context: &Context,

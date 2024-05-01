@@ -1,7 +1,6 @@
 pub mod compat {
     use ethereum_consensus::{
         deneb::{
-            mainnet as spec,
             polynomial_commitments::{KzgCommitment, KzgProof},
             Blob,
         },
@@ -10,6 +9,11 @@ pub mod compat {
     };
     use mev_rs::types::{BlobsBundle, ExecutionPayload};
     use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
+
+    #[cfg(not(feature = "minimal-preset"))]
+    use ethereum_consensus::deneb::mainnet as spec;
+    #[cfg(feature = "minimal-preset")]
+    use ethereum_consensus::deneb::minimal as spec;
 
     pub fn to_bytes32(value: B256) -> Bytes32 {
         Bytes32::try_from(value.as_ref()).unwrap()

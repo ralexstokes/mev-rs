@@ -3,7 +3,12 @@ use crate::{
     types::{ProposerSchedule, SignedBidSubmission},
     Error,
 };
-use beacon_api_client::{api_error_or_ok, mainnet::Client as BeaconApiClient};
+use beacon_api_client::api_error_or_ok;
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client as BeaconApiClient;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client as BeaconApiClient;
 
 /// A `Client` for a service implementing the Relay APIs.
 #[derive(Clone)]

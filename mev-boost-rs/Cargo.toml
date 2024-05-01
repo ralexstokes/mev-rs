@@ -6,6 +6,15 @@ license = "MIT OR Apache-2.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = []
+# enable to use `minimal` preset instead of `mainnet`
+minimal-preset = [
+    "mev-rs/minimal-preset",
+    "mev-build-rs/minimal-preset",
+    "mev-relay-rs/minimal-preset",
+]
+
 [dependencies]
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"

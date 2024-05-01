@@ -1,17 +1,11 @@
 use async_trait::async_trait;
-use beacon_api_client::{
-    mainnet::Client as ApiClient, BroadcastValidation, PayloadAttributesEvent,
-};
+use beacon_api_client::{BroadcastValidation, PayloadAttributesEvent};
 use ethereum_consensus::{
-    bellatrix::mainnet as bellatrix,
-    capella::mainnet as capella,
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
-    deneb::mainnet as deneb,
     primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
     ssz::prelude::HashTreeRoot,
     state_transition::Context,
-    types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
@@ -34,6 +28,25 @@ use std::{
     sync::Arc,
 };
 use tracing::{debug, error, info, trace, warn};
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client as ApiClient;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client as ApiClient;
+#[cfg(not(feature = "minimal-preset"))]
+use ethereum_consensus::{
+    bellatrix::mainnet as bellatrix,
+    capella::mainnet as capella,
+    deneb::mainnet as deneb,
+    types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
+};
+#[cfg(feature = "minimal-preset")]
+use ethereum_consensus::{
+    bellatrix::minimal as bellatrix,
+    capella::minimal as capella,
+    deneb::minimal as deneb,
+    types::minimal::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
+};
 
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;

@@ -1,7 +1,5 @@
 use crate::{signing::verify_signed_builder_data, types::SignedValidatorRegistration};
-use beacon_api_client::{
-    mainnet::Client, Error as ApiError, StateId, ValidatorStatus, ValidatorSummary,
-};
+use beacon_api_client::{Error as ApiError, StateId, ValidatorStatus, ValidatorSummary};
 use ethereum_consensus::{
     builder::ValidatorRegistration,
     primitives::{BlsPublicKey, Epoch, Slot, ValidatorIndex},
@@ -16,6 +14,11 @@ use std::{
 };
 use thiserror::Error;
 use tracing::trace;
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client;
 
 #[derive(Debug, Error)]
 pub enum Error {

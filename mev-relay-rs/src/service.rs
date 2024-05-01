@@ -1,6 +1,6 @@
 use crate::relay::Relay;
 use backoff::ExponentialBackoff;
-use beacon_api_client::{mainnet::Client, PayloadAttributesTopic};
+use beacon_api_client::PayloadAttributesTopic;
 use ethereum_consensus::{
     crypto::SecretKey, networks::Network, primitives::BlsPublicKey, state_transition::Context,
 };
@@ -11,6 +11,11 @@ use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{error, warn};
 use url::Url;
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client;
 
 #[derive(Deserialize, Debug)]
 pub struct Config {

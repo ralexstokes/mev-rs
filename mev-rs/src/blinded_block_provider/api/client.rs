@@ -7,9 +7,13 @@ use crate::{
 };
 use axum::http::{Method, StatusCode};
 use beacon_api_client::{
-    api_error_or_ok, mainnet::Client as BeaconApiClient, ApiResult, Error as ApiError,
-    VersionedValue, ETH_CONSENSUS_VERSION_HEADER,
+    api_error_or_ok, ApiResult, Error as ApiError, VersionedValue, ETH_CONSENSUS_VERSION_HEADER,
 };
+
+#[cfg(not(feature = "minimal-preset"))]
+use beacon_api_client::mainnet::Client as BeaconApiClient;
+#[cfg(feature = "minimal-preset")]
+use beacon_api_client::minimal::Client as BeaconApiClient;
 
 /// A `Client` for a service implementing the Builder APIs.
 /// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
