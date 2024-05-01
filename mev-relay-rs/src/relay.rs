@@ -1,5 +1,4 @@
 use crate::auction_context::AuctionContext;
-
 use async_trait::async_trait;
 use beacon_api_client::{
     mainnet::Client as ApiClient, BroadcastValidation, PayloadAttributesEvent,
@@ -17,14 +16,11 @@ use ethereum_consensus::{
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
-    signing::{
-        compute_consensus_domain, sign_builder_message, verify_signed_builder_data,
-        verify_signed_data,
-    },
+    signing::{compute_consensus_domain, verify_signed_builder_data, verify_signed_data},
     types::{
-        builder_bid, AuctionContents, AuctionRequest, BidTrace, BuilderBid, ExecutionPayload,
-        ExecutionPayloadHeader, ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock,
-        SignedBuilderBid, SignedValidatorRegistration,
+        AuctionContents, AuctionRequest, BidTrace, ExecutionPayload, ExecutionPayloadHeader,
+        ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock, SignedBuilderBid,
+        SignedValidatorRegistration,
     },
     BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, RelayError,
     ValidatorRegistry,
@@ -39,17 +35,6 @@ use tracing::{debug, error, info, trace, warn};
 
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;
-
-fn to_header(execution_payload: &ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
-    let header = match execution_payload {
-        ExecutionPayload::Bellatrix(payload) => {
-            ExecutionPayloadHeader::Bellatrix(payload.try_into()?)
-        }
-        ExecutionPayload::Capella(payload) => ExecutionPayloadHeader::Capella(payload.try_into()?),
-        ExecutionPayload::Deneb(payload) => ExecutionPayloadHeader::Deneb(payload.try_into()?),
-    };
-    Ok(header)
-}
 
 fn validate_header_equality(
     local_header: &ExecutionPayloadHeader,
@@ -412,45 +397,20 @@ impl Relay {
         signed_submission: &SignedBidSubmission,
         value: U256,
     ) -> Result<(), Error> {
-        let builder_public_key = auction_request.public_key.clone();
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value() > value {
-                info!(%auction_request, %builder_public_key, "block submission was not greater in value; ignoring");
+                info!(%auction_request, builder_public_key = %bid.builder_public_key(), "block submission was not greater in value; ignoring");
                 return Ok(())
             }
         }
-        let execution_payload = signed_submission.payload().clone();
-        let header = to_header(&execution_payload)?;
-        let bid = match signed_submission {
-            SignedBidSubmission::Bellatrix(_) => {
-                BuilderBid::Bellatrix(builder_bid::bellatrix::BuilderBid {
-                    header,
-                    value,
-                    public_key: self.public_key.clone(),
-                })
-            }
-            SignedBidSubmission::Capella(_) => {
-                BuilderBid::Capella(builder_bid::capella::BuilderBid {
-                    header,
-                    value,
-                    public_key: self.public_key.clone(),
-                })
-            }
-            SignedBidSubmission::Deneb(submission) => {
-                BuilderBid::Deneb(builder_bid::deneb::BuilderBid {
-                    header,
-                    blob_kzg_commitments: submission.blobs_bundle.commitments.clone(),
-                    value,
-                    public_key: self.public_key.clone(),
-                })
-            }
-        };
-        let signature = sign_builder_message(&bid, &self.secret_key, &self.context)?;
-        let signed_builder_bid = SignedBuilderBid { message: bid, signature };
-
-        let block_hash = execution_payload.block_hash().clone();
-        let auction_context =
-            Arc::new(AuctionContext::new(signed_builder_bid, signed_submission.clone()));
+        let auction_context = AuctionContext::new(
+            signed_submission.clone(),
+            self.public_key.clone(),
+            &self.secret_key,
+            &self.context,
+        )?;
+        let auction_context = Arc::new(auction_context);
+        let block_hash = auction_context.execution_payload().block_hash();
         info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, "inserting new bid");
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
