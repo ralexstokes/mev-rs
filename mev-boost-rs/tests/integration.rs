@@ -7,7 +7,7 @@ use ethereum_consensus::{
     capella::mainnet as capella,
     crypto::SecretKey,
     networks::Network,
-    phase0::mainnet::{compute_domain, Validator},
+    phase0::{compute_domain, Validator},
     primitives::{DomainType, ExecutionAddress, Hash32, Root},
     signing::sign_with_domain,
     state_transition::Context,

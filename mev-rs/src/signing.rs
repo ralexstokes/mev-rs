@@ -2,7 +2,7 @@ use ethereum_consensus::{
     builder::compute_builder_domain,
     crypto,
     domains::DomainType,
-    phase0::mainnet::compute_domain,
+    phase0::compute_domain,
     primitives::{BlsPublicKey, BlsSignature, Domain, Root, Slot},
     signing::{compute_signing_root, sign_with_domain},
     ssz::prelude::HashTreeRoot,
