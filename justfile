@@ -1,11 +1,11 @@
 validate-example-config:
     cargo run config example.config.toml
 
-docker-build:
+build-docker:
     docker build -t ralexstokes/mev-rs .
-docker-push:
+push-docker:
     docker push ralexstokes/mev-rs
-docker-update: docker-build docker-push
+update-docker-hub: build-docker push-docker
 
 test:
     cargo test --all
