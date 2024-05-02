@@ -9,7 +9,7 @@ use std::{
 pub type RelaySet = HashSet<Arc<Relay>>;
 pub type Proposals = HashMap<Proposer, RelaySet>;
 
-#[derive(Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
 pub struct Proposer {
     pub public_key: BlsPublicKey,
     pub fee_recipient: Address,
@@ -26,8 +26,8 @@ impl AuctionSchedule {
         self.schedule.retain(|&slot, _| slot >= retain_slot);
     }
 
-    pub fn take_matching_proposals(&mut self, slot: Slot) -> Option<Proposals> {
-        self.schedule.remove(&slot)
+    pub fn get_matching_proposals(&self, slot: Slot) -> Option<&Proposals> {
+        self.schedule.get(&slot)
     }
 
     pub fn process(&mut self, relay: Arc<Relay>, schedule: &[ProposerSchedule]) -> Vec<Slot> {

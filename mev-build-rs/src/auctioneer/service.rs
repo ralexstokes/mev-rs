@@ -24,13 +24,16 @@ use reth::{
     payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId, PayloadStore},
 };
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tokio::sync::{
     broadcast,
     mpsc::{Receiver, Sender},
 };
 use tokio_stream::StreamExt;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 fn make_attributes_for_proposer(
     attributes: &BuilderPayloadBuilderAttributes,
@@ -129,6 +132,7 @@ pub struct Service<
 
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
+    processed_payload_attributes: HashMap<Slot, HashSet<PayloadId>>,
 }
 
 impl<
@@ -168,6 +172,7 @@ impl<
             bidder_rx,
             auction_schedule: Default::default(),
             open_auctions: Default::default(),
+            processed_payload_attributes: Default::default(),
         }
     }
 
@@ -188,29 +193,36 @@ impl<
         }
 
         // NOTE: clear stale state
-        let slot = epoch * self.context.slots_per_epoch;
-        self.auction_schedule.clear(slot);
-        self.open_auctions.retain(|_, auction| auction.slot >= slot);
+        let retain_slot = epoch * self.context.slots_per_epoch;
+        self.auction_schedule.clear(retain_slot);
+        self.open_auctions.retain(|_, auction| auction.slot >= retain_slot);
+        self.processed_payload_attributes.retain(|&slot, _| slot >= retain_slot);
     }
 
-    fn take_proposals(&mut self, slot: Slot) -> Option<Proposals> {
-        self.auction_schedule.take_matching_proposals(slot)
+    fn get_proposals(&self, slot: Slot) -> Option<&Proposals> {
+        self.auction_schedule.get_matching_proposals(slot)
     }
 
     async fn process_proposals(
         &self,
         slot: Slot,
         attributes: BuilderPayloadBuilderAttributes,
-        proposals: Proposals,
+        proposals: &Proposals,
     ) -> Vec<AuctionContext> {
         let mut new_auctions = vec![];
         for (proposer, relays) in proposals {
-            let attributes = make_attributes_for_proposer(&attributes, &proposer);
+            let attributes = make_attributes_for_proposer(&attributes, proposer);
 
             if self.start_build(&attributes).await.is_some() {
                 // TODO: can likely skip full attributes in `AuctionContext`
                 // TODO: consider data layout here...
-                let auction = AuctionContext { slot, attributes, proposer, relays };
+                // TODO: can likely refactor around auction schedule to skip some clones...
+                let auction = AuctionContext {
+                    slot,
+                    attributes,
+                    proposer: proposer.clone(),
+                    relays: relays.clone(),
+                };
                 new_auctions.push(auction);
             }
         }
@@ -251,8 +263,17 @@ impl<
             self.context.seconds_per_slot,
         )
         .expect("is past genesis");
+
+        let processed_set = self.processed_payload_attributes.entry(slot).or_default();
+        let is_new = processed_set.insert(attributes.payload_id());
+
+        if !is_new {
+            trace!(payload_id = %attributes.payload_id(), "ignoring duplicate payload attributes");
+            return
+        }
+
         // TODO: consolidate once stable
-        if let Some(proposals) = self.take_proposals(slot) {
+        if let Some(proposals) = self.get_proposals(slot) {
             let auctions = self.process_proposals(slot, attributes, proposals).await;
             for auction in auctions {
                 self.process_new_auction(auction).await;
