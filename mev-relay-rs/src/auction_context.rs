@@ -107,7 +107,7 @@ impl AuctionContext {
                 execution_payload,
                 value,
             }),
-            SignedBidSubmission::Capella(_) => Self::Capella(bellatrix::AuctionContext {
+            SignedBidSubmission::Capella(_) => Self::Capella(capella::AuctionContext {
                 builder_public_key,
                 signed_builder_bid,
                 execution_payload,
