@@ -39,6 +39,7 @@ pub mod deneb {
     use super::{KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK};
     use crate::types::ExecutionPayloadHeader;
     use ethereum_consensus::{primitives::BlsPublicKey, ssz::prelude::*};
+
     #[derive(Debug, Clone, Serializable, HashTreeRoot, PartialEq, Eq)]
     #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
     pub struct BuilderBid {
