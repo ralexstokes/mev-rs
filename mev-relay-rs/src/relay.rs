@@ -424,7 +424,10 @@ impl Relay {
         )?;
         let auction_context = Arc::new(auction_context);
         let block_hash = auction_context.execution_payload().block_hash();
-        info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, "inserting new bid");
+        let txn_count = auction_context.execution_payload().transactions().len();
+        let blob_count =
+            auction_context.blobs_bundle().map(|bundle| bundle.blobs.len()).unwrap_or_default();
+        info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, txn_count, blob_count, "inserting new bid");
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
         Ok(())

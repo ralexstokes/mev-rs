@@ -339,6 +339,9 @@ impl<
             slot = auction.slot,
             block_number = payload.block().number,
             block_hash = %payload.block().hash(),
+            parent_hash = %payload.block().header.header().parent_hash,
+            txn_count = %payload.block().body.len(),
+            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
             value = %payload.fees(),
             relays=?auction.relays,
             "submitting payload"
