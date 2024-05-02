@@ -33,8 +33,9 @@ pub async fn get_genesis_time(
             }
 
             // fallback
-            warn!("could not get genesis time from context or connection to consensus node; using best guess");
-            typical_genesis_time(context)
+            let genesis_time = typical_genesis_time(context);
+            warn!(genesis_time, "could not get genesis time from context or connection to consensus node; using best guess");
+            genesis_time
         }
     }
 }
