@@ -149,6 +149,14 @@ impl AuctionContext {
         }
     }
 
+    pub fn blobs_bundle(&self) -> Option<&BlobsBundle> {
+        match self {
+            Self::Bellatrix(_) => None,
+            Self::Capella(_) => None,
+            Self::Deneb(context) => Some(&context.blobs_bundle),
+        }
+    }
+
     pub fn value(&self) -> U256 {
         match self {
             Self::Bellatrix(context) => context.value,

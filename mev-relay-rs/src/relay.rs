@@ -1,6 +1,6 @@
 use crate::auction_context::AuctionContext;
 use async_trait::async_trait;
-use beacon_api_client::{BroadcastValidation, PayloadAttributesEvent};
+use beacon_api_client::{BroadcastValidation, PayloadAttributesEvent, SubmitSignedBeaconBlock};
 use ethereum_consensus::{
     clock::get_current_unix_time_in_nanos,
     crypto::SecretKey,
@@ -424,7 +424,10 @@ impl Relay {
         )?;
         let auction_context = Arc::new(auction_context);
         let block_hash = auction_context.execution_payload().block_hash();
-        info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, "inserting new bid");
+        let txn_count = auction_context.execution_payload().transactions().len();
+        let blob_count =
+            auction_context.blobs_bundle().map(|bundle| bundle.blobs.len()).unwrap_or_default();
+        info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, txn_count, blob_count, "inserting new bid");
         let mut state = self.state.lock();
         state.auctions.insert(auction_request, auction_context);
         Ok(())
@@ -525,10 +528,15 @@ impl BlindedBlockProvider for Relay {
                 let version = signed_block.version();
                 let block_root =
                     signed_block.message().hash_tree_root().map_err(ConsensusError::from)?;
+                let request = SubmitSignedBeaconBlock {
+                    signed_block: &signed_block,
+                    kzg_proofs: auction_context.blobs_bundle().map(|bundle| bundle.proofs.as_ref()),
+                    blobs: auction_context.blobs_bundle().map(|bundle| bundle.blobs.as_ref()),
+                };
                 if let Err(err) = self
                     .beacon_node
                     .post_signed_beacon_block_v2(
-                        &signed_block,
+                        request,
                         version,
                         Some(BroadcastValidation::ConsensusAndEquivocation),
                     )
