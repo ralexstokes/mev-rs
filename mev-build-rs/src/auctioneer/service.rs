@@ -33,7 +33,11 @@ use tokio::sync::{
     mpsc::{Receiver, Sender},
 };
 use tokio_stream::StreamExt;
-use tracing::{error, info, trace, warn};
+use tracing::{debug, error, info, trace, warn};
+
+// Fetch new proposer schedules from all connected relays at this period into the epoch
+// E.g. a value of `2` corresponds to being half-way into the epoch.
+const PROPOSAL_SCHEDULE_INTERVAL: u64 = 2;
 
 fn make_attributes_for_proposer(
     attributes: &BuilderPayloadBuilderAttributes,
@@ -176,22 +180,33 @@ impl<
         }
     }
 
-    async fn on_epoch(&mut self, epoch: Epoch) {
-        // TODO: parallel fetch, join set?
+    async fn fetch_proposer_schedules(&mut self, slot: Slot) {
+        // TODO: consider moving to new task on another thread, can do parallel fetch (join set)
+        // and not block others at this interval
         // TODO: batch updates to auction schedule
         // TODO: consider fast data access once this stabilizes
         for relay in self.relays.iter() {
             match relay.get_proposal_schedule().await {
                 Ok(schedule) => {
                     let slots = self.auction_schedule.process(relay.clone(), &schedule);
-                    info!(epoch, ?slots, %relay, "processed proposer schedule");
+                    info!(slot, ?slots, %relay, "processed proposer schedule");
                 }
                 Err(err) => {
                     warn!(err = %err, "error fetching proposer schedule from relay")
                 }
             }
         }
+    }
 
+    async fn on_slot(&mut self, slot: Slot) {
+        debug!(slot, "processed");
+        if (slot * PROPOSAL_SCHEDULE_INTERVAL) % self.context.slots_per_epoch == 0 {
+            self.fetch_proposer_schedules(slot).await;
+        }
+    }
+
+    async fn on_epoch(&mut self, epoch: Epoch) {
+        debug!(epoch, "processed");
         // NOTE: clear stale state
         let retain_slot = epoch * self.context.slots_per_epoch;
         self.auction_schedule.clear(retain_slot);
@@ -351,8 +366,11 @@ impl<
     }
 
     async fn process_clock(&mut self, message: ClockMessage) {
-        let ClockMessage::NewEpoch(epoch) = message;
-        self.on_epoch(epoch).await;
+        use ClockMessage::*;
+        match message {
+            NewSlot(slot) => self.on_slot(slot).await,
+            NewEpoch(epoch) => self.on_epoch(epoch).await,
+        }
     }
 
     async fn process_payload_event(&mut self, event: Events<Engine>) {

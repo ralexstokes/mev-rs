@@ -7,7 +7,8 @@ use crate::{
     },
 };
 use ethereum_consensus::{
-    clock::SystemClock, networks::Network, primitives::Epoch, state_transition::Context,
+    clock::SystemClock, deneb::Slot, networks::Network, primitives::Epoch,
+    state_transition::Context,
 };
 use eyre::OptionExt;
 use mev_rs::{get_genesis_time, Error};
@@ -149,12 +150,20 @@ pub async fn launch(
 
         // TODO: block on sync here to avoid spurious first PA?
 
+        if let Err(err) = clock_tx.send(ClockMessage::NewSlot(current_slot)) {
+            let msg = err.0;
+            warn!(?msg, "could not update receivers with new slot")
+        }
         if let Err(err) = clock_tx.send(ClockMessage::NewEpoch(current_epoch)) {
             let msg = err.0;
             warn!(?msg, "could not update receivers with new epoch");
         }
 
         while let Some(slot) = slots.next().await {
+            if let Err(err) = clock_tx.send(ClockMessage::NewSlot(slot)) {
+                let msg = err.0;
+                warn!(?msg, "could not update receivers with new slot")
+            }
             let epoch = clock.epoch_for(slot);
             if epoch > current_epoch {
                 current_epoch = epoch;
@@ -171,5 +180,6 @@ pub async fn launch(
 
 #[derive(Debug, Clone)]
 pub enum ClockMessage {
+    NewSlot(Slot),
     NewEpoch(Epoch),
 }
