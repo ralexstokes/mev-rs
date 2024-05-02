@@ -16,10 +16,10 @@ ENV FEATURES ${FEATURES}
 
 RUN apt-get update && apt-get -y upgrade && apt-get install -y libclang-dev pkg-config
 
-RUN cargo chef cook --profile ${BUILD_PROFILE} --features ${FEATURES} --recipe-path recipe.json
+RUN cargo chef cook --profile ${BUILD_PROFILE} --features "$FEATURES" --recipe-path recipe.json
 
 COPY . .
-RUN cargo build --profile ${BUILD_PROFILE} --features ${FEATURES}  --locked --bin mev
+RUN cargo build --profile ${BUILD_PROFILE} --features "$FEATURES"  --locked --bin mev
 
 RUN cp /app/target/${BUILD_PROFILE}/mev /app/mev
 
