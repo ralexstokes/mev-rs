@@ -86,7 +86,7 @@ jobs:
       # ==============================
 
       - name: Download artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
 
       # ==============================
       #       Create release draft
@@ -119,9 +119,6 @@ jobs:
 
           ENDBODY
           )
-          assets=()
-          for asset in ./mev-rs-*.tar.gz*; do
-              assets+=("-a" "$asset/$asset")
-          done
+          assets=(./mev-rs-*.tar.gz*/mev-rs-*.tar.gz*)
           tag_name="${{ env.VERSION }}"
-          echo "$body" | gh release create --draft "${assets[@]}" -F "-" "$tag_name"
+          echo "$body" | gh release create --draft -F "-" "$tag_name" "${assets[@]}"
