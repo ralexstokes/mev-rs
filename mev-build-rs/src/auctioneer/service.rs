@@ -306,13 +306,12 @@ impl<
             BidderMessage::Dispatch { payload_id, value: _value, keep_alive: _keep_alive } => {
                 // TODO: forward keep alive signal to builder
                 // TODO: sort out streaming comms to builder
+                // TOOD: backpressure on bidder...?
                 if let Some(payload) = self.payload_store.resolve(payload_id).await {
                     match payload {
                         Ok(payload) => self.submit_payload(payload).await,
                         Err(err) => warn!(%err, "payload resolution failed"),
                     }
-                } else {
-                    warn!(%payload_id, "no payload could be retrieved from payload store for bid")
                 }
             }
             _ => {}
