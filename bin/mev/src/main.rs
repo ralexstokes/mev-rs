@@ -7,6 +7,9 @@ use tokio::signal;
 use tracing::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
+const MINIMAL_PRESET_NOTICE: &str =
+    "`minimal-preset` feature is enabled. The `minimal` consensus preset is being used.";
+
 #[derive(Debug, Parser)]
 #[clap(author, version, about = "utilities for block space", long_about = None)]
 struct Cli {
@@ -36,6 +39,10 @@ fn setup_logging() {
 
 fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> eyre::Result<()> {
     setup_logging();
+
+    if cfg!(feature = "minimal-preset") {
+        warn!("{MINIMAL_PRESET_NOTICE}");
+    }
 
     // impl #[tokio::main]
     tokio::runtime::Builder::new_multi_thread()
@@ -79,6 +86,9 @@ fn main() -> eyre::Result<()> {
         Commands::Boost(cmd) => run_task_until_signal(cmd.execute()),
         #[cfg(feature = "build")]
         Commands::Build(cmd) => cmd.run(|node_builder, cli_args| async move {
+            if cfg!(feature = "minimal-preset") {
+                warn!("{MINIMAL_PRESET_NOTICE}");
+            }
             let config: cmd::config::Config = cli_args.try_into()?;
             if let Some(network) = config.network {
                 warn!(%network, "`network` option provided in configuration but ignored in favor of `reth` configuration");
