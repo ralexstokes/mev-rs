@@ -180,7 +180,7 @@ impl<
         }
     }
 
-    async fn fetch_proposer_schedules(&mut self, slot: Slot) {
+    async fn fetch_proposer_schedules(&mut self) {
         // TODO: consider moving to new task on another thread, can do parallel fetch (join set)
         // and not block others at this interval
         // TODO: batch updates to auction schedule
@@ -189,7 +189,7 @@ impl<
             match relay.get_proposal_schedule().await {
                 Ok(schedule) => {
                     let slots = self.auction_schedule.process(relay.clone(), &schedule);
-                    info!(slot, ?slots, %relay, "processed proposer schedule");
+                    info!(?slots, %relay, "processed proposer schedule");
                 }
                 Err(err) => {
                     warn!(err = %err, "error fetching proposer schedule from relay")
@@ -201,7 +201,7 @@ impl<
     async fn on_slot(&mut self, slot: Slot) {
         debug!(slot, "processed");
         if (slot * PROPOSAL_SCHEDULE_INTERVAL) % self.context.slots_per_epoch == 0 {
-            self.fetch_proposer_schedules(slot).await;
+            self.fetch_proposer_schedules().await;
         }
     }
 
@@ -392,6 +392,9 @@ impl<
                 info!(%relay, "configured with relay");
             }
         }
+
+        // initialize proposer schedule
+        self.fetch_proposer_schedules().await;
 
         let mut payload_events =
             self.builder.subscribe().await.expect("can subscribe to events").into_stream();
