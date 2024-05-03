@@ -1,9 +1,6 @@
 pub mod compat {
     use ethereum_consensus::{
-        deneb::{
-            polynomial_commitments::{KzgCommitment, KzgProof},
-            Blob,
-        },
+        deneb::polynomial_commitments::{KzgCommitment, KzgProof},
         primitives::{Bytes32, ExecutionAddress},
         ssz::prelude::{ByteList, ByteVector, List, U256},
     };
@@ -87,7 +84,7 @@ pub mod compat {
                 proofs.push(proof);
             }
             for blob in &sidecar.blobs {
-                let blob = Blob::try_from(blob.as_ref()).unwrap();
+                let blob = spec::Blob::try_from(blob.as_ref()).unwrap();
                 blobs.push(blob);
             }
         }

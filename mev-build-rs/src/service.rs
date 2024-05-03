@@ -7,7 +7,9 @@ use crate::{
     },
 };
 use ethereum_consensus::{
-    clock::SystemClock, deneb::Slot, networks::Network, primitives::Epoch,
+    clock::SystemClock,
+    networks::Network,
+    primitives::{Epoch, Slot},
     state_transition::Context,
 };
 use eyre::OptionExt;
