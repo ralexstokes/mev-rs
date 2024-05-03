@@ -1,12 +1,10 @@
 use ethereum_consensus::primitives::{BlsPublicKey, Slot};
-use mev_rs::{types::ProposerSchedule, Relay};
+use mev_rs::types::ProposerSchedule;
 use reth::primitives::Address;
-use std::{
-    collections::{HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{HashMap, HashSet};
 
-pub type RelaySet = HashSet<Arc<Relay>>;
+pub type RelayIndex = usize;
+pub type RelaySet = HashSet<RelayIndex>;
 pub type Proposals = HashMap<Proposer, RelaySet>;
 
 #[derive(Debug, Clone, Default, Hash, PartialEq, Eq)]
@@ -30,7 +28,7 @@ impl AuctionSchedule {
         self.schedule.get(&slot)
     }
 
-    pub fn process(&mut self, relay: Arc<Relay>, schedule: &[ProposerSchedule]) -> Vec<Slot> {
+    pub fn process(&mut self, relay: RelayIndex, schedule: &[ProposerSchedule]) -> Vec<Slot> {
         let mut slots = Vec::with_capacity(schedule.len());
         for entry in schedule {
             slots.push(entry.slot);
@@ -42,7 +40,7 @@ impl AuctionSchedule {
                 gas_limit: registration.gas_limit,
             };
             let relays = slot.entry(proposer).or_default();
-            relays.insert(relay.clone());
+            relays.insert(relay);
         }
         slots
     }
