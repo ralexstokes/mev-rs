@@ -12,7 +12,7 @@ use reth::{
     builder::{node::FullNodeTypes, BuilderContext},
     cli::config::PayloadBuilderConfig,
     payload::{PayloadBuilderHandle, PayloadBuilderService},
-    primitives::{Address, Bytes},
+    primitives::{Address, Bytes, U256},
     providers::CanonStateSubscriptions,
     transaction_pool::TransactionPool,
 };
@@ -26,6 +26,7 @@ pub struct PayloadServiceBuilder {
     extra_data: Option<Bytes>,
     signer: LocalWallet,
     fee_recipient: Address,
+    subsidy_wei: Option<U256>,
 }
 
 impl TryFrom<&Config> for PayloadServiceBuilder {
@@ -34,7 +35,12 @@ impl TryFrom<&Config> for PayloadServiceBuilder {
     fn try_from(value: &Config) -> Result<Self, Self::Error> {
         let signer = signer_from_mnemonic(&value.execution_mnemonic)?;
         let fee_recipient = value.fee_recipient.unwrap_or_else(|| signer.address());
-        Ok(Self { extra_data: value.extra_data.clone(), signer, fee_recipient })
+        Ok(Self {
+            extra_data: value.extra_data.clone(),
+            signer,
+            fee_recipient,
+            subsidy_wei: value.subsidy_wei,
+        })
     }
 }
 
@@ -71,7 +77,7 @@ where
             ctx.task_executor().clone(),
             payload_job_config,
             ctx.chain_spec().clone(),
-            PayloadBuilder::new(self.signer, self.fee_recipient, chain_id),
+            PayloadBuilder::new(self.signer, self.fee_recipient, chain_id, self.subsidy_wei),
         );
 
         let (payload_service, payload_builder) =

@@ -18,7 +18,7 @@ use reth::{
     api::EngineTypes,
     builder::{NodeBuilder, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
-    primitives::{Address, Bytes, NamedChain},
+    primitives::{Address, Bytes, NamedChain, U256},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
@@ -39,6 +39,9 @@ pub struct BuilderConfig {
     pub genesis_time: Option<u64>,
     pub extra_data: Option<Bytes>,
     pub execution_mnemonic: String,
+    // NOTE: This is a temporary field to route the same data from the `BidderConfig`
+    // to the builder. Will be removed once we have communications set up from bidder to builder.
+    pub subsidy_wei: Option<U256>,
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -108,8 +111,11 @@ fn custom_network_from_config_directory(path: PathBuf) -> Network {
 pub async fn launch(
     node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>>>,
     custom_chain_config_directory: Option<PathBuf>,
-    config: Config,
+    mut config: Config,
 ) -> eyre::Result<()> {
+    // NOTE: temporary shim
+    // TODO: remove once bidder can talk to builder
+    config.builder.subsidy_wei = config.bidder.subsidy_wei;
     let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
 
     let handle = node_builder
