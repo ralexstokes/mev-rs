@@ -42,8 +42,8 @@ wait_until_ms = 1000
 # [optional] amount of value to bid as a fraction of the payload's revenue
 # if missing, defaults to 1.0 (100%)
 # validation: should be between [0, 1] inclusive.
-bid_percent = 0.9
-# [optional] amount to add to the bid on top of the payload's revenue,
-# if missing, defaults to 0 wei
+bid_percent = 1.0
+# [optional] amount in wei to add to the bid on top of the payload's revenue,
+# if missing, defaults to `mev_build_rs::payload::builder::DEFAULT_SUBSIDY_PAYMENT`
 # currently sourced from the builder's wallet authoring the payment transaction
-subsidy_wei = "0x0000000000000000000000000000000000000000000000000000000000000001"
+subsidy_wei = "0x000000000000000000000000000000000000000000000000000000174876e800" # 100 Gwei

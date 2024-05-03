@@ -46,6 +46,8 @@ pub enum Error {
 }
 
 pub const BASE_TX_GAS_LIMIT: u64 = 21000;
+// Default value in wei to add to payload payment, regardless of fees.
+pub const DEFAULT_SUBSIDY_PAYMENT: u64 = 1337;
 
 fn make_payment_transaction(
     signer: &LocalWallet,
@@ -183,12 +185,24 @@ pub struct Inner {
     pub signer: LocalWallet,
     pub fee_recipient: Address,
     pub chain_id: ChainId,
+    pub subsidy_wei: U256,
     pub states: Mutex<HashMap<PayloadId, BundleStateWithReceipts>>,
 }
 
 impl PayloadBuilder {
-    pub fn new(signer: LocalWallet, fee_recipient: Address, chain_id: ChainId) -> Self {
-        let inner = Inner { signer, fee_recipient, chain_id, states: Default::default() };
+    pub fn new(
+        signer: LocalWallet,
+        fee_recipient: Address,
+        chain_id: ChainId,
+        subsidy_wei: Option<U256>,
+    ) -> Self {
+        let inner = Inner {
+            signer,
+            fee_recipient,
+            chain_id,
+            subsidy_wei: subsidy_wei.unwrap_or_else(|| U256::from(DEFAULT_SUBSIDY_PAYMENT)),
+            states: Default::default(),
+        };
         Self(Arc::new(inner))
     }
 
@@ -199,7 +213,7 @@ impl PayloadBuilder {
 
     fn determine_payment_amount(&self, fees: U256) -> U256 {
         // TODO: remove temporary hardcoded subsidy
-        fees + U256::from(1337)
+        fees + self.subsidy_wei
     }
 
     pub fn finalize_payload<Client: StateProviderFactory>(

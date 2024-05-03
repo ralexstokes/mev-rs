@@ -126,7 +126,7 @@ pub struct Service<
     clock: broadcast::Receiver<ClockMessage>,
     builder: PayloadBuilderHandle<Engine>,
     payload_store: PayloadStore<Engine>,
-    relays: Vec<Arc<Relay>>,
+    relays: Vec<Relay>,
     config: Config,
     context: Arc<Context>,
     // TODO consolidate this somewhere...
@@ -155,10 +155,8 @@ impl<
         context: Arc<Context>,
         genesis_time: u64,
     ) -> Self {
-        let relays = parse_relay_endpoints(&config.relays)
-            .into_iter()
-            .map(|endpoint| Arc::new(Relay::from(endpoint)))
-            .collect::<Vec<_>>();
+        let relays =
+            parse_relay_endpoints(&config.relays).into_iter().map(Relay::from).collect::<Vec<_>>();
 
         config.public_key = config.secret_key.public_key();
 
@@ -185,10 +183,12 @@ impl<
         // and not block others at this interval
         // TODO: batch updates to auction schedule
         // TODO: consider fast data access once this stabilizes
-        for relay in self.relays.iter() {
+        // TODO: rework `auction_schedule` so there is no issue with confusing relays and their
+        // indices
+        for (relay_index, relay) in self.relays.iter().enumerate() {
             match relay.get_proposal_schedule().await {
                 Ok(schedule) => {
-                    let slots = self.auction_schedule.process(relay.clone(), &schedule);
+                    let slots = self.auction_schedule.process(relay_index, &schedule);
                     info!(?slots, %relay, "processed proposer schedule");
                 }
                 Err(err) => {
@@ -354,11 +354,19 @@ impl<
             &self.context,
         ) {
             Ok(signed_submission) => {
-                let relays = &auction.relays;
                 // TODO: parallel dispatch
-                for relay in relays {
-                    if let Err(err) = relay.submit_bid(&signed_submission).await {
-                        warn!(%err, ?relay, slot = auction.slot, "could not submit payload");
+                for &relay_index in &auction.relays {
+                    match self.relays.get(relay_index) {
+                        Some(relay) => {
+                            if let Err(err) = relay.submit_bid(&signed_submission).await {
+                                warn!(%err, ?relay, slot = auction.slot, "could not submit payload");
+                            }
+                        }
+                        None => {
+                            // NOTE: this arm signals a violation of an internal invariant
+                            // Please fix if you see this error
+                            error!(relay_index, "could not dispatch to unknown relay");
+                        }
                     }
                 }
             }
