@@ -5,12 +5,16 @@ on:
     tags:
       - v*
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   extract-version:
     runs-on: ubuntu-latest
     steps:
       - name: Extract version
-        run: echo "::set-output name=VERSION::$(echo ${GITHUB_REF#refs/tags/})"
+        run: echo "VERSION=$(echo ${GITHUB_REF#refs/tags/})" >> $GITHUB_OUTPUT
         id: extract_version
     outputs:
       VERSION: ${{ steps.extract_version.outputs.VERSION }}
@@ -30,7 +34,7 @@ jobs:
     needs: extract-version
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Read toolchain file
         id: rust-toolchain
@@ -63,21 +67,22 @@ jobs:
       # =======================================================================
 
       - name:  Upload artifact
-        uses:  actions/upload-artifact@v2
+        uses:  actions/upload-artifact@v4
         with:
           name: mev-rs-${{ needs.extract-version.outputs.VERSION }}-${{ matrix.arch }}.tar.gz
           path: mev-rs-${{ needs.extract-version.outputs.VERSION }}-${{ matrix.arch }}.tar.gz
+          compression-level: 0
 
   draft-release:
-    name:   Draft Release
+    name: Draft Release
     needs:  [build, extract-version]
     runs-on: ubuntu-latest
     env:
-      VERSION:  ${{ needs.extract-version.outputs.VERSION }}
+      VERSION: ${{ needs.extract-version.outputs.VERSION }}
     steps:
       # This is necessary for generating the changelog. It has to come before "Download Artifacts" or else it deletes the artifacts.
       - name: Checkout sources
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -94,11 +99,14 @@ jobs:
 
       - name: Generate Full Changelog
         id: changelog
-        run: echo "::set-output name=CHANGELOG::$(git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }})"
+        run: |
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          echo "$(git log --pretty=format:"- %s" $(git describe --tags --abbrev=0 ${{ env.VERSION }}^)..${{ env.VERSION }})" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create Release Draft
         env:
-          GITHUB_USER: ralexstokes
+          GITHUB_USER: ${{ github.repository_owner }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
         # The formatting here is adapted from OpenEthereum: https://github.com/openethereum/openethereum/blob/main/.github/workflows/build.yml
