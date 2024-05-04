@@ -270,8 +270,6 @@ impl<
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
-        // TODO: ignore already processed attributes
-
         let slot = convert_timestamp_to_slot(
             attributes.timestamp(),
             self.genesis_time,
@@ -335,6 +333,11 @@ impl<
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
+        let relay_set = auction
+            .relays
+            .iter()
+            .map(|&index| format!("{0}", self.relays[index]))
+            .collect::<Vec<_>>();
         info!(
             slot = auction.slot,
             block_number = payload.block().number,
@@ -343,7 +346,7 @@ impl<
             txn_count = %payload.block().body.len(),
             blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
             value = %payload.fees(),
-            relays=?auction.relays,
+            relays=?relay_set,
             "submitting payload"
         );
         match prepare_submission(
