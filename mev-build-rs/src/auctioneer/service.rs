@@ -395,10 +395,7 @@ impl<
             warn!("no valid relays provided in config");
         } else {
             let count = self.relays.len();
-            info!("configured with {count} relay(s)");
-            for relay in self.relays.iter() {
-                info!(%relay, "configured with relay");
-            }
+            info!(count, relays = ?self.relays, "configured with relay(s)");
         }
 
         // initialize proposer schedule

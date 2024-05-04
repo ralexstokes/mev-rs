@@ -10,7 +10,7 @@ use mev_rs::{
 use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
-use tracing::{error, info};
+use tracing::{info, warn};
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -46,13 +46,10 @@ impl Service {
         let Self { host, port, relays, network, config } = self;
 
         if relays.is_empty() {
-            error!("no valid relays provided; please restart with correct configuration");
+            warn!("no valid relays provided in config");
         } else {
             let count = relays.len();
-            info!("configured with {count} relay(s)");
-            for relay in &relays {
-                info!(%relay, "configured with relay");
-            }
+            info!(count, ?relays, "configured with relay(s)");
         }
 
         let relays = relays.into_iter().map(Relay::from);

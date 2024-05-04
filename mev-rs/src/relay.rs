@@ -13,7 +13,6 @@ use std::{cmp, fmt, hash, ops::Deref};
 use tracing::{error, warn};
 use url::Url;
 
-#[derive(Debug)]
 pub struct RelayEndpoint {
     url: Url,
     public_key: BlsPublicKey,
@@ -27,6 +26,12 @@ impl TryFrom<Url> for RelayEndpoint {
         let public_key = BlsPublicKey::try_from(&public_key[..])?;
 
         Ok(Self { url, public_key })
+    }
+}
+
+impl fmt::Debug for RelayEndpoint {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
+        f.write_str(self.url.as_str())
     }
 }
 
