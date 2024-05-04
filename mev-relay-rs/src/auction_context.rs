@@ -1,14 +1,19 @@
 use ethereum_consensus::{
     primitives::{BlsPublicKey, U256},
+    ssz::prelude::*,
     state_transition::Context,
 };
 use mev_rs::{
     signing::{sign_builder_message, SecretKey},
     types::{
-        auction_contents, builder_bid, AuctionContents, BlobsBundle, BuilderBid, ExecutionPayload,
-        ExecutionPayloadHeader, SignedBidSubmission, SignedBuilderBid,
+        auction_contents, builder_bid, AuctionContents, BidTrace, BlobsBundle, BuilderBid,
+        ExecutionPayload, ExecutionPayloadHeader, SignedBidSubmission, SignedBuilderBid,
     },
     Error,
+};
+use std::{
+    hash::{Hash, Hasher},
+    time::Duration,
 };
 
 fn to_header(execution_payload: &ExecutionPayload) -> Result<ExecutionPayloadHeader, Error> {
@@ -25,12 +30,27 @@ fn to_header(execution_payload: &ExecutionPayload) -> Result<ExecutionPayloadHea
 pub mod bellatrix {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Eq)]
     pub struct AuctionContext {
         pub builder_public_key: BlsPublicKey,
+        pub bid_trace: BidTrace,
+        pub receive_duration: Duration,
         pub signed_builder_bid: SignedBuilderBid,
         pub execution_payload: ExecutionPayload,
         pub value: U256,
+    }
+
+    impl Hash for AuctionContext {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.builder_public_key.hash(state);
+            self.bid_trace.hash(state);
+            self.receive_duration.hash(state);
+            self.signed_builder_bid.hash(state);
+            let payload_root =
+                self.execution_payload.hash_tree_root().expect("can get hash tree root");
+            payload_root.hash(state);
+            self.value.hash(state);
+        }
     }
 }
 
@@ -41,17 +61,35 @@ pub mod capella {
 pub mod deneb {
     use super::*;
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Eq)]
     pub struct AuctionContext {
         pub builder_public_key: BlsPublicKey,
+        pub bid_trace: BidTrace,
+        pub receive_duration: Duration,
         pub signed_builder_bid: SignedBuilderBid,
         pub execution_payload: ExecutionPayload,
         pub value: U256,
         pub blobs_bundle: BlobsBundle,
     }
+
+    impl Hash for AuctionContext {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.builder_public_key.hash(state);
+            self.bid_trace.hash(state);
+            self.receive_duration.hash(state);
+            self.signed_builder_bid.hash(state);
+            let payload_root =
+                self.execution_payload.hash_tree_root().expect("can get hash tree root");
+            payload_root.hash(state);
+            self.value.hash(state);
+            let blobs_bundle_root =
+                self.blobs_bundle.hash_tree_root().expect("can get hash tree root");
+            blobs_bundle_root.hash(state);
+        }
+    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub enum AuctionContext {
     Bellatrix(bellatrix::AuctionContext),
     Capella(capella::AuctionContext),
@@ -61,6 +99,7 @@ pub enum AuctionContext {
 impl AuctionContext {
     pub fn new(
         signed_submission: SignedBidSubmission,
+        receive_duration: Duration,
         relay_public_key: BlsPublicKey,
         relay_secret_key: &SecretKey,
         context: &Context,
@@ -101,20 +140,28 @@ impl AuctionContext {
         let signed_builder_bid = SignedBuilderBid { message: bid, signature };
 
         let auction_context = match signed_submission {
-            SignedBidSubmission::Bellatrix(_) => Self::Bellatrix(bellatrix::AuctionContext {
+            SignedBidSubmission::Bellatrix(submission) => {
+                Self::Bellatrix(bellatrix::AuctionContext {
+                    builder_public_key,
+                    bid_trace: submission.message,
+                    receive_duration,
+                    signed_builder_bid,
+                    execution_payload,
+                    value,
+                })
+            }
+            SignedBidSubmission::Capella(submission) => Self::Capella(capella::AuctionContext {
                 builder_public_key,
-                signed_builder_bid,
-                execution_payload,
-                value,
-            }),
-            SignedBidSubmission::Capella(_) => Self::Capella(capella::AuctionContext {
-                builder_public_key,
+                bid_trace: submission.message,
+                receive_duration,
                 signed_builder_bid,
                 execution_payload,
                 value,
             }),
             SignedBidSubmission::Deneb(submission) => Self::Deneb(deneb::AuctionContext {
                 builder_public_key,
+                bid_trace: submission.message,
+                receive_duration,
                 signed_builder_bid,
                 execution_payload,
                 value,
@@ -130,6 +177,22 @@ impl AuctionContext {
             Self::Bellatrix(context) => &context.builder_public_key,
             Self::Capella(context) => &context.builder_public_key,
             Self::Deneb(context) => &context.builder_public_key,
+        }
+    }
+
+    pub fn bid_trace(&self) -> &BidTrace {
+        match self {
+            Self::Bellatrix(context) => &context.bid_trace,
+            Self::Capella(context) => &context.bid_trace,
+            Self::Deneb(context) => &context.bid_trace,
+        }
+    }
+
+    pub fn receive_duration(&self) -> Duration {
+        match self {
+            Self::Bellatrix(context) => context.receive_duration,
+            Self::Capella(context) => context.receive_duration,
+            Self::Deneb(context) => context.receive_duration,
         }
     }
 

@@ -5,7 +5,7 @@ use ethereum_consensus::{
     Fork,
 };
 
-#[derive(Debug, Default, Clone, SimpleSerialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Hash, SimpleSerialize)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BidTrace {
     #[serde(with = "crate::serde::as_str")]
@@ -87,7 +87,7 @@ pub mod data_api {
         #[serde(with = "crate::serde::as_str")]
         pub timestamp: u64,
         #[serde(with = "crate::serde::as_str")]
-        pub timestamp_ms: u64,
+        pub timestamp_ms: u128,
     }
 }
 

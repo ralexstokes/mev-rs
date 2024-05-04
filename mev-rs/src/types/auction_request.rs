@@ -1,7 +1,7 @@
 use ethereum_consensus::primitives::{BlsPublicKey, Hash32, Slot};
 
 /// Describes a single unique auction.
-#[derive(Debug, Default, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct AuctionRequest {
     /// Slot for the proposal
