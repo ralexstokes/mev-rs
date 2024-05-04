@@ -421,7 +421,6 @@ impl Relay {
         Ok(())
     }
 
-    // NOTE: we assume that `auction_request` and `signed_submission` have been validated.
     fn insert_bid_if_greater(
         &self,
         auction_request: AuctionRequest,
