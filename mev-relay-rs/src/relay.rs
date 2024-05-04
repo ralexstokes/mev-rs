@@ -186,6 +186,24 @@ fn unblind_block(
     }
 }
 
+fn verify_blinded_block_signature(
+    auction_request: &AuctionRequest,
+    signed_block: &SignedBlindedBeaconBlock,
+    genesis_validators_root: &Root,
+    context: &Context,
+) -> Result<(), Error> {
+    let proposer_public_key = &auction_request.public_key;
+    let slot = signed_block.message().slot();
+    let domain = compute_consensus_domain(slot, genesis_validators_root, context)?;
+    verify_signed_data(
+        &signed_block.message(),
+        signed_block.signature(),
+        proposer_public_key,
+        domain,
+    )
+    .map_err(Into::into)
+}
+
 #[derive(Clone)]
 pub struct Relay(Arc<Inner>);
 
@@ -598,22 +616,4 @@ impl BlindedBlockRelayer for Relay {
 
         Ok(())
     }
-}
-
-fn verify_blinded_block_signature(
-    auction_request: &AuctionRequest,
-    signed_block: &SignedBlindedBeaconBlock,
-    genesis_validators_root: &Root,
-    context: &Context,
-) -> Result<(), Error> {
-    let proposer_public_key = &auction_request.public_key;
-    let slot = signed_block.message().slot();
-    let domain = compute_consensus_domain(slot, genesis_validators_root, context)?;
-    verify_signed_data(
-        &signed_block.message(),
-        signed_block.signature(),
-        proposer_public_key,
-        domain,
-    )
-    .map_err(Into::into)
 }
