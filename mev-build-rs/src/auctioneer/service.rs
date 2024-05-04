@@ -270,8 +270,6 @@ impl<
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
-        // TODO: ignore already processed attributes
-
         let slot = convert_timestamp_to_slot(
             attributes.timestamp(),
             self.genesis_time,
