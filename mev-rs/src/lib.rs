@@ -13,7 +13,7 @@ pub mod types;
 mod validator_registry;
 
 pub use blinded_block_provider::BlindedBlockProvider;
-pub use blinded_block_relayer::BlindedBlockRelayer;
+pub use blinded_block_relayer::{BlindedBlockDataProvider, BlindedBlockRelayer};
 
 pub use block_validation::*;
 pub use error::*;

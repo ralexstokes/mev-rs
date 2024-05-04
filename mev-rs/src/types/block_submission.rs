@@ -25,6 +25,72 @@ pub struct BidTrace {
     pub value: U256,
 }
 
+pub mod data_api {
+    use super::*;
+
+    #[derive(Debug, Default, Clone)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct PayloadTrace {
+        #[serde(with = "crate::serde::as_str")]
+        pub slot: Slot,
+        pub parent_hash: Hash32,
+        pub block_hash: Hash32,
+        #[serde(rename = "builder_pubkey")]
+        pub builder_public_key: BlsPublicKey,
+        #[serde(rename = "proposer_pubkey")]
+        pub proposer_public_key: BlsPublicKey,
+        pub proposer_fee_recipient: ExecutionAddress,
+        #[serde(with = "crate::serde::as_str")]
+        pub gas_limit: u64,
+        #[serde(with = "crate::serde::as_str")]
+        pub gas_used: u64,
+        #[serde(with = "crate::serde::as_str")]
+        pub value: U256,
+        #[serde(with = "crate::serde::as_str")]
+        pub block_number: u64,
+        #[serde(rename = "num_tx")]
+        #[serde(with = "crate::serde::as_str")]
+        pub transaction_count: usize,
+        // NOTE: non-standard field
+        #[serde(rename = "num_blob")]
+        #[serde(with = "crate::serde::as_str")]
+        pub blob_count: usize,
+    }
+
+    #[derive(Debug, Default, Clone)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct SubmissionTrace {
+        #[serde(with = "crate::serde::as_str")]
+        pub slot: Slot,
+        pub parent_hash: Hash32,
+        pub block_hash: Hash32,
+        #[serde(rename = "builder_pubkey")]
+        pub builder_public_key: BlsPublicKey,
+        #[serde(rename = "proposer_pubkey")]
+        pub proposer_public_key: BlsPublicKey,
+        pub proposer_fee_recipient: ExecutionAddress,
+        #[serde(with = "crate::serde::as_str")]
+        pub gas_limit: u64,
+        #[serde(with = "crate::serde::as_str")]
+        pub gas_used: u64,
+        #[serde(with = "crate::serde::as_str")]
+        pub value: U256,
+        #[serde(with = "crate::serde::as_str")]
+        pub block_number: u64,
+        #[serde(rename = "num_tx")]
+        #[serde(with = "crate::serde::as_str")]
+        pub transaction_count: usize,
+        // NOTE: non-standard field
+        #[serde(rename = "num_blob")]
+        #[serde(with = "crate::serde::as_str")]
+        pub blob_count: usize,
+        #[serde(with = "crate::serde::as_str")]
+        pub timestamp: u64,
+        #[serde(with = "crate::serde::as_str")]
+        pub timestamp_ms: u64,
+    }
+}
+
 pub mod bellatrix {
     use super::{BidTrace, BlsSignature, ExecutionPayload};
     use ethereum_consensus::ssz::prelude::*;

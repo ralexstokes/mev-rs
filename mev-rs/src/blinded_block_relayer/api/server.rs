@@ -5,12 +5,18 @@ use crate::{
         },
         BlindedBlockProvider,
     },
-    blinded_block_relayer::BlindedBlockRelayer,
+    blinded_block_relayer::{
+        BlindedBlockDataProvider, BlindedBlockRelayer, BlockSubmissionFilter,
+        DeliveredPayloadFilter, ValidatorRegistrationQuery,
+    },
     error::Error,
-    types::{ProposerSchedule, SignedBidSubmission},
+    types::{
+        block_submission::data_api::{PayloadTrace, SubmissionTrace},
+        ProposerSchedule, SignedBidSubmission, SignedValidatorRegistration,
+    },
 };
 use axum::{
-    extract::{Json, State},
+    extract::{Json, Query, State},
     routing::{get, post, IntoMakeService},
     Router,
 };
@@ -37,13 +43,46 @@ async fn handle_submit_bid<R: BlindedBlockRelayer>(
     relay.submit_bid(&signed_bid_submission).await
 }
 
+async fn handle_get_proposer_payloads_delivered<R: BlindedBlockDataProvider>(
+    State(relay): State<R>,
+    Query(filters): Query<DeliveredPayloadFilter>,
+) -> Result<Json<Vec<PayloadTrace>>, Error> {
+    trace!("handling proposer payloads delivered");
+    Ok(Json(relay.get_delivered_payloads(&filters).await?))
+}
+
+async fn handle_get_builder_blocks_received<R: BlindedBlockDataProvider>(
+    State(relay): State<R>,
+    Query(filters): Query<BlockSubmissionFilter>,
+) -> Result<Json<Vec<SubmissionTrace>>, Error> {
+    trace!("handling block submissions");
+    Ok(Json(relay.get_block_submissions(&filters).await?))
+}
+
+async fn handle_get_validator_registration<R: BlindedBlockDataProvider>(
+    State(relay): State<R>,
+    Query(params): Query<ValidatorRegistrationQuery>,
+) -> Result<Json<SignedValidatorRegistration>, Error> {
+    trace!("handling fetch validator registration");
+    Ok(Json(relay.fetch_validator_registration(&params.public_key).await?))
+}
+
 pub struct Server<R> {
     host: Ipv4Addr,
     port: u16,
     relay: R,
 }
 
-impl<R: BlindedBlockRelayer + BlindedBlockProvider + Clone + Send + Sync + 'static> Server<R> {
+impl<
+        R: BlindedBlockRelayer
+            + BlindedBlockProvider
+            + BlindedBlockDataProvider
+            + Clone
+            + Send
+            + Sync
+            + 'static,
+    > Server<R>
+{
     pub fn new(host: Ipv4Addr, port: u16, relay: R) -> Self {
         Self { host, port, relay }
     }
@@ -60,6 +99,18 @@ impl<R: BlindedBlockRelayer + BlindedBlockProvider + Clone + Send + Sync + 'stat
             .route("/eth/v1/builder/blinded_blocks", post(handle_open_bid::<R>))
             .route("/relay/v1/builder/validators", get(handle_get_proposal_schedule::<R>))
             .route("/relay/v1/builder/blocks", post(handle_submit_bid::<R>))
+            .route(
+                "/relay/v1/data/bidtraces/proposer_payload_delivered",
+                get(handle_get_proposer_payloads_delivered::<R>),
+            )
+            .route(
+                "/relay/v1/data/bidtraces/builder_blocks_received",
+                get(handle_get_builder_blocks_received::<R>),
+            )
+            .route(
+                "/relay/v1/data/validator_registration",
+                get(handle_get_validator_registration::<R>),
+            )
             .with_state(self.relay.clone());
         let addr = SocketAddr::from((self.host, self.port));
         axum::Server::bind(&addr).serve(router.into_make_service())
