@@ -20,7 +20,7 @@ use tokio::task::JoinHandle;
 use tracing::{error, info, trace};
 
 /// Type alias for the configured axum server
-pub type BlockrelayServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
+pub type BlockRelayServer = axum::Server<AddrIncoming, IntoMakeService<Router>>;
 
 async fn handle_get_proposal_schedule<R: BlindedBlockRelayer>(
     State(relay): State<R>,
@@ -37,7 +37,7 @@ async fn handle_submit_bid<R: BlindedBlockRelayer>(
     relay.submit_bid(&signed_bid_submission).await
 }
 
-pub struct Server<R: BlindedBlockRelayer + BlindedBlockProvider> {
+pub struct Server<R> {
     host: Ipv4Addr,
     port: u16,
     relay: R,
@@ -49,7 +49,7 @@ impl<R: BlindedBlockRelayer + BlindedBlockProvider + Clone + Send + Sync + 'stat
     }
 
     /// Configures and returns the axum server
-    pub fn serve(&self) -> BlockrelayServer {
+    pub fn serve(&self) -> BlockRelayServer {
         let router = Router::new()
             .route("/eth/v1/builder/status", get(handle_status_check))
             .route("/eth/v1/builder/validators", post(handle_validator_registration::<R>))
