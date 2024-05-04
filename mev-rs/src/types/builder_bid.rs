@@ -9,7 +9,10 @@ use ethereum_consensus::{
     state_transition::Context,
     Error, Fork,
 };
-use std::fmt;
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 #[cfg(not(feature = "minimal-preset"))]
 use ethereum_consensus::deneb::mainnet::MAX_BLOB_COMMITMENTS_PER_BLOCK;
@@ -81,6 +84,13 @@ impl<'de> serde::Deserialize<'de> for BuilderBid {
     }
 }
 
+impl Hash for BuilderBid {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let root = self.hash_tree_root().expect("can get hash tree root");
+        root.hash(state);
+    }
+}
+
 impl BuilderBid {
     pub fn version(&self) -> Fork {
         match self {
@@ -133,7 +143,17 @@ impl BuilderBid {
     }
 }
 
-#[derive(Debug, Clone, Serializable, HashTreeRoot, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug,
+    Clone,
+    Serializable,
+    HashTreeRoot,
+    PartialEq,
+    Eq,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct SignedBuilderBid {
     pub message: BuilderBid,
     pub signature: BlsSignature,

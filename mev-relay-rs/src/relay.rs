@@ -2,7 +2,7 @@ use crate::auction_context::AuctionContext;
 use async_trait::async_trait;
 use beacon_api_client::{BroadcastValidation, PayloadAttributesEvent, SubmitSignedBeaconBlock};
 use ethereum_consensus::{
-    clock::get_current_unix_time_in_nanos,
+    clock::{duration_since_unix_epoch, get_current_unix_time_in_nanos},
     crypto::SecretKey,
     primitives::{BlsPublicKey, Epoch, Root, Slot, U256},
     ssz::prelude::HashTreeRoot,
@@ -10,20 +10,24 @@ use ethereum_consensus::{
     Error as ConsensusError, Fork,
 };
 use mev_rs::{
+    blinded_block_relayer::{BlockSubmissionFilter, DeliveredPayloadFilter},
     signing::{compute_consensus_domain, verify_signed_builder_data, verify_signed_data},
     types::{
+        block_submission::data_api::{PayloadTrace, SubmissionTrace},
         AuctionContents, AuctionRequest, BidTrace, ExecutionPayload, ExecutionPayloadHeader,
         ProposerSchedule, SignedBidSubmission, SignedBlindedBeaconBlock, SignedBuilderBid,
         SignedValidatorRegistration,
     },
-    BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler, RelayError,
-    ValidatorRegistry,
+    BlindedBlockDataProvider, BlindedBlockProvider, BlindedBlockRelayer, Error, ProposerScheduler,
+    RelayError, ValidatorRegistry,
 };
 use parking_lot::Mutex;
 use std::{
+    cmp::Ordering,
     collections::{HashMap, HashSet},
     ops::Deref,
     sync::Arc,
+    time::Duration,
 };
 use tracing::{debug, error, info, trace, warn};
 
@@ -48,6 +52,7 @@ use ethereum_consensus::{
 
 // Sets the lifetime of an auction with respect to its proposal slot.
 const AUCTION_LIFETIME_SLOTS: Slot = 1;
+const HISTORY_LOOK_BEHIND_EPOCHS: Epoch = 4;
 
 fn validate_header_equality(
     local_header: &ExecutionPayloadHeader,
@@ -186,6 +191,24 @@ fn unblind_block(
     }
 }
 
+fn verify_blinded_block_signature(
+    auction_request: &AuctionRequest,
+    signed_block: &SignedBlindedBeaconBlock,
+    genesis_validators_root: &Root,
+    context: &Context,
+) -> Result<(), Error> {
+    let proposer_public_key = &auction_request.public_key;
+    let slot = signed_block.message().slot();
+    let domain = compute_consensus_domain(slot, genesis_validators_root, context)?;
+    verify_signed_data(
+        &signed_block.message(),
+        signed_block.signature(),
+        proposer_public_key,
+        domain,
+    )
+    .map_err(Into::into)
+}
+
 #[derive(Clone)]
 pub struct Relay(Arc<Inner>);
 
@@ -218,6 +241,10 @@ struct State {
     // auction state
     open_auctions: HashSet<AuctionRequest>,
     auctions: HashMap<AuctionRequest, Arc<AuctionContext>>,
+    // keeps set of all submissions that are _NOT_ the current best bid.
+    // the current best bid is stored in `auctions`.
+    other_submissions: HashMap<AuctionRequest, HashSet<AuctionContext>>,
+    delivered_payloads: HashMap<AuctionRequest, Arc<AuctionContext>>,
 }
 
 impl Relay {
@@ -254,6 +281,14 @@ impl Relay {
             error!(%err, epoch, "could not update validator registry");
         }
         self.refresh_proposer_schedule(epoch).await;
+
+        let retain_slot = epoch.checked_sub(HISTORY_LOOK_BEHIND_EPOCHS).unwrap_or_default() *
+            self.context.slots_per_epoch;
+        trace!(retain_slot, "pruning stale auctions");
+        let mut state = self.state.lock();
+        state.auctions.retain(|auction_request, _| auction_request.slot >= retain_slot);
+        state.other_submissions.retain(|auction_request, _| auction_request.slot >= retain_slot);
+        state.delivered_payloads.retain(|auction_request, _| auction_request.slot >= retain_slot);
     }
 
     async fn refresh_proposer_schedule(&self, epoch: Epoch) {
@@ -290,9 +325,6 @@ impl Relay {
         state
             .open_auctions
             .retain(|auction_request| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
-        state
-            .auctions
-            .retain(|auction_request, _| auction_request.slot + AUCTION_LIFETIME_SLOTS >= slot);
     }
 
     // TODO: build tip context and support reorgs...
@@ -403,12 +435,12 @@ impl Relay {
         Ok(())
     }
 
-    // NOTE: we assume that `auction_request` and `signed_submission` have been validated.
     fn insert_bid_if_greater(
         &self,
         auction_request: AuctionRequest,
         signed_submission: &SignedBidSubmission,
         value: U256,
+        receive_duration: Duration,
     ) -> Result<(), Error> {
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value() > value {
@@ -418,6 +450,7 @@ impl Relay {
         }
         let auction_context = AuctionContext::new(
             signed_submission.clone(),
+            receive_duration,
             self.public_key.clone(),
             &self.secret_key,
             &self.context,
@@ -429,8 +462,37 @@ impl Relay {
             auction_context.blobs_bundle().map(|bundle| bundle.blobs.len()).unwrap_or_default();
         info!(%auction_request, builder_public_key = %auction_context.builder_public_key(), %block_hash, txn_count, blob_count, "inserting new bid");
         let mut state = self.state.lock();
-        state.auctions.insert(auction_request, auction_context);
+        let old_context = state.auctions.insert(auction_request.clone(), auction_context);
+
+        // NOTE: save other submissions for data APIs
+        if let Some(context) = old_context {
+            // TODO: better way to remove from `Arc`?
+            if let Some(context) = Arc::into_inner(context) {
+                let entry = state.other_submissions.entry(auction_request).or_default();
+                entry.insert(context);
+            }
+        }
         Ok(())
+    }
+
+    fn store_delivered_payload(
+        &self,
+        auction_request: AuctionRequest,
+        auction_context: Arc<AuctionContext>,
+    ) {
+        let mut state = self.state.lock();
+        if let Some(existing) = state.delivered_payloads.get(&auction_request) {
+            if existing != &auction_context {
+                error!(
+                    ?auction_request,
+                    ?auction_context,
+                    ?existing,
+                    "skipping attempt to store different result for delivered payload"
+                );
+                return
+            }
+        }
+        state.delivered_payloads.insert(auction_request, auction_context);
     }
 }
 
@@ -548,6 +610,7 @@ impl BlindedBlockProvider for Relay {
                     let block_hash = auction_context.execution_payload().block_hash();
                     info!(%auction_request, %block_root, %block_hash, "returning local payload");
                     let auction_contents = auction_context.to_auction_contents();
+                    self.store_delivered_payload(auction_request, auction_context);
                     Ok(auction_contents)
                 }
             }
@@ -569,6 +632,7 @@ impl BlindedBlockRelayer for Relay {
     }
 
     async fn submit_bid(&self, signed_submission: &SignedBidSubmission) -> Result<(), Error> {
+        let receive_duration = duration_since_unix_epoch();
         let (auction_request, value) = {
             let bid_trace = signed_submission.message();
             let builder_public_key = &bid_trace.builder_public_key;
@@ -594,26 +658,123 @@ impl BlindedBlockRelayer for Relay {
         // NOTE: this does _not_ respect cancellations
         // TODO: move to regime where we track best bid by builder
         // and also move logic to cursor best bid for auction off this API
-        self.insert_bid_if_greater(auction_request, signed_submission, value)?;
+        self.insert_bid_if_greater(auction_request, signed_submission, value, receive_duration)?;
 
         Ok(())
     }
 }
 
-fn verify_blinded_block_signature(
-    auction_request: &AuctionRequest,
-    signed_block: &SignedBlindedBeaconBlock,
-    genesis_validators_root: &Root,
-    context: &Context,
-) -> Result<(), Error> {
-    let proposer_public_key = &auction_request.public_key;
-    let slot = signed_block.message().slot();
-    let domain = compute_consensus_domain(slot, genesis_validators_root, context)?;
-    verify_signed_data(
-        &signed_block.message(),
-        signed_block.signature(),
-        proposer_public_key,
-        domain,
-    )
-    .map_err(Into::into)
+fn payload_trace_from_auction(auction_context: &AuctionContext) -> PayloadTrace {
+    let bid_trace = auction_context.bid_trace();
+    let builder_bid = &auction_context.signed_builder_bid().message;
+    let header = builder_bid.header();
+    PayloadTrace {
+        slot: bid_trace.slot,
+        parent_hash: bid_trace.parent_hash.clone(),
+        block_hash: bid_trace.block_hash.clone(),
+        builder_public_key: bid_trace.builder_public_key.clone(),
+        proposer_public_key: bid_trace.proposer_public_key.clone(),
+        proposer_fee_recipient: bid_trace.proposer_fee_recipient.clone(),
+        gas_limit: bid_trace.gas_limit,
+        gas_used: bid_trace.gas_used,
+        value: bid_trace.value,
+        block_number: header.block_number(),
+        transaction_count: auction_context.execution_payload().transactions().len(),
+        blob_count: auction_context
+            .blobs_bundle()
+            .map(|bundle| bundle.blobs.len())
+            .unwrap_or_default(),
+    }
+}
+
+fn submission_trace_from_auction(auction_context: &AuctionContext) -> SubmissionTrace {
+    let bid_trace = auction_context.bid_trace();
+    let receive_duration = auction_context.receive_duration();
+    let builder_bid = &auction_context.signed_builder_bid().message;
+    let header = builder_bid.header();
+    SubmissionTrace {
+        slot: bid_trace.slot,
+        parent_hash: bid_trace.parent_hash.clone(),
+        block_hash: bid_trace.block_hash.clone(),
+        builder_public_key: bid_trace.builder_public_key.clone(),
+        proposer_public_key: bid_trace.proposer_public_key.clone(),
+        proposer_fee_recipient: bid_trace.proposer_fee_recipient.clone(),
+        gas_limit: bid_trace.gas_limit,
+        gas_used: bid_trace.gas_used,
+        value: bid_trace.value,
+        block_number: header.block_number(),
+        transaction_count: auction_context.execution_payload().transactions().len(),
+        blob_count: auction_context
+            .blobs_bundle()
+            .map(|bundle| bundle.blobs.len())
+            .unwrap_or_default(),
+        timestamp: receive_duration.as_secs(),
+        timestamp_ms: receive_duration.as_millis(),
+    }
+}
+
+#[async_trait]
+impl BlindedBlockDataProvider for Relay {
+    async fn get_delivered_payloads(
+        &self,
+        _filters: &DeliveredPayloadFilter,
+    ) -> Result<Vec<PayloadTrace>, Error> {
+        let state = self.state.lock();
+        let mut traces = state
+            .delivered_payloads
+            .iter()
+            .map(|(auction_request, auction_context)| {
+                let trace = payload_trace_from_auction(auction_context);
+                (auction_request, trace)
+            })
+            .collect::<Vec<_>>();
+        traces.sort_by(|a, b| a.0.cmp(b.0));
+        Ok(traces.into_iter().rev().map(|(_, trace)| trace).collect())
+    }
+
+    async fn get_block_submissions(
+        &self,
+        _filters: &BlockSubmissionFilter,
+    ) -> Result<Vec<SubmissionTrace>, Error> {
+        let state = self.state.lock();
+        let mut traces = state
+            .auctions
+            .iter()
+            .map(|(auction_request, auction_context)| {
+                let trace = submission_trace_from_auction(auction_context);
+                (auction_request.clone(), trace)
+            })
+            .collect::<Vec<_>>();
+        let other_traces = state
+            .other_submissions
+            .iter()
+            .flat_map(|(auction_request, contexts)| {
+                contexts.iter().map(|auction_context| {
+                    let trace = submission_trace_from_auction(auction_context);
+                    (auction_request.clone(), trace)
+                })
+            })
+            .collect::<Vec<_>>();
+        traces.extend(other_traces);
+        // sort by primarily slot, and then receipt timestamp
+        traces.sort_by(|a, b| {
+            let auction_request = a.0.cmp(&b.0);
+            if let Ordering::Equal = auction_request {
+                a.1.timestamp_ms.cmp(&b.1.timestamp_ms)
+            } else {
+                auction_request
+            }
+        });
+        Ok(traces.into_iter().rev().map(|(_, trace)| trace).collect())
+    }
+
+    async fn fetch_validator_registration(
+        &self,
+        public_key: &BlsPublicKey,
+    ) -> Result<SignedValidatorRegistration, Error> {
+        self.validator_registry
+            .get_signed_registration(public_key)
+            .ok_or_else(|| RelayError::ValidatorNotRegistered(public_key.clone()))
+            .map_err(Into::into)
+    }
 }
