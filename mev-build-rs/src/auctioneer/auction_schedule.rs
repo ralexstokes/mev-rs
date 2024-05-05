@@ -16,9 +16,11 @@ pub struct Proposer {
 
 #[derive(Debug, Default)]
 pub struct AuctionSchedule {
+    // TODO: unpack into flatter data structure(s)
     schedule: HashMap<Slot, Proposals>,
 }
 
+// TODO: merge w/ `ProposerSchedule`?
 impl AuctionSchedule {
     pub fn clear(&mut self, retain_slot: Slot) {
         self.schedule.retain(|&slot, _| slot >= retain_slot);

@@ -1,49 +1,41 @@
 use crate::{
     auctioneer::AuctionContext,
-    bidder::{strategies::BasicStrategy, Bid, Config, KeepAlive},
+    bidder::{strategies::BasicStrategy, Config, KeepAlive},
 };
 use ethereum_consensus::clock::duration_until;
-use reth::{
-    api::PayloadBuilderAttributes, payload::PayloadId, primitives::U256, tasks::TaskExecutor,
-};
+use reth::{api::PayloadBuilderAttributes, primitives::U256, tasks::TaskExecutor};
 use std::{sync::Arc, time::Duration};
 use tokio::{
-    sync::{
-        mpsc::{Receiver, Sender},
-        oneshot,
-    },
-    time::{sleep, timeout},
+    sync::{mpsc::Receiver, oneshot},
+    time::timeout,
 };
 
 /// All bidding routines stop this many seconds *after* the timestamp of the proposal
 /// regardless of what the bidding strategy suggests
 pub const DEFAULT_BIDDING_DEADLINE_AFTER_SLOT: u64 = 1;
 
+pub type RevenueUpdate = (U256, oneshot::Sender<Option<U256>>);
+
 pub enum Message {
-    NewAuction(Arc<AuctionContext>),
-    Dispatch { payload_id: PayloadId, value: U256, keep_alive: KeepAlive },
-    RevenueQuery(PayloadId, oneshot::Sender<Option<U256>>),
+    NewAuction(Arc<AuctionContext>, Receiver<RevenueUpdate>),
 }
 
 pub struct Service {
-    auctioneer_rx: Receiver<Message>,
-    auctioneer_tx: Sender<Message>,
+    auctioneer: Receiver<Message>,
     executor: TaskExecutor,
     config: Config,
 }
 
 impl Service {
-    pub fn new(
-        auctioneer_rx: Receiver<Message>,
-        auctioneer_tx: Sender<Message>,
-        executor: TaskExecutor,
-        config: Config,
-    ) -> Self {
-        Self { auctioneer_rx, auctioneer_tx, executor, config }
+    pub fn new(auctioneer: Receiver<Message>, executor: TaskExecutor, config: Config) -> Self {
+        Self { auctioneer, executor, config }
     }
 
-    fn start_bid(&mut self, auction: Arc<AuctionContext>) {
-        let auctioneer = self.auctioneer_tx.clone();
+    fn start_bid(
+        &mut self,
+        auction: Arc<AuctionContext>,
+        mut revenue_updates: Receiver<RevenueUpdate>,
+    ) {
         // TODO: make strategies configurable...
         let mut strategy = BasicStrategy::new(&self.config);
         let duration_after_slot = Duration::from_secs(DEFAULT_BIDDING_DEADLINE_AFTER_SLOT);
@@ -53,34 +45,15 @@ impl Service {
         self.executor.spawn_blocking(async move {
             // TODO issues with timeout and open channels?
             let _ = timeout(max_bidding_duration, async move {
-                let payload_id = auction.attributes.payload_id();
-                let mut should_run = KeepAlive::Yes;
-                while matches!(should_run, KeepAlive::Yes) {
-                    // TODO: payload builder should stream (payload_id, block_hash, fees) for each
-                    // constructed block
-                    let (tx, rx) = oneshot::channel();
-                    let message = Message::RevenueQuery(payload_id, tx);
-                    auctioneer.send(message).await.expect("can send");
-                    let current_revenue = match rx.await.expect("can recv") {
-                        Some(fees) => fees,
-                        None => {
-                            // auction has ended
-                            break
-                        }
-                    };
-
-                    match strategy.run(&auction, current_revenue).await {
-                        Bid::Wait(duration) => {
-                            sleep(duration).await;
-                            continue
-                        }
-                        Bid::Submit { value, keep_alive } => {
-                            should_run = keep_alive;
-                            auctioneer
-                                .send(Message::Dispatch { payload_id, value, keep_alive })
-                                .await
-                                .expect("can send");
-                        }
+                while let Some((current_revenue, dispatch)) = revenue_updates.recv().await {
+                    let (value, keep_alive) = strategy.run(&auction, current_revenue).await;
+                    if dispatch.send(value).is_err() {
+                        // builder is done
+                        break
+                    }
+                    if matches!(keep_alive, KeepAlive::No) {
+                        // close `builder` to signal bidding is done
+                        break
                     }
                 }
             })
@@ -88,17 +61,10 @@ impl Service {
         });
     }
 
-    async fn dispatch(&mut self, message: Message) {
-        if let Message::NewAuction(auction) = message {
-            self.start_bid(auction);
-        }
-    }
-
     pub async fn spawn(mut self) {
-        loop {
-            tokio::select! {
-                Some(message) = self.auctioneer_rx.recv() => self.dispatch(message).await,
-            }
+        while let Some(Message::NewAuction(auction, revenue_updates)) = self.auctioneer.recv().await
+        {
+            self.start_bid(auction, revenue_updates);
         }
     }
 }

@@ -1,6 +1,4 @@
-use crate::payload::{
-    attributes::BuilderPayloadBuilderAttributes, resolve::PayloadFinalizerConfig,
-};
+use crate::payload::{attributes::BuilderPayloadBuilderAttributes, job::PayloadFinalizerConfig};
 use alloy_signer::SignerSync;
 use alloy_signer_wallet::LocalWallet;
 use reth::{
@@ -37,6 +35,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use thiserror::Error;
+use tokio::sync::mpsc::Sender;
 use tracing::{debug, trace, warn};
 
 #[derive(Debug, Error)]
@@ -46,8 +45,6 @@ pub enum Error {
 }
 
 pub const BASE_TX_GAS_LIMIT: u64 = 21000;
-// Default value in wei to add to payload payment, regardless of fees.
-pub const DEFAULT_SUBSIDY_PAYMENT: u64 = 1337;
 
 fn make_payment_transaction(
     signer: &LocalWallet,
@@ -182,27 +179,21 @@ impl Deref for PayloadBuilder {
 
 #[derive(Debug)]
 pub struct Inner {
-    pub signer: LocalWallet,
+    bids: Sender<EthBuiltPayload>,
+    signer: LocalWallet,
     pub fee_recipient: Address,
-    pub chain_id: ChainId,
-    pub subsidy_wei: U256,
-    pub states: Mutex<HashMap<PayloadId, BundleStateWithReceipts>>,
+    chain_id: ChainId,
+    states: Mutex<HashMap<PayloadId, BundleStateWithReceipts>>,
 }
 
 impl PayloadBuilder {
     pub fn new(
+        bids: Sender<EthBuiltPayload>,
         signer: LocalWallet,
         fee_recipient: Address,
         chain_id: ChainId,
-        subsidy_wei: Option<U256>,
     ) -> Self {
-        let inner = Inner {
-            signer,
-            fee_recipient,
-            chain_id,
-            subsidy_wei: subsidy_wei.unwrap_or_else(|| U256::from(DEFAULT_SUBSIDY_PAYMENT)),
-            states: Default::default(),
-        };
+        let inner = Inner { bids, signer, fee_recipient, chain_id, states: Default::default() };
         Self(Arc::new(inner))
     }
 
@@ -211,9 +202,32 @@ impl PayloadBuilder {
         state.remove(&payload_id)
     }
 
-    fn determine_payment_amount(&self, fees: U256) -> U256 {
-        // TODO: remove temporary hardcoded subsidy
-        fees + self.subsidy_wei
+    pub async fn finalize_payload_and_dispatch<Client: StateProviderFactory>(
+        &self,
+        client: Client,
+        payload: EthBuiltPayload,
+        payment_amount: U256,
+        config: &PayloadFinalizerConfig,
+    ) {
+        let blob_sidecars = payload.sidecars().to_vec();
+        match self.finalize_payload(
+            payload.id(),
+            client,
+            payload.block().clone(),
+            payment_amount,
+            config,
+        ) {
+            Ok(mut payload) => {
+                payload.extend_sidecars(blob_sidecars);
+                if let Err(err) = self.bids.send(payload).await {
+                    let payload = err.0;
+                    warn!(?payload, "could not send payload to auctioneer");
+                }
+            }
+            Err(err) => {
+                warn!(?err, "builder could not finalize payload for auction");
+            }
+        }
     }
 
     pub fn finalize_payload<Client: StateProviderFactory>(
@@ -221,10 +235,9 @@ impl PayloadBuilder {
         payload_id: PayloadId,
         client: Client,
         block: SealedBlock,
-        fees: U256,
+        payment_amount: U256,
         config: &PayloadFinalizerConfig,
     ) -> Result<EthBuiltPayload, PayloadBuilderError> {
-        let payment_amount = self.determine_payment_amount(fees);
         let bundle_state_with_receipts = self
             .get_build_state(payload_id)
             .ok_or_else(|| PayloadBuilderError::Other("missing build state for payload".into()))?;

@@ -153,6 +153,7 @@ where
             cached_reads,
             payload_task_guard: self.payload_task_guard.clone(),
             builder: self.builder.clone(),
+            pending_bid_update: None,
         })
     }
 
