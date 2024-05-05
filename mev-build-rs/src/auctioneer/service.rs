@@ -53,7 +53,7 @@ fn make_attributes_for_proposer(
 }
 
 fn prepare_submission(
-    payload: EthBuiltPayload,
+    payload: &EthBuiltPayload,
     signing_key: &SecretKey,
     public_key: &BlsPublicKey,
     auction_context: &AuctionContext,
@@ -333,24 +333,8 @@ impl<
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
-        let relay_set = auction
-            .relays
-            .iter()
-            .map(|&index| format!("{0}", self.relays[index]))
-            .collect::<Vec<_>>();
-        info!(
-            slot = auction.slot,
-            block_number = payload.block().number,
-            block_hash = %payload.block().hash(),
-            parent_hash = %payload.block().header.header().parent_hash,
-            txn_count = %payload.block().body.len(),
-            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
-            value = %payload.fees(),
-            relays=?relay_set,
-            "submitting payload"
-        );
         match prepare_submission(
-            payload,
+            &payload,
             &self.config.secret_key,
             &self.config.public_key,
             auction,
@@ -377,6 +361,22 @@ impl<
                 warn!(%err, slot = auction.slot, "could not prepare submission")
             }
         }
+        let relay_set = auction
+            .relays
+            .iter()
+            .map(|&index| format!("{0}", self.relays[index]))
+            .collect::<Vec<_>>();
+        info!(
+            slot = auction.slot,
+            block_number = payload.block().number,
+            block_hash = %payload.block().hash(),
+            parent_hash = %payload.block().header.header().parent_hash,
+            txn_count = %payload.block().body.len(),
+            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
+            value = %payload.fees(),
+            relays=?relay_set,
+            "payload submitted"
+        );
     }
 
     async fn process_clock(&mut self, message: ClockMessage) {
