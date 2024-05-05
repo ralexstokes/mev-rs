@@ -30,7 +30,7 @@ impl Default for Config {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: HashSet<RelayEndpoint>,
+    relays: Vec<RelayEndpoint>,
     network: Network,
     config: Config,
 }
@@ -43,7 +43,7 @@ impl Service {
           relayset.insert(relay);
         }
 
-        Self { host: config.host, port: config.port, relays: relayset, network, config }
+        Self { host: config.host, port: config.port, relays: Vec::from_iter(relayset), network, config }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
