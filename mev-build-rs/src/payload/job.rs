@@ -289,11 +289,7 @@ impl Future for BidUpdate {
                 Poll::Ready(Ok(maybe_value
                     .map(|value| (this.payload.take().expect("only called once"), value))))
             }
-            Poll::Ready(Err(err)) => {
-                let payload_id = this.payload.as_ref().map(|p| p.id()).expect("only called once");
-                warn!(%payload_id, "could not receive bid update from bidder");
-                Poll::Ready(Err(err))
-            }
+            Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
         }
     }
 }
