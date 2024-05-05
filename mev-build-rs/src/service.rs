@@ -36,7 +36,6 @@ pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct BuilderConfig {
     pub fee_recipient: Option<Address>,
-    pub genesis_time: Option<u64>,
     pub extra_data: Option<Bytes>,
     pub execution_mnemonic: String,
 }
