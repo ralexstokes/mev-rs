@@ -228,8 +228,9 @@ where
                         BuildOutcome::Better { payload, cached_reads } => {
                             this.cached_reads = Some(cached_reads);
                             debug!(target: "payload_builder", value = %payload.fees(), "built better payload");
-                            // TODO: consider removing this code path...
-                            this.best_payload = None;
+                            // TODO: consider reworking this code path...
+                            // If it stays, then at least skip clone here...
+                            this.best_payload = Some(payload.clone());
 
                             if let Some(proposal) = this.config.attributes.proposal.as_ref() {
                                 let (value_tx, value_rx) = oneshot::channel();
