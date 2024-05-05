@@ -29,6 +29,21 @@ impl TryFrom<Url> for RelayEndpoint {
     }
 }
 
+impl hash::Hash for RelayEndpoint {
+  fn hash<H: hash::Hasher>(&self, state: &mut H) {
+      self.public_key.hash(state);
+  }
+}
+
+impl cmp::PartialEq for RelayEndpoint {
+  fn eq(&self, other: &Self) -> bool {
+      self.public_key == other.public_key
+  }
+}
+
+impl cmp::Eq for RelayEndpoint {}
+
+
 impl fmt::Debug for RelayEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         f.write_str(self.url.as_str())
