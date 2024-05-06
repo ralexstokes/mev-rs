@@ -83,7 +83,7 @@ fn append_payment<Client: StateProviderFactory>(
     block: SealedBlock,
     value: U256,
 ) -> Result<SealedBlock, PayloadBuilderError> {
-    let state_provider = client.state_by_block_hash(config.parent_hash)?;
+    let state_provider = client.state_by_block_hash(block.header.header().parent_hash)?;
     let state = StateProviderDatabase::new(&state_provider);
     // TODO: use cached reads
     let mut db = State::builder()

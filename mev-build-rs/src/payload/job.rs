@@ -1,12 +1,11 @@
 use crate::payload::{attributes::BuilderPayloadBuilderAttributes, builder::PayloadBuilder};
 use futures_util::{Future, FutureExt};
 use reth::{
-    api::PayloadBuilderAttributes,
     payload::{
         self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload,
         KeepPayloadJobAlive,
     },
-    primitives::{Address, B256, U256},
+    primitives::{Address, U256},
     providers::StateProviderFactory,
     revm::primitives::{BlockEnv, CfgEnvWithHandlerCfg},
     tasks::TaskSpawner,
@@ -29,7 +28,6 @@ use tracing::{debug, error, trace, warn};
 #[derive(Debug)]
 pub struct PayloadFinalizerConfig {
     pub proposer_fee_recipient: Address,
-    pub parent_hash: B256,
     // TODO: store with payload builder?
     pub cfg_env: CfgEnvWithHandlerCfg,
     // TODO: store with payload builder?
@@ -158,7 +156,6 @@ where
                         if let Some(proposal) = this.config.attributes.proposal.as_ref() {
                             let config = PayloadFinalizerConfig {
                                 proposer_fee_recipient: proposal.proposer_fee_recipient,
-                                parent_hash: this.config.attributes.parent(),
                                 cfg_env: this.config.initialized_cfg.clone(),
                                 block_env: this.config.initialized_block_env.clone(),
                             };
