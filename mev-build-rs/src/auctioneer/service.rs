@@ -208,8 +208,6 @@ impl<
         let payload_id = auction.attributes.payload_id();
         // TODO: consider data layout in `open_auctions`
         self.open_auctions.entry(payload_id).or_insert_with(|| Arc::new(auction)).clone()
-        // TODO: store auction-scope cancellation (or notify?) token in `Auctioneer::join_set`
-        // loop over these in main driver loop to cancel auctions
     }
 
     async fn open_auction(

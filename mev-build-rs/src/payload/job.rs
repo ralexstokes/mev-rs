@@ -125,6 +125,7 @@ where
         }
 
         let fut = ResolveBestPayload { best_payload, maybe_better, empty_payload };
+
         (fut, KeepPayloadJobAlive::No)
     }
 }
