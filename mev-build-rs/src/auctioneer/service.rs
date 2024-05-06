@@ -216,7 +216,7 @@ impl<
         proposer: Proposer,
         relays: HashSet<RelayIndex>,
         mut attributes: BuilderPayloadBuilderAttributes,
-    ) {
+    ) -> Option<PayloadId> {
         let (bidder, revenue_updates) = mpsc::channel(DEFAULT_BUILDER_BIDDER_CHANNEL_SIZE);
         let proposal = ProposalAttributes {
             proposer_gas_limit: proposer.gas_limit,
@@ -235,10 +235,19 @@ impl<
 
         if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
             warn!(%err, "could not start build with payload builder");
-            return
+            return None
         }
 
+        let payload_id = auction.attributes.payload_id();
         self.bidder.start_bid(auction, revenue_updates);
+        Some(payload_id)
+    }
+
+    // Record `payload_id` as processed so that we can identify duplicate notifications.
+    // Return value indicates if the `payload_id` has been observed before or not.
+    fn observe_payload_id(&mut self, slot: Slot, payload_id: PayloadId) -> bool {
+        let processed_set = self.processed_payload_attributes.entry(slot).or_default();
+        processed_set.insert(payload_id)
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
@@ -249,8 +258,7 @@ impl<
         )
         .expect("is past genesis");
 
-        let processed_set = self.processed_payload_attributes.entry(slot).or_default();
-        let is_new = processed_set.insert(attributes.payload_id());
+        let is_new = self.observe_payload_id(slot, attributes.payload_id());
 
         if !is_new {
             trace!(payload_id = %attributes.payload_id(), "ignoring duplicate payload attributes");
@@ -259,7 +267,11 @@ impl<
 
         if let Some(proposals) = self.get_proposals(slot) {
             for (proposer, relays) in proposals {
-                self.open_auction(slot, proposer, relays, attributes.clone()).await;
+                if let Some(payload_id) =
+                    self.open_auction(slot, proposer, relays, attributes.clone()).await
+                {
+                    self.observe_payload_id(slot, payload_id);
+                }
             }
         }
     }
