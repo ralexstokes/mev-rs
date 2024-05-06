@@ -141,19 +141,18 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
-        // check if the deadline is reached
-        if this.deadline.as_mut().poll(cx).is_ready() {
-            trace!(target: "payload_builder", "payload building deadline reached");
-            return Poll::Ready(Ok(()))
-        }
-
-        // poll any channel sends
+        // poll for pending bids
+        // NOTE: this should happen before anything else to ensure synchronization
+        // invariants the bidding task relies on
+        let mut pending_bid = false;
         if let Some(mut fut) = this.pending_bid_update.take() {
+            pending_bid = true;
             match fut.poll_unpin(cx) {
                 Poll::Pending => {
                     this.pending_bid_update = Some(fut);
                 }
                 Poll::Ready(Ok(maybe_dispatch)) => {
+                    pending_bid = false;
                     if let Some((payload, value_to_bid)) = maybe_dispatch {
                         // TODO: handle the pending block, esp if this is the last bid
                         if let Some(proposal) = this.config.attributes.proposal.as_ref() {
@@ -183,6 +182,18 @@ where
                 }
                 // bidder has terminated, so we terminate this job
                 Poll::Ready(Err(_)) => return Poll::Ready(Ok(())),
+            }
+        }
+
+        // check if the deadline is reached
+        if this.deadline.as_mut().poll(cx).is_ready() {
+            trace!(target: "payload_builder", "payload building deadline reached");
+            if pending_bid {
+                // if we have reached the deadline, but still have a pending bid outstanding,
+                // return `Pending` to keep the job alive until we can settle the final bid update.
+                return Poll::Pending
+            } else {
+                return Poll::Ready(Ok(()))
             }
         }
 
