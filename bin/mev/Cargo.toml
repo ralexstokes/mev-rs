@@ -20,18 +20,18 @@ minimal-preset = [
 ]
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
 
 mev-boost-rs = { path = "../../mev-boost-rs", optional = true }
 mev-relay-rs = { path = "../../mev-relay-rs", optional = true }
 mev-build-rs = { path = "../../mev-build-rs", optional = true }
 mev-rs = { path = "../../mev-rs" }
 
-serde = { version = "1.0", features = ["derive"] }
+serde = { workspace = true, features = ["derive"] }
 
-clap = { version = "4.1.4", features = ["derive", "env"] }
+clap = { workspace = true, features = ["derive", "env"] }
 eyre = { workspace = true }
 
 ethereum-consensus = { workspace = true }

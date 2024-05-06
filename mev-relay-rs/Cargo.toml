@@ -12,18 +12,18 @@ default = []
 minimal-preset = ["mev-rs/minimal-preset"]
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-tracing = "0.1"
-futures = "0.3.21"
-async-trait = "0.1.53"
-parking_lot = "0.12.1"
-pin-project = "1.0.12"
-backoff = { version = "0.4.0", features = ["tokio"] }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+parking_lot = { workspace = true }
+pin-project = { workspace = true }
+backoff = { workspace = true, features = ["tokio"] }
 
-thiserror = "1.0.30"
-http = "0.2.7"
-url = { version = "2.2.2", default-features = false }
-serde = { version = "1.0", features = ["derive"] }
+thiserror = { workspace = true }
+url = { workspace = true, default-features = false }
+serde = { workspace = true, features = ["derive"] }
+http = { workspace = true }
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
