@@ -5,7 +5,7 @@ use crate::{
 use reth::{primitives::U256, tasks::TaskExecutor};
 use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, oneshot};
-use tracing::warn;
+use tracing::trace;
 
 pub type RevenueUpdate = (U256, oneshot::Sender<Option<U256>>);
 
@@ -33,7 +33,8 @@ impl Service {
             while let Some((current_revenue, dispatch)) = revenue_updates.recv().await {
                 let value = strategy.run(&auction, current_revenue).await;
                 if dispatch.send(value).is_err() {
-                    warn!("could not send bid value to builder");
+                    trace!("channel closed; could not send bid value to builder");
+                    break
                 }
             }
         });
