@@ -82,6 +82,14 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
+        Fork::Electra => {
+            SignedBidSubmission::Electra(block_submission::electra::SignedBidSubmission {
+                message,
+                execution_payload,
+                blobs_bundle: to_blobs_bundle(payload.sidecars())?,
+                signature,
+            })
+        }
         other => unreachable!("fork {other} is not reachable from this type"),
     };
     Ok(submission)
