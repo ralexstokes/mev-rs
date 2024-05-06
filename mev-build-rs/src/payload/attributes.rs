@@ -5,7 +5,7 @@ use reth::{
     primitives::{
         alloy_primitives::private::alloy_rlp::Encodable,
         revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
-        Address, ChainSpec, Header, Withdrawals, B256,
+        Address, ChainSpec, Header, Withdrawals, B256, B64,
     },
     rpc::types::engine::PayloadAttributes,
 };
@@ -13,11 +13,7 @@ use sha2::Digest;
 use std::convert::Infallible;
 use tokio::sync::mpsc::Sender;
 
-pub fn payload_id_with_bytes(
-    parent: &B256,
-    attributes: &PayloadAttributes,
-    proposal: Option<&ProposalAttributes>,
-) -> (PayloadId, [u8; 8]) {
+pub fn payload_id(parent: &B256, attributes: &PayloadAttributes) -> PayloadId {
     let mut hasher = sha2::Sha256::new();
     hasher.update(parent.as_slice());
     hasher.update(&attributes.timestamp.to_be_bytes()[..]);
@@ -33,20 +29,11 @@ pub fn payload_id_with_bytes(
         hasher.update(parent_beacon_block);
     }
 
-    if let Some(proposal) = proposal {
-        hasher.update(proposal.proposer_gas_limit.to_be_bytes());
-        hasher.update(proposal.proposer_fee_recipient.as_slice());
-    }
-
     let out = hasher.finalize();
-    let inner: [u8; 8] = out.as_slice()[..8].try_into().expect("sufficient length");
-    (PayloadId::new(inner), inner)
+    PayloadId::new(out.as_slice()[..8].try_into().expect("sufficient length"))
 }
 
-pub fn mix_proposal_into_payload_id(
-    payload_id: [u8; 8],
-    proposal: &ProposalAttributes,
-) -> PayloadId {
+pub fn mix_proposal_into_payload_id(payload_id: B64, proposal: &ProposalAttributes) -> PayloadId {
     let mut hasher = sha2::Sha256::new();
     hasher.update(payload_id);
 
@@ -67,15 +54,12 @@ pub struct ProposalAttributes {
 #[derive(Debug, Clone)]
 pub struct BuilderPayloadBuilderAttributes {
     pub inner: EthPayloadBuilderAttributes,
-    // TODO: can skip this if we expose the inner value upstream
-    // NOTE: save this here to avoid recomputing later
-    payload_id: Option<[u8; 8]>,
     pub proposal: Option<ProposalAttributes>,
 }
 
 impl BuilderPayloadBuilderAttributes {
     pub fn new(parent: B256, attributes: PayloadAttributes) -> Self {
-        let (id, id_bytes) = payload_id_with_bytes(&parent, &attributes, None);
+        let id = payload_id(&parent, &attributes);
 
         let inner = EthPayloadBuilderAttributes {
             id,
@@ -86,16 +70,13 @@ impl BuilderPayloadBuilderAttributes {
             withdrawals: attributes.withdrawals.unwrap_or_default().into(),
             parent_beacon_block_root: attributes.parent_beacon_block_root,
         };
-        Self { inner, payload_id: Some(id_bytes), proposal: None }
+        Self { inner, proposal: None }
     }
 
     pub fn attach_proposal(&mut self, proposal: ProposalAttributes) {
-        // NOTE: error to call this more than once; see note on this field, hopefully this goes away
-        if let Some(payload_id) = self.payload_id.take() {
-            let id = mix_proposal_into_payload_id(payload_id, &proposal);
-            self.inner.id = id;
-            self.proposal = Some(proposal);
-        }
+        let id = mix_proposal_into_payload_id(self.inner.id.0, &proposal);
+        self.inner.id = id;
+        self.proposal = Some(proposal);
     }
 }
 
