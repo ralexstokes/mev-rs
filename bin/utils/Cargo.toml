@@ -7,13 +7,13 @@ license = "MIT OR Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-url = { version = "2.2.2", default-features = false }
+tokio = { workspace = true, features = ["full"] }
+url = { workspace = true }
 
 mev-rs = { path = "../../mev-rs" }
 
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0.92" }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }

@@ -16,16 +16,16 @@ minimal-preset = [
 ]
 
 [dependencies]
-tokio = { version = "1.0", features = ["full"] }
-tracing = "0.1"
-async-trait = "0.1.53"
-pin-project = "1.0.12"
-rand = "0.8.5"
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+pin-project = { workspace = true }
 futures-util = { workspace = true }
+rand = { workspace = true }
 
-serde = { version = "1.0", features = ["derive"] }
-thiserror = "1.0.30"
-parking_lot = "0.12.1"
+serde = { workspace = true, features = ["derive"] }
+thiserror = { workspace = true }
+parking_lot = { workspace = true }
 
 ethereum-consensus = { workspace = true }
 beacon-api-client = { workspace = true }
@@ -33,7 +33,6 @@ beacon-api-client = { workspace = true }
 mev-rs = { path = "../mev-rs" }
 
 [dev-dependencies]
-rand = "0.8.5"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = { version = "2.2.2", default-features = false }
 serde_json = "1.0.81"
