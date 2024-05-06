@@ -83,6 +83,14 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
+        Fork::Electra => {
+            SignedBidSubmission::Electra(block_submission::electra::SignedBidSubmission {
+                message,
+                execution_payload,
+                blobs_bundle: to_blobs_bundle(payload.sidecars())?,
+                signature,
+            })
+        }
         fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)
