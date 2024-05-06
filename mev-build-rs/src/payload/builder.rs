@@ -94,11 +94,9 @@ fn append_payment<Client: StateProviderFactory>(
         .build();
 
     let signer_account = db.load_cache_account(signer.address())?;
-    // TODO handle option
-    let nonce = signer_account.account_info().expect("account exists").nonce;
-    // TODO handle option
+    let nonce = signer_account.account_info().map(|info| info.nonce).unwrap_or_default();
     // SAFETY: cast to bigger type always succeeds
-    let max_fee_per_gas = block.header().base_fee_per_gas.expect("exists") as u128;
+    let max_fee_per_gas = block.header().base_fee_per_gas.unwrap_or_default() as u128;
     let payment_tx =
         make_payment_transaction(signer, config, chain_id, nonce, max_fee_per_gas, value)?;
 

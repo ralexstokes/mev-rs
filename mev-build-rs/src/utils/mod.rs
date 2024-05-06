@@ -1,8 +1,9 @@
 pub mod compat {
+    use crate::Error;
     use ethereum_consensus::{
         deneb::polynomial_commitments::{KzgCommitment, KzgProof},
         primitives::{Bytes32, ExecutionAddress},
-        ssz::prelude::{ByteList, ByteVector, List, U256},
+        ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
     };
     use mev_rs::types::{BlobsBundle, ExecutionPayload};
     use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
@@ -68,12 +69,11 @@ pub mod compat {
         ExecutionPayload::Deneb(payload)
     }
 
-    pub fn to_blobs_bundle(sidecars: &[BlobTransactionSidecar]) -> BlobsBundle {
-        let mut commitments = List::default();
-        let mut proofs = List::default();
-        let mut blobs = List::default();
+    pub fn to_blobs_bundle(sidecars: &[BlobTransactionSidecar]) -> Result<BlobsBundle, Error> {
+        let mut commitments = vec![];
+        let mut proofs = vec![];
+        let mut blobs = vec![];
 
-        // TODO: perform length checks to avoid panic on `push`
         for sidecar in sidecars {
             for commitment in &sidecar.commitments {
                 let commitment = KzgCommitment::try_from(commitment.as_slice()).unwrap();
@@ -89,6 +89,17 @@ pub mod compat {
             }
         }
 
-        BlobsBundle { commitments, proofs, blobs }
+        Ok(BlobsBundle {
+            commitments: commitments
+                .try_into()
+                .map_err(|(_, err): (_, SimpleSerializeError)| Error::Consensus(err.into()))?,
+            proofs: proofs
+                .try_into()
+                .map_err(|(_, err): (_, SimpleSerializeError)| Error::Consensus(err.into()))?,
+
+            blobs: blobs
+                .try_into()
+                .map_err(|(_, err): (_, SimpleSerializeError)| Error::Consensus(err.into()))?,
+        })
     }
 }

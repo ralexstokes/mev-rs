@@ -79,7 +79,7 @@ fn prepare_submission(
         Fork::Deneb => SignedBidSubmission::Deneb(block_submission::deneb::SignedBidSubmission {
             message,
             execution_payload,
-            blobs_bundle: to_blobs_bundle(payload.sidecars()),
+            blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
         other => unreachable!("fork {other} is not reachable from this type"),
