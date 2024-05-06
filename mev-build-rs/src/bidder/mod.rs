@@ -1,7 +1,7 @@
 mod service;
 pub mod strategies;
 
-pub use service::{Message, RevenueUpdate, Service};
+pub use service::{RevenueUpdate, Service};
 pub use strategies::Config;
 
 /// Do we expect to submit more bids or not?

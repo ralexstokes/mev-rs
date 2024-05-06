@@ -57,7 +57,6 @@ pub struct Services<
     >,
 > {
     pub auctioneer: Auctioneer<Engine>,
-    pub bidder: Bidder,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
 }
@@ -81,21 +80,19 @@ pub async fn construct_services<
     let clock = context.clock_at(genesis_time);
 
     let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-    let (bidder_tx, bidder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
 
+    let bidder = Bidder::new(task_executor, config.bidder);
     let auctioneer = Auctioneer::new(
         clock_rx,
         payload_builder,
-        bidder_tx,
+        bidder,
         bid_rx,
         config.auctioneer,
         context,
         genesis_time,
     );
 
-    let bidder = Bidder::new(bidder_rx, task_executor, config.bidder);
-
-    Ok(Services { auctioneer, bidder, clock, clock_tx })
+    Ok(Services { auctioneer, clock, clock_tx })
 }
 
 fn custom_network_from_config_directory(path: PathBuf) -> Network {
@@ -138,11 +135,10 @@ pub async fn launch(
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, bidder, clock, clock_tx } =
+    let Services { auctioneer, clock, clock_tx } =
         construct_services(network, config, task_executor, payload_builder, bid_rx).await?;
 
     handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
-    handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
         let mut slots = clock.clone().into_stream();
 

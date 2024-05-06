@@ -1,6 +1,6 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
-    bidder::Message as BidderMessage,
+    bidder::Service as Bidder,
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     utils::compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
@@ -30,7 +30,7 @@ use std::{
 };
 use tokio::sync::{
     broadcast,
-    mpsc::{self, Receiver, Sender},
+    mpsc::{self, Receiver},
 };
 use tokio_stream::StreamExt;
 use tracing::{debug, error, info, trace, warn};
@@ -119,7 +119,7 @@ pub struct Service<
     context: Arc<Context>,
     // TODO consolidate this somewhere...
     genesis_time: u64,
-    bidder: Sender<BidderMessage>,
+    bidder: Bidder,
     bids: Receiver<EthBuiltPayload>,
 
     auction_schedule: AuctionSchedule,
@@ -137,7 +137,7 @@ impl<
     pub fn new(
         clock: broadcast::Receiver<ClockMessage>,
         builder: PayloadBuilderHandle<Engine>,
-        bidder: Sender<BidderMessage>,
+        bidder: Bidder,
         bids: Receiver<EthBuiltPayload>,
         mut config: Config,
         context: Arc<Context>,
@@ -235,17 +235,12 @@ impl<
         // TODO: work out cancellation discipline
         let auction = self.store_auction(auction);
 
-        // start payload job with payload builder
         if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
             warn!(%err, "could not start build with payload builder");
             return
         }
 
-        // start bidding process
-        self.bidder
-            .send(BidderMessage::NewAuction(auction, revenue_updates))
-            .await
-            .expect("can send");
+        self.bidder.start_bid(auction, revenue_updates);
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
