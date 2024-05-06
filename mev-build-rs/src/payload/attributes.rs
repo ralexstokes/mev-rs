@@ -1,3 +1,4 @@
+use crate::bidder::RevenueUpdate;
 use reth::{
     api::PayloadBuilderAttributes,
     payload::{EthPayloadBuilderAttributes, PayloadId},
@@ -10,6 +11,7 @@ use reth::{
 };
 use sha2::Digest;
 use std::convert::Infallible;
+use tokio::sync::mpsc::Sender;
 
 pub fn payload_id_with_bytes(
     parent: &B256,
@@ -59,6 +61,7 @@ pub fn mix_proposal_into_payload_id(
 pub struct ProposalAttributes {
     pub proposer_gas_limit: u64,
     pub proposer_fee_recipient: Address,
+    pub bidder: Sender<RevenueUpdate>,
 }
 
 #[derive(Debug, Clone)]

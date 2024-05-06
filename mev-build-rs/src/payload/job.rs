@@ -1,16 +1,13 @@
-use crate::payload::{
-    attributes::BuilderPayloadBuilderAttributes,
-    builder::PayloadBuilder,
-    resolve::{PayloadFinalizer, PayloadFinalizerConfig, ResolveBuilderPayload},
-};
+use crate::payload::{attributes::BuilderPayloadBuilderAttributes, builder::PayloadBuilder};
 use futures_util::{Future, FutureExt};
 use reth::{
-    api::PayloadBuilderAttributes,
     payload::{
         self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload,
         KeepPayloadJobAlive,
     },
+    primitives::{Address, U256},
     providers::StateProviderFactory,
+    revm::primitives::{BlockEnv, CfgEnvWithHandlerCfg},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
 };
@@ -23,10 +20,19 @@ use std::{
     task::{Context, Poll},
 };
 use tokio::{
-    sync::oneshot,
+    sync::oneshot::{self, error::RecvError},
     time::{Interval, Sleep},
 };
-use tracing::{debug, trace};
+use tracing::{debug, error, trace, warn};
+
+#[derive(Debug)]
+pub struct PayloadFinalizerConfig {
+    pub proposer_fee_recipient: Address,
+    // TODO: store with payload builder?
+    pub cfg_env: CfgEnvWithHandlerCfg,
+    // TODO: store with payload builder?
+    pub block_env: BlockEnv,
+}
 
 pub struct PayloadJob<Client, Pool, Tasks> {
     pub config: PayloadConfig<BuilderPayloadBuilderAttributes>,
@@ -41,6 +47,7 @@ pub struct PayloadJob<Client, Pool, Tasks> {
     pub cached_reads: Option<CachedReads>,
     // TODO: consider moving shared state here, rather than builder
     pub builder: PayloadBuilder,
+    pub pending_bid_update: Option<BidUpdate>,
 }
 
 impl<Client, Pool, Tasks> payload::PayloadJob for PayloadJob<Client, Pool, Tasks>
@@ -50,7 +57,7 @@ where
     Tasks: TaskSpawner + Clone + 'static,
 {
     type PayloadAttributes = BuilderPayloadBuilderAttributes;
-    type ResolvePayloadFuture = ResolveBuilderPayload<Client, Pool>;
+    type ResolvePayloadFuture = ResolveBestPayload<EthBuiltPayload>;
     type BuiltPayload = EthBuiltPayload;
 
     // TODO: do we need to customize this? if not, use default impl in some way
@@ -117,22 +124,7 @@ where
 
         let fut = ResolveBestPayload { best_payload, maybe_better, empty_payload };
 
-        let config =
-            self.config.attributes.proposal.as_ref().map(|attributes| PayloadFinalizerConfig {
-                proposer_fee_recipient: attributes.proposer_fee_recipient,
-                parent_hash: self.config.attributes.parent(),
-                cfg_env: self.config.initialized_cfg.clone(),
-                block_env: self.config.initialized_block_env.clone(),
-            });
-        let finalizer = PayloadFinalizer {
-            client: self.client.clone(),
-            _pool: self.pool.clone(),
-            payload_id: self.config.payload_id(),
-            builder: self.builder.clone(),
-            config,
-        };
-
-        (ResolveBuilderPayload { resolution: fut, finalizer }, KeepPayloadJobAlive::No)
+        (fut, KeepPayloadJobAlive::No)
     }
 }
 
@@ -147,10 +139,59 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
 
+        // poll for pending bids
+        // NOTE: this should happen before anything else to ensure synchronization
+        // invariants the bidding task relies on
+        let mut pending_bid = false;
+        if let Some(mut fut) = this.pending_bid_update.take() {
+            pending_bid = true;
+            match fut.poll_unpin(cx) {
+                Poll::Pending => {
+                    this.pending_bid_update = Some(fut);
+                }
+                Poll::Ready(Ok(maybe_dispatch)) => {
+                    pending_bid = false;
+                    if let Some((payload, value_to_bid)) = maybe_dispatch {
+                        // TODO: handle the pending block, esp if this is the last bid
+                        if let Some(proposal) = this.config.attributes.proposal.as_ref() {
+                            let config = PayloadFinalizerConfig {
+                                proposer_fee_recipient: proposal.proposer_fee_recipient,
+                                cfg_env: this.config.initialized_cfg.clone(),
+                                block_env: this.config.initialized_block_env.clone(),
+                            };
+                            let client = this.client.clone();
+                            let builder = this.builder.clone();
+                            this.executor.spawn_blocking(Box::pin(async move {
+                                // TODO: - track proposer payment, revenue
+                                builder
+                                    .finalize_payload_and_dispatch(
+                                        client,
+                                        payload,
+                                        value_to_bid,
+                                        &config,
+                                    )
+                                    .await
+                            }));
+                        } else {
+                            error!(?payload, "attempt to finalize payload for an auction that is missing proposal attributes");
+                        }
+                    }
+                }
+                // bidder has terminated, so we terminate this job
+                Poll::Ready(Err(_)) => return Poll::Ready(Ok(())),
+            }
+        }
+
         // check if the deadline is reached
         if this.deadline.as_mut().poll(cx).is_ready() {
             trace!(target: "payload_builder", "payload building deadline reached");
-            return Poll::Ready(Ok(()))
+            if pending_bid {
+                // if we have reached the deadline, but still have a pending bid outstanding,
+                // return `Pending` to keep the job alive until we can settle the final bid update.
+                return Poll::Pending
+            } else {
+                return Poll::Ready(Ok(()))
+            }
         }
 
         // check if the interval is reached
@@ -196,7 +237,25 @@ where
                         BuildOutcome::Better { payload, cached_reads } => {
                             this.cached_reads = Some(cached_reads);
                             debug!(target: "payload_builder", value = %payload.fees(), "built better payload");
-                            this.best_payload = Some(payload);
+                            // TODO: consider reworking this code path...
+                            // If it stays, then at least skip clone here...
+                            this.best_payload = Some(payload.clone());
+
+                            if let Some(proposal) = this.config.attributes.proposal.as_ref() {
+                                let (value_tx, value_rx) = oneshot::channel();
+                                let fees = payload.fees();
+                                let bidder = proposal.bidder.clone();
+                                this.executor.spawn(Box::pin(async move {
+                                    if bidder.is_closed() {
+                                        return
+                                    }
+                                    if bidder.send((fees, value_tx)).await.is_err() {
+                                        warn!("could not send fees to bidder");
+                                    }
+                                }));
+                                this.pending_bid_update =
+                                    Some(BidUpdate { value_rx, payload: Some(payload) });
+                            }
                         }
                         BuildOutcome::Aborted { fees, cached_reads } => {
                             this.cached_reads = Some(cached_reads);
@@ -218,5 +277,28 @@ where
         }
 
         Poll::Pending
+    }
+}
+
+pub struct BidUpdate {
+    value_rx: oneshot::Receiver<Option<U256>>,
+    // TODO: consider payload store, to skip shuttling data around
+    payload: Option<EthBuiltPayload>,
+}
+
+impl Future for BidUpdate {
+    type Output = Result<Option<(EthBuiltPayload, U256)>, RecvError>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+
+        match this.value_rx.poll_unpin(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(Ok(maybe_value)) => {
+                Poll::Ready(Ok(maybe_value
+                    .map(|value| (this.payload.take().expect("only called once"), value))))
+            }
+            Poll::Ready(Err(err)) => Poll::Ready(Err(err)),
+        }
     }
 }

@@ -1,6 +1,6 @@
 use crate::{
-    auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelaySet},
-    bidder::Message as BidderMessage,
+    auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
+    bidder::Service as Bidder,
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     utils::compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
@@ -21,7 +21,7 @@ use mev_rs::{
 };
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId, PayloadStore},
+    payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId},
 };
 use serde::Deserialize;
 use std::{
@@ -30,7 +30,7 @@ use std::{
 };
 use tokio::sync::{
     broadcast,
-    mpsc::{Receiver, Sender},
+    mpsc::{self, Receiver},
 };
 use tokio_stream::StreamExt;
 use tracing::{debug, error, info, trace, warn};
@@ -39,21 +39,10 @@ use tracing::{debug, error, info, trace, warn};
 // E.g. a value of `2` corresponds to being half-way into the epoch.
 const PROPOSAL_SCHEDULE_INTERVAL: u64 = 2;
 
-fn make_attributes_for_proposer(
-    attributes: &BuilderPayloadBuilderAttributes,
-    proposer: &Proposer,
-) -> BuilderPayloadBuilderAttributes {
-    let proposal = ProposalAttributes {
-        proposer_gas_limit: proposer.gas_limit,
-        proposer_fee_recipient: proposer.fee_recipient,
-    };
-    let mut attributes = attributes.clone();
-    attributes.attach_proposal(proposal);
-    attributes
-}
+const DEFAULT_BUILDER_BIDDER_CHANNEL_SIZE: usize = 16;
 
 fn prepare_submission(
-    payload: EthBuiltPayload,
+    payload: &EthBuiltPayload,
     signing_key: &SecretKey,
     public_key: &BlsPublicKey,
     auction_context: &AuctionContext,
@@ -125,14 +114,13 @@ pub struct Service<
 > {
     clock: broadcast::Receiver<ClockMessage>,
     builder: PayloadBuilderHandle<Engine>,
-    payload_store: PayloadStore<Engine>,
     relays: Vec<Relay>,
     config: Config,
     context: Arc<Context>,
     // TODO consolidate this somewhere...
     genesis_time: u64,
-    bidder_tx: Sender<BidderMessage>,
-    bidder_rx: Receiver<BidderMessage>,
+    bidder: Bidder,
+    bids: Receiver<EthBuiltPayload>,
 
     auction_schedule: AuctionSchedule,
     open_auctions: HashMap<PayloadId, Arc<AuctionContext>>,
@@ -149,8 +137,8 @@ impl<
     pub fn new(
         clock: broadcast::Receiver<ClockMessage>,
         builder: PayloadBuilderHandle<Engine>,
-        bidder_tx: Sender<BidderMessage>,
-        bidder_rx: Receiver<BidderMessage>,
+        bidder: Bidder,
+        bids: Receiver<EthBuiltPayload>,
         mut config: Config,
         context: Arc<Context>,
         genesis_time: u64,
@@ -160,18 +148,15 @@ impl<
 
         config.public_key = config.secret_key.public_key();
 
-        let payload_store = builder.clone().into();
-
         Self {
             clock,
             builder,
-            payload_store,
             relays,
             config,
             context,
             genesis_time,
-            bidder_tx,
-            bidder_rx,
+            bidder,
+            bids,
             auction_schedule: Default::default(),
             open_auctions: Default::default(),
             processed_payload_attributes: Default::default(),
@@ -214,59 +199,46 @@ impl<
         self.processed_payload_attributes.retain(|&slot, _| slot >= retain_slot);
     }
 
-    fn get_proposals(&self, slot: Slot) -> Option<&Proposals> {
-        self.auction_schedule.get_matching_proposals(slot)
+    fn get_proposals(&self, slot: Slot) -> Option<Proposals> {
+        // TODO: rework data layout to avoid expensive clone
+        self.auction_schedule.get_matching_proposals(slot).cloned()
     }
 
-    async fn process_proposals(
-        &self,
-        slot: Slot,
-        attributes: BuilderPayloadBuilderAttributes,
-        proposals: &Proposals,
-    ) -> Vec<AuctionContext> {
-        let mut new_auctions = vec![];
-        for (proposer, relays) in proposals {
-            let attributes = make_attributes_for_proposer(&attributes, proposer);
-
-            if self.start_build(&attributes).await.is_some() {
-                // TODO: can likely skip full attributes in `AuctionContext`
-                // TODO: consider data layout here...
-                // TODO: can likely refactor around auction schedule to skip some clones...
-                let auction = AuctionContext {
-                    slot,
-                    attributes,
-                    proposer: proposer.clone(),
-                    relays: relays.clone(),
-                };
-                new_auctions.push(auction);
-            }
-        }
-        new_auctions
-    }
-
-    async fn start_build(&self, attributes: &BuilderPayloadBuilderAttributes) -> Option<PayloadId> {
-        // TODO: necessary to get response, other than no error?
-        match self.builder.new_payload(attributes.clone()).await {
-            Ok(payload_id) => {
-                let attributes_payload_id = attributes.payload_id();
-                if payload_id != attributes_payload_id {
-                    error!(%payload_id, %attributes_payload_id, "mismatch between computed payload id and the one returned by the payload builder");
-                }
-                Some(payload_id)
-            }
-            Err(err) => {
-                warn!(%err, "builder could not start build with payload builder");
-                None
-            }
-        }
-    }
-
-    async fn process_new_auction(&mut self, auction: AuctionContext) {
+    fn store_auction(&mut self, auction: AuctionContext) -> Arc<AuctionContext> {
         let payload_id = auction.attributes.payload_id();
         // TODO: consider data layout in `open_auctions`
-        let auction = self.open_auctions.entry(payload_id).or_insert_with(|| Arc::new(auction));
+        self.open_auctions.entry(payload_id).or_insert_with(|| Arc::new(auction)).clone()
+    }
 
-        self.bidder_tx.send(BidderMessage::NewAuction(auction.clone())).await.expect("can send");
+    async fn open_auction(
+        &mut self,
+        slot: Slot,
+        proposer: Proposer,
+        relays: HashSet<RelayIndex>,
+        mut attributes: BuilderPayloadBuilderAttributes,
+    ) {
+        let (bidder, revenue_updates) = mpsc::channel(DEFAULT_BUILDER_BIDDER_CHANNEL_SIZE);
+        let proposal = ProposalAttributes {
+            proposer_gas_limit: proposer.gas_limit,
+            proposer_fee_recipient: proposer.fee_recipient,
+            bidder,
+        };
+        attributes.attach_proposal(proposal);
+
+        // TODO: can likely skip full attributes in `AuctionContext`
+        // TODO: consider data layout here...
+        // TODO: can likely refactor around auction schedule to skip some clones...
+        let auction = AuctionContext { slot, attributes, proposer, relays };
+
+        // TODO: work out cancellation discipline
+        let auction = self.store_auction(auction);
+
+        if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
+            warn!(%err, "could not start build with payload builder");
+            return
+        }
+
+        self.bidder.start_bid(auction, revenue_updates);
     }
 
     async fn on_payload_attributes(&mut self, attributes: BuilderPayloadBuilderAttributes) {
@@ -285,72 +257,17 @@ impl<
             return
         }
 
-        // TODO: consolidate once stable
         if let Some(proposals) = self.get_proposals(slot) {
-            let auctions = self.process_proposals(slot, attributes, proposals).await;
-            for auction in auctions {
-                self.process_new_auction(auction).await;
+            for (proposer, relays) in proposals {
+                self.open_auction(slot, proposer, relays, attributes.clone()).await;
             }
-        }
-    }
-
-    async fn process_bid_update(&mut self, message: BidderMessage) {
-        match message {
-            BidderMessage::RevenueQuery(payload_id, tx) => {
-                // TODO: store this payload (by hash) so that the bid that returns targets something
-                // stable...
-                if let Some(payload) = self.payload_store.best_payload(payload_id).await {
-                    match payload {
-                        Ok(payload) => {
-                            // TODO: send more dynamic updates
-                            // by the time the bidder submits a value the best payload may have
-                            // already changed
-                            tx.send(Some(payload.fees())).expect("can send");
-                            return
-                        }
-                        Err(err) => warn!(%err, "could not get best payload from payload store"),
-                    }
-                }
-                // NOTE: if no payload was found, the auction has been terminated
-                if let Err(err) = tx.send(None) {
-                    warn!(?err, "could not send after failure to retrieve payload");
-                }
-            }
-            BidderMessage::Dispatch { payload_id, value: _value, keep_alive: _keep_alive } => {
-                // TODO: forward keep alive signal to builder
-                // TODO: sort out streaming comms to builder
-                // TOOD: backpressure on bidder...?
-                if let Some(payload) = self.payload_store.resolve(payload_id).await {
-                    match payload {
-                        Ok(payload) => self.submit_payload(payload).await,
-                        Err(err) => warn!(%err, "payload resolution failed"),
-                    }
-                }
-            }
-            _ => {}
         }
     }
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
-        let relay_set = auction
-            .relays
-            .iter()
-            .map(|&index| format!("{0}", self.relays[index]))
-            .collect::<Vec<_>>();
-        info!(
-            slot = auction.slot,
-            block_number = payload.block().number,
-            block_hash = %payload.block().hash(),
-            parent_hash = %payload.block().header.header().parent_hash,
-            txn_count = %payload.block().body.len(),
-            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
-            value = %payload.fees(),
-            relays=?relay_set,
-            "submitting payload"
-        );
         match prepare_submission(
-            payload,
+            &payload,
             &self.config.secret_key,
             &self.config.public_key,
             auction,
@@ -377,6 +294,22 @@ impl<
                 warn!(%err, slot = auction.slot, "could not prepare submission")
             }
         }
+        let relay_set = auction
+            .relays
+            .iter()
+            .map(|&index| format!("{0}", self.relays[index]))
+            .collect::<Vec<_>>();
+        info!(
+            slot = auction.slot,
+            block_number = payload.block().number,
+            block_hash = %payload.block().hash(),
+            parent_hash = %payload.block().header.header().parent_hash,
+            txn_count = %payload.block().body.len(),
+            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
+            value = %payload.fees(),
+            relays=?relay_set,
+            "payload submitted"
+        );
     }
 
     async fn process_clock(&mut self, message: ClockMessage) {
@@ -414,7 +347,7 @@ impl<
                     Ok(event) =>  self.process_payload_event(event).await,
                     Err(err) => warn!(%err, "error getting payload event"),
                 },
-                Some(message) = self.bidder_rx.recv() => self.process_bid_update(message).await,
+                Some(payload) = self.bids.recv() => self.submit_payload(payload).await,
             }
         }
     }

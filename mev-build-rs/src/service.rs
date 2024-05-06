@@ -18,7 +18,7 @@ use reth::{
     api::EngineTypes,
     builder::{NodeBuilder, WithLaunchContext},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
-    primitives::{Address, Bytes, NamedChain, U256},
+    primitives::{Address, Bytes, NamedChain},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
@@ -36,12 +36,8 @@ pub const DEFAULT_COMPONENT_CHANNEL_SIZE: usize = 16;
 #[derive(Deserialize, Debug, Default, Clone)]
 pub struct BuilderConfig {
     pub fee_recipient: Option<Address>,
-    pub genesis_time: Option<u64>,
     pub extra_data: Option<Bytes>,
     pub execution_mnemonic: String,
-    // NOTE: This is a temporary field to route the same data from the `BidderConfig`
-    // to the builder. Will be removed once we have communications set up from bidder to builder.
-    pub subsidy_wei: Option<U256>,
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -61,7 +57,6 @@ pub struct Services<
     >,
 > {
     pub auctioneer: Auctioneer<Engine>,
-    pub bidder: Bidder,
     pub clock: SystemClock,
     pub clock_tx: Sender<ClockMessage>,
 }
@@ -76,6 +71,7 @@ pub async fn construct_services<
     config: Config,
     task_executor: TaskExecutor,
     payload_builder: PayloadBuilderHandle<Engine>,
+    bid_rx: mpsc::Receiver<EthBuiltPayload>,
 ) -> Result<Services<Engine>, Error> {
     let context = Arc::new(Context::try_from(network)?);
 
@@ -84,22 +80,19 @@ pub async fn construct_services<
     let clock = context.clock_at(genesis_time);
 
     let (clock_tx, clock_rx) = broadcast::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-    let (bidder_tx, bidder_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
-    let (bid_dispatch_tx, bid_dispatch_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
 
+    let bidder = Bidder::new(task_executor, config.bidder);
     let auctioneer = Auctioneer::new(
         clock_rx,
         payload_builder,
-        bidder_tx,
-        bid_dispatch_rx,
+        bidder,
+        bid_rx,
         config.auctioneer,
         context,
         genesis_time,
     );
 
-    let bidder = Bidder::new(bidder_rx, bid_dispatch_tx, task_executor, config.bidder);
-
-    Ok(Services { auctioneer, bidder, clock, clock_tx })
+    Ok(Services { auctioneer, clock, clock_tx })
 }
 
 fn custom_network_from_config_directory(path: PathBuf) -> Network {
@@ -111,12 +104,10 @@ fn custom_network_from_config_directory(path: PathBuf) -> Network {
 pub async fn launch(
     node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>>>,
     custom_chain_config_directory: Option<PathBuf>,
-    mut config: Config,
+    config: Config,
 ) -> eyre::Result<()> {
-    // NOTE: temporary shim
-    // TODO: remove once bidder can talk to builder
-    config.builder.subsidy_wei = config.bidder.subsidy_wei;
-    let payload_builder = PayloadServiceBuilder::try_from(&config.builder)?;
+    let (bid_tx, bid_rx) = mpsc::channel(DEFAULT_COMPONENT_CHANNEL_SIZE);
+    let payload_builder = PayloadServiceBuilder::try_from((&config.builder, bid_tx))?;
 
     let handle = node_builder
         .with_types::<BuilderNode>()
@@ -144,11 +135,10 @@ pub async fn launch(
 
     let task_executor = handle.node.task_executor.clone();
     let payload_builder = handle.node.payload_builder.clone();
-    let Services { auctioneer, bidder, clock, clock_tx } =
-        construct_services(network, config, task_executor, payload_builder).await?;
+    let Services { auctioneer, clock, clock_tx } =
+        construct_services(network, config, task_executor, payload_builder, bid_rx).await?;
 
     handle.node.task_executor.spawn_critical_blocking("mev-builder/auctioneer", auctioneer.spawn());
-    handle.node.task_executor.spawn_critical_blocking("mev-builder/bidder", bidder.spawn());
     handle.node.task_executor.spawn_critical("mev-builder/clock", async move {
         let mut slots = clock.clone().into_stream();
 
