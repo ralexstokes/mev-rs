@@ -363,7 +363,6 @@ impl Relay {
             Ok(())
         } else {
             let err = RelayError::InvalidAuctionRequest(auction_request.clone());
-            warn!(%err);
             Err(err)
         }
     }
@@ -530,7 +529,10 @@ impl BlindedBlockProvider for Relay {
         &self,
         auction_request: &AuctionRequest,
     ) -> Result<SignedBuilderBid, Error> {
-        self.validate_auction_request(auction_request)?;
+        if let Err(err) = self.validate_auction_request(auction_request) {
+            warn!(%err, "could not fetch best bid");
+            return Err(err.into())
+        }
 
         let auction_context = self
             .get_auction_context(auction_request)
@@ -558,7 +560,10 @@ impl BlindedBlockProvider for Relay {
             AuctionRequest { slot, parent_hash, public_key }
         };
 
-        self.validate_auction_request(&auction_request)?;
+        if let Err(err) = self.validate_auction_request(&auction_request) {
+            warn!(%err, "could not open bid");
+            return Err(err.into())
+        }
 
         let auction_context = self
             .get_auction_context(&auction_request)
@@ -643,7 +648,10 @@ impl BlindedBlockRelayer for Relay {
                 parent_hash: bid_trace.parent_hash.clone(),
                 public_key: bid_trace.proposer_public_key.clone(),
             };
-            self.validate_auction_request(&auction_request)?;
+            if let Err(err) = self.validate_auction_request(&auction_request) {
+                warn!(%err, "could not validate bid submission");
+                return Err(err.into())
+            }
 
             self.validate_builder_submission_trusted(bid_trace, signed_submission.payload())?;
             debug!(%auction_request, "validated builder submission");
