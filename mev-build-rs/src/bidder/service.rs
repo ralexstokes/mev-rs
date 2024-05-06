@@ -1,10 +1,11 @@
 use crate::{
     auctioneer::AuctionContext,
-    bidder::{strategies::BasicStrategy, Config, KeepAlive},
+    bidder::{strategies::BasicStrategy, Config},
 };
 use reth::{primitives::U256, tasks::TaskExecutor};
 use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, oneshot};
+use tracing::warn;
 
 pub type RevenueUpdate = (U256, oneshot::Sender<Option<U256>>);
 
@@ -26,15 +27,13 @@ impl Service {
         // TODO: make strategies configurable...
         let mut strategy = BasicStrategy::new(&self.config);
         self.executor.spawn_blocking(async move {
+            // NOTE: `revenue_updates` will be closed when the builder is done with new payloads for
+            // this auction so we can just loop on `recv` and return naturally once the
+            // channel is closed
             while let Some((current_revenue, dispatch)) = revenue_updates.recv().await {
-                let (value, keep_alive) = strategy.run(&auction, current_revenue).await;
+                let value = strategy.run(&auction, current_revenue).await;
                 if dispatch.send(value).is_err() {
-                    // builder is done
-                    break
-                }
-                if matches!(keep_alive, KeepAlive::No) {
-                    // close `builder` to signal bidding is done
-                    break
+                    warn!("could not send bid value to builder");
                 }
             }
         });

@@ -1,4 +1,4 @@
-use crate::{auctioneer::AuctionContext, bidder::KeepAlive};
+use crate::auctioneer::AuctionContext;
 use reth::primitives::U256;
 use serde::Deserialize;
 
@@ -34,12 +34,8 @@ impl BasicStrategy {
         value
     }
 
-    pub async fn run(
-        &mut self,
-        _auction: &AuctionContext,
-        current_revenue: U256,
-    ) -> (Option<U256>, KeepAlive) {
+    pub async fn run(&mut self, _auction: &AuctionContext, current_revenue: U256) -> Option<U256> {
         let value = self.compute_value(current_revenue);
-        (Some(value), KeepAlive::Yes)
+        Some(value)
     }
 }
