@@ -55,6 +55,10 @@ pub mod deneb {
     }
 }
 
+pub mod electra {
+    pub use super::deneb::*;
+}
+
 #[derive(Debug, Clone, Serializable, HashTreeRoot, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[serde(untagged)]
@@ -63,6 +67,7 @@ pub enum BuilderBid {
     Bellatrix(bellatrix::BuilderBid),
     Capella(capella::BuilderBid),
     Deneb(deneb::BuilderBid),
+    Electra(electra::BuilderBid),
 }
 
 impl<'de> serde::Deserialize<'de> for BuilderBid {
@@ -71,6 +76,9 @@ impl<'de> serde::Deserialize<'de> for BuilderBid {
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Electra(inner))
+        }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner))
         }
@@ -97,6 +105,7 @@ impl BuilderBid {
             Self::Bellatrix(..) => Fork::Bellatrix,
             Self::Capella(..) => Fork::Capella,
             Self::Deneb(..) => Fork::Deneb,
+            Self::Electra(..) => Fork::Electra,
         }
     }
 
@@ -105,6 +114,7 @@ impl BuilderBid {
             Self::Bellatrix(inner) => &inner.header,
             Self::Capella(inner) => &inner.header,
             Self::Deneb(inner) => &inner.header,
+            Self::Electra(inner) => &inner.header,
         }
     }
 
@@ -113,6 +123,7 @@ impl BuilderBid {
     ) -> Option<&List<KzgCommitment, MAX_BLOB_COMMITMENTS_PER_BLOCK>> {
         match self {
             Self::Deneb(inner) => Some(&inner.blob_kzg_commitments),
+            Self::Electra(inner) => Some(&inner.blob_kzg_commitments),
             _ => None,
         }
     }
@@ -122,6 +133,7 @@ impl BuilderBid {
             Self::Bellatrix(inner) => inner.value,
             Self::Capella(inner) => inner.value,
             Self::Deneb(inner) => inner.value,
+            Self::Electra(inner) => inner.value,
         }
     }
 
@@ -130,6 +142,7 @@ impl BuilderBid {
             Self::Bellatrix(inner) => &inner.public_key,
             Self::Capella(inner) => &inner.public_key,
             Self::Deneb(inner) => &inner.public_key,
+            Self::Electra(inner) => &inner.public_key,
         }
     }
 

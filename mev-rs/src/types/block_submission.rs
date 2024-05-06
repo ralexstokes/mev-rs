@@ -123,6 +123,10 @@ pub mod deneb {
     }
 }
 
+pub mod electra {
+    pub use super::deneb::*;
+}
+
 #[derive(Debug, Clone, Serializable, HashTreeRoot)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[serde(untagged)]
@@ -131,6 +135,7 @@ pub enum SignedBidSubmission {
     Bellatrix(bellatrix::SignedBidSubmission),
     Capella(capella::SignedBidSubmission),
     Deneb(deneb::SignedBidSubmission),
+    Electra(electra::SignedBidSubmission),
 }
 
 impl<'de> serde::Deserialize<'de> for SignedBidSubmission {
@@ -139,6 +144,9 @@ impl<'de> serde::Deserialize<'de> for SignedBidSubmission {
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Electra(inner))
+        }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner))
         }
@@ -158,6 +166,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(..) => Fork::Bellatrix,
             Self::Capella(..) => Fork::Capella,
             Self::Deneb(..) => Fork::Deneb,
+            Self::Electra(..) => Fork::Electra,
         }
     }
 
@@ -166,6 +175,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.message,
             Self::Capella(inner) => &inner.message,
             Self::Deneb(inner) => &inner.message,
+            Self::Electra(inner) => &inner.message,
         }
     }
 
@@ -174,6 +184,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.execution_payload,
             Self::Capella(inner) => &inner.execution_payload,
             Self::Deneb(inner) => &inner.execution_payload,
+            Self::Electra(inner) => &inner.execution_payload,
         }
     }
 
@@ -182,6 +193,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.signature,
             Self::Capella(inner) => &inner.signature,
             Self::Deneb(inner) => &inner.signature,
+            Self::Electra(inner) => &inner.signature,
         }
     }
 
@@ -190,6 +202,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(..) => None,
             Self::Capella(..) => None,
             Self::Deneb(inner) => Some(&inner.blobs_bundle),
+            Self::Electra(inner) => Some(&inner.blobs_bundle),
         }
     }
 }

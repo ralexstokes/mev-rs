@@ -40,6 +40,10 @@ pub mod deneb {
     }
 }
 
+pub mod electra {
+    pub use super::deneb::*;
+}
+
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[serde(untagged)]
@@ -47,6 +51,7 @@ pub enum AuctionContents {
     Bellatrix(bellatrix::AuctionContents),
     Capella(capella::AuctionContents),
     Deneb(deneb::AuctionContents),
+    Electra(electra::AuctionContents),
 }
 
 impl<'de> serde::Deserialize<'de> for AuctionContents {
@@ -55,6 +60,9 @@ impl<'de> serde::Deserialize<'de> for AuctionContents {
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Electra(inner))
+        }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner))
         }
@@ -74,6 +82,7 @@ impl AuctionContents {
             Self::Bellatrix(..) => Fork::Bellatrix,
             Self::Capella(..) => Fork::Capella,
             Self::Deneb(..) => Fork::Deneb,
+            Self::Electra(..) => Fork::Electra,
         }
     }
 
@@ -82,12 +91,14 @@ impl AuctionContents {
             Self::Bellatrix(inner) => inner,
             Self::Capella(inner) => inner,
             Self::Deneb(inner) => &inner.execution_payload,
+            Self::Electra(inner) => &inner.execution_payload,
         }
     }
 
     pub fn blobs_bundle(&self) -> Option<&BlobsBundle> {
         match self {
             Self::Deneb(inner) => Some(&inner.blobs_bundle),
+            Self::Electra(inner) => Some(&inner.blobs_bundle),
             _ => None,
         }
     }
