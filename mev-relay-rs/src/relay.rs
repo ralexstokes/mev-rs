@@ -40,6 +40,7 @@ use ethereum_consensus::{
     bellatrix::mainnet as bellatrix,
     capella::mainnet as capella,
     deneb::mainnet as deneb,
+    electra::mainnet as electra,
     types::mainnet::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
 };
 #[cfg(feature = "minimal-preset")]
@@ -47,6 +48,7 @@ use ethereum_consensus::{
     bellatrix::minimal as bellatrix,
     capella::minimal as capella,
     deneb::minimal as deneb,
+    electra::minimal as electra,
     types::minimal::{ExecutionPayloadHeaderRef, SignedBeaconBlock},
 };
 
@@ -76,6 +78,13 @@ fn validate_header_equality(
         ExecutionPayloadHeader::Deneb(local_header) => {
             let provided_header =
                 provided_header.deneb().ok_or(RelayError::InvalidExecutionPayloadInBlock)?;
+            if local_header != provided_header {
+                return Err(RelayError::InvalidExecutionPayloadInBlock);
+            }
+        }
+        ExecutionPayloadHeader::Electra(local_header) => {
+            let provided_header =
+                provided_header.electra().ok_or(RelayError::InvalidExecutionPayloadInBlock)?;
             if local_header != provided_header {
                 return Err(RelayError::InvalidExecutionPayloadInBlock);
             }
@@ -187,6 +196,41 @@ fn unblind_block(
                 signature,
             };
             Ok(SignedBeaconBlock::Deneb(inner))
+        }
+        SignedBlindedBeaconBlock::Electra(blinded_block) => {
+            let signature = blinded_block.signature.clone();
+            let block = &blinded_block.message;
+            let body = &block.body;
+            let execution_payload = execution_payload.electra().ok_or(Error::InvalidFork {
+                expected: Fork::Electra,
+                provided: execution_payload.version(),
+            })?;
+
+            let inner = electra::SignedBeaconBlock {
+                message: electra::BeaconBlock {
+                    slot: block.slot,
+                    proposer_index: block.proposer_index,
+                    parent_root: block.parent_root,
+                    state_root: block.state_root,
+                    body: electra::BeaconBlockBody {
+                        randao_reveal: body.randao_reveal.clone(),
+                        eth1_data: body.eth1_data.clone(),
+                        graffiti: body.graffiti.clone(),
+                        proposer_slashings: body.proposer_slashings.clone(),
+                        attester_slashings: body.attester_slashings.clone(),
+                        attestations: body.attestations.clone(),
+                        deposits: body.deposits.clone(),
+                        voluntary_exits: body.voluntary_exits.clone(),
+                        sync_aggregate: body.sync_aggregate.clone(),
+                        execution_payload: execution_payload.clone(),
+                        bls_to_execution_changes: body.bls_to_execution_changes.clone(),
+                        blob_kzg_commitments: body.blob_kzg_commitments.clone(),
+                        consolidations: body.consolidations.clone(),
+                    },
+                },
+                signature,
+            };
+            Ok(SignedBeaconBlock::Electra(inner))
         }
     }
 }
