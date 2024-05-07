@@ -46,6 +46,8 @@ pub enum Error {
 
 pub const BASE_TX_GAS_LIMIT: u64 = 21000;
 
+pub const PAYMENT_TO_CONTRACT_GAS_LIMIT: u64 = 100_000;
+
 fn make_payment_transaction(
     signer: &LocalWallet,
     config: &PayloadFinalizerConfig,
@@ -95,15 +97,18 @@ fn append_payment<Client: StateProviderFactory>(
         .build();
 
     let signer_account = db.load_cache_account(signer.address())?;
-    let nonce = signer_account.account_info().map(|info| info.nonce).unwrap_or_default();
+    let nonce = signer_account.account_info().map(|account| account.nonce).unwrap_or_default();
 
     let proposer_fee_recipient_account = db.load_cache_account(config.proposer_fee_recipient)?;
-    let is_empty_code_hash =
-        proposer_fee_recipient_account.account_info().unwrap_or_default().is_empty_code_hash();
+    let is_empty_code_hash = proposer_fee_recipient_account
+        .account_info()
+        .map(|account| account.is_empty_code_hash())
+        .unwrap_or_default();
 
-    // If the proposer (fee recipient) has associated code, we hardcode 250_000 for gas payment.
-    // If it is a regular EOA, we send the base gas 21_000.
-    let gas_limit = if is_empty_code_hash { BASE_TX_GAS_LIMIT } else { 250_000 };
+    // Use a fixed gas limit for the payment transaction reflecting the recipient's status
+    // as asmart contract or EOA.
+    let gas_limit =
+        if is_empty_code_hash { BASE_TX_GAS_LIMIT } else { PAYMENT_TO_CONTRACT_GAS_LIMIT };
 
     // SAFETY: cast to bigger type always succeeds
     let max_fee_per_gas = block.header().base_fee_per_gas.unwrap_or_default() as u128;
