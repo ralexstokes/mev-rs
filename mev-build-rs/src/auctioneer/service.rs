@@ -91,7 +91,7 @@ fn prepare_submission(
                 signature,
             })
         }
-        other => unreachable!("fork {other} is not reachable from this type"),
+        fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)
 }
