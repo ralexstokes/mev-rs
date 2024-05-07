@@ -106,7 +106,7 @@ fn append_payment<Client: StateProviderFactory>(
         .unwrap_or_default();
 
     // Use a fixed gas limit for the payment transaction reflecting the recipient's status
-    // as asmart contract or EOA.
+    // as smart contract or EOA.
     let gas_limit =
         if is_empty_code_hash { BASE_TX_GAS_LIMIT } else { PAYMENT_TO_CONTRACT_GAS_LIMIT };
 
