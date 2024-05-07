@@ -1,9 +1,9 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
     bidder::Service as Bidder,
+    compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
-    utils::compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
     Error,
 };
 use ethereum_consensus::{
