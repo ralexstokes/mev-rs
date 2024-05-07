@@ -9,9 +9,9 @@ use mev_rs::types::{BlobsBundle, ExecutionPayload};
 use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
 
 #[cfg(not(feature = "minimal-preset"))]
-use ethereum_consensus::deneb::mainnet as deneb;
+use ethereum_consensus::{deneb::mainnet as deneb, electra::mainnet as electra};
 #[cfg(feature = "minimal-preset")]
-use ethereum_consensus::deneb::minimal as deneb;
+use ethereum_consensus::{deneb::minimal as deneb, electra::minimal as electra};
 
 pub fn to_bytes32(value: B256) -> Bytes32 {
     Bytes32::try_from(value.as_ref()).unwrap()
@@ -68,6 +68,43 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
                 excess_blob_gas: header.excess_blob_gas.unwrap(),
             };
             Ok(ExecutionPayload::Deneb(payload))
+        }
+        Fork::Electra => {
+            let transactions = transactions
+                .iter()
+                .map(|t| electra::Transaction::try_from(t.envelope_encoded().as_ref()).unwrap())
+                .collect::<Vec<_>>();
+            let withdrawals = withdrawals
+                .as_ref()
+                .unwrap()
+                .iter()
+                .map(|w| electra::Withdrawal {
+                    index: w.index as usize,
+                    validator_index: w.validator_index as usize,
+                    address: to_bytes20(w.address),
+                    amount: w.amount,
+                })
+                .collect::<Vec<_>>();
+            let payload = electra::ExecutionPayload {
+                parent_hash: to_bytes32(header.parent_hash),
+                fee_recipient: to_bytes20(header.beneficiary),
+                state_root: to_bytes32(header.state_root),
+                receipts_root: to_bytes32(header.receipts_root),
+                logs_bloom: to_byte_vector(header.logs_bloom),
+                prev_randao: to_bytes32(header.mix_hash),
+                block_number: header.number,
+                gas_limit: header.gas_limit,
+                gas_used: header.gas_used,
+                timestamp: header.timestamp,
+                extra_data: ByteList::try_from(header.extra_data.as_ref()).unwrap(),
+                base_fee_per_gas: U256::from(header.base_fee_per_gas.unwrap_or_default()),
+                block_hash: to_bytes32(hash),
+                transactions: TryFrom::try_from(transactions).unwrap(),
+                withdrawals: TryFrom::try_from(withdrawals).unwrap(),
+                blob_gas_used: header.blob_gas_used.unwrap(),
+                excess_blob_gas: header.excess_blob_gas.unwrap(),
+            };
+            Ok(ExecutionPayload::Electra(payload))
         }
         fork => Err(Error::UnsupportedFork(fork)),
     }
