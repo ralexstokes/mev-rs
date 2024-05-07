@@ -59,9 +59,10 @@ fn prepare_submission(
         gas_used: payload.block().gas_used,
         value: payload.fees(),
     };
-    let execution_payload = to_execution_payload(payload.block());
+    let fork = context.fork_for(auction_context.slot);
+    let execution_payload = to_execution_payload(payload.block(), fork)?;
     let signature = sign_builder_message(&message, signing_key, context)?;
-    let submission = match execution_payload.version() {
+    let submission = match fork {
         Fork::Bellatrix => {
             SignedBidSubmission::Bellatrix(block_submission::bellatrix::SignedBidSubmission {
                 message,
