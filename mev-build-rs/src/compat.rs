@@ -3,7 +3,7 @@ use ethereum_consensus::{
     crypto::{KzgCommitment, KzgProof},
     primitives::{Bytes32, ExecutionAddress},
     ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
-    Error as ConsensusError, Fork,
+    Fork,
 };
 use mev_rs::types::{BlobsBundle, ExecutionPayload};
 use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
@@ -69,7 +69,7 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
             };
             Ok(ExecutionPayload::Deneb(payload))
         }
-        fork => Err(Error::Consensus(ConsensusError::UnsupportedFork(fork))),
+        fork => Err(Error::UnsupportedFork(fork)),
     }
 }
 

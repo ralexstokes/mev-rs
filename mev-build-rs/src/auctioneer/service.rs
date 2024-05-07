@@ -83,7 +83,7 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
-        other => unreachable!("fork {other} is not reachable from this type"),
+        fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)
 }
