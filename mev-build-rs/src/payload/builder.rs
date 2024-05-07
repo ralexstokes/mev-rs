@@ -51,13 +51,14 @@ fn make_payment_transaction(
     config: &PayloadFinalizerConfig,
     chain_id: ChainId,
     nonce: u64,
+    gas_limit: u64,
     max_fee_per_gas: u128,
     value: U256,
 ) -> Result<TransactionSignedEcRecovered, PayloadBuilderError> {
     let tx = Transaction::Eip1559(TxEip1559 {
         chain_id,
         nonce,
-        gas_limit: BASE_TX_GAS_LIMIT,
+        gas_limit,
         max_fee_per_gas,
         max_priority_fee_per_gas: 0,
         to: TxKind::Call(config.proposer_fee_recipient),
@@ -95,10 +96,26 @@ fn append_payment<Client: StateProviderFactory>(
 
     let signer_account = db.load_cache_account(signer.address())?;
     let nonce = signer_account.account_info().map(|info| info.nonce).unwrap_or_default();
+
+    let proposer_fee_recipient_account = db.load_cache_account(config.proposer_fee_recipient)?;
+    let is_empty_code_hash =
+        proposer_fee_recipient_account.account_info().unwrap_or_default().is_empty_code_hash();
+
+    // If the proposer (fee recipient) has associated code, we hardcode 250_000 for gas payment.
+    // If it is a regular EOA, we send the base gas 21_000.
+    let gas_limit = if is_empty_code_hash { BASE_TX_GAS_LIMIT } else { 250_000 };
+
     // SAFETY: cast to bigger type always succeeds
     let max_fee_per_gas = block.header().base_fee_per_gas.unwrap_or_default() as u128;
-    let payment_tx =
-        make_payment_transaction(signer, config, chain_id, nonce, max_fee_per_gas, value)?;
+    let payment_tx = make_payment_transaction(
+        signer,
+        config,
+        chain_id,
+        nonce,
+        gas_limit,
+        max_fee_per_gas,
+        value,
+    )?;
 
     // TODO: skip clones here
     let mut env: EnvWithHandlerCfg = EnvWithHandlerCfg::new_with_cfg_env(
