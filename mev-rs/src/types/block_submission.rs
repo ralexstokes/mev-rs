@@ -1,4 +1,4 @@
-use crate::types::{auction_contents::deneb::BlobsBundle, ExecutionPayload};
+use crate::types::{auction_contents::BlobsBundle, ExecutionPayload};
 use ethereum_consensus::{
     primitives::{BlsPublicKey, BlsSignature, ExecutionAddress, Hash32, Slot},
     ssz::prelude::*,
