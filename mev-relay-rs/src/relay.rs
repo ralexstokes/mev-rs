@@ -723,6 +723,14 @@ fn submission_trace_from_auction(auction_context: &AuctionContext) -> Submission
 
 #[async_trait]
 impl BlindedBlockDataProvider for Relay {
+    fn public_key(&self) -> &BlsPublicKey {
+        &self.public_key
+    }
+
+    fn registered_validators_count(&self) -> usize {
+        self.validator_registry.registration_count()
+    }
+
     async fn get_delivered_payloads(
         &self,
         _filters: &DeliveredPayloadFilter,

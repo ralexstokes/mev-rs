@@ -120,6 +120,11 @@ impl ValidatorRegistry {
         state.pubkeys_by_index.get(&index).cloned()
     }
 
+    pub fn registration_count(&self) -> usize {
+        let state = self.state.read();
+        state.validator_preferences.len()
+    }
+
     // pub fn get_validator_index(&self, public_key: &BlsPublicKey) -> Option<ValidatorIndex> {
     //     let state = self.state.read();
     //     state.validators.get(public_key).map(|v| v.index)
