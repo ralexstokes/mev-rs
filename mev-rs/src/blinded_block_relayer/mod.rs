@@ -52,6 +52,10 @@ pub struct ValidatorRegistrationQuery {
 
 #[async_trait]
 pub trait BlindedBlockDataProvider {
+    fn public_key(&self) -> &BlsPublicKey;
+
+    fn registered_validators_count(&self) -> usize;
+
     async fn get_delivered_payloads(
         &self,
         filters: &DeliveredPayloadFilter,
