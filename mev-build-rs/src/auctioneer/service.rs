@@ -278,6 +278,7 @@ impl<
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
         let auction = self.open_auctions.get(&payload.id()).expect("has auction");
+        let mut successful_relays_for_submission = Vec::with_capacity(auction.relays.len());
         match prepare_submission(
             &payload,
             &self.config.secret_key,
@@ -292,6 +293,8 @@ impl<
                         Some(relay) => {
                             if let Err(err) = relay.submit_bid(&signed_submission).await {
                                 warn!(%err, ?relay, slot = auction.slot, "could not submit payload");
+                            } else {
+                                successful_relays_for_submission.push(relay_index);
                             }
                         }
                         None => {
@@ -306,22 +309,23 @@ impl<
                 warn!(%err, slot = auction.slot, "could not prepare submission")
             }
         }
-        let relay_set = auction
-            .relays
-            .iter()
-            .map(|&index| format!("{0}", self.relays[index]))
-            .collect::<Vec<_>>();
-        info!(
-            slot = auction.slot,
-            block_number = payload.block().number,
-            block_hash = %payload.block().hash(),
-            parent_hash = %payload.block().header.header().parent_hash,
-            txn_count = %payload.block().body.len(),
-            blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
-            value = %payload.fees(),
-            relays=?relay_set,
-            "payload submitted"
-        );
+        if !successful_relays_for_submission.is_empty() {
+            let relay_set = successful_relays_for_submission
+                .into_iter()
+                .map(|index| format!("{0}", self.relays[index]))
+                .collect::<Vec<_>>();
+            info!(
+                slot = auction.slot,
+                block_number = payload.block().number,
+                block_hash = %payload.block().hash(),
+                parent_hash = %payload.block().header.header().parent_hash,
+                txn_count = %payload.block().body.len(),
+                blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
+                value = %payload.fees(),
+                relays=?relay_set,
+                "payload submitted"
+            );
+        }
     }
 
     async fn process_clock(&mut self, message: ClockMessage) {
