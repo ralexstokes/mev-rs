@@ -10,7 +10,7 @@ pub use block_submission::{BidTrace, SignedBidSubmission};
 pub use builder_bid::{BuilderBid, SignedBuilderBid};
 pub use ethereum_consensus::builder::SignedValidatorRegistration;
 pub use ethereum_consensus_types::{
-    ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
+    BlindedBeaconBlockBody, ExecutionPayload, ExecutionPayloadHeader, SignedBlindedBeaconBlock,
 };
 pub use proposer_schedule::*;
 
