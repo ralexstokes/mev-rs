@@ -4,7 +4,7 @@ use futures_util::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
     get_genesis_time,
-    relay::{parse_relay_endpoints, Relay, RelayEndpoint},
+    relay::{parse_relay_endpoints, Relay},
     Error,
 };
 use serde::Deserialize;
@@ -29,14 +29,14 @@ impl Default for Config {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<RelayEndpoint>,
+    relays: Vec<Relay>,
     network: Network,
     config: Config,
 }
 
 impl Service {
     pub fn from(network: Network, config: Config) -> Self {
-        let relays = parse_relay_endpoints(&config.relays);
+        let relays = parse_relay_endpoints(&config.relays).into_iter().map(Relay::from).collect();
 
         Self { host: config.host, port: config.port, relays, network, config }
     }
@@ -51,8 +51,6 @@ impl Service {
             let count = relays.len();
             info!(count, ?relays, "configured with relay(s)");
         }
-
-        let relays = relays.into_iter().map(Relay::from);
 
         let context = Context::try_from(network)?;
         let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
