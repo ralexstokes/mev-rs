@@ -8,7 +8,7 @@ use mev_rs::{
     Error,
 };
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{info, warn};
 
@@ -42,7 +42,7 @@ impl Service {
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub async fn spawn(self) -> Result<ServiceHandle, Error> {
+    pub fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network, config } = self;
 
         if relays.is_empty() {
@@ -52,14 +52,15 @@ impl Service {
             info!(count, ?relays, "configured with relay(s)");
         }
 
-        let context = Context::try_from(network)?;
-        let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
-        let clock = context.clock_at(genesis_time);
-        let relay_mux = RelayMux::new(relays, context);
+        let context = Arc::new(Context::try_from(network)?);
+        let relay_mux = RelayMux::new(relays, context.clone());
 
         let relay_mux_clone = relay_mux.clone();
         let relay_task = tokio::spawn(async move {
             let relay_mux = relay_mux_clone;
+            let genesis_time =
+                get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
+            let clock = context.clock_at(genesis_time);
             let mut slots = clock.clone().into_stream();
 
             // NOTE: this will block until genesis if we are before the genesis time

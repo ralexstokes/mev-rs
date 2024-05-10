@@ -81,7 +81,7 @@ impl Deref for RelayMux {
 
 pub struct Inner {
     relays: Vec<Arc<Relay>>,
-    context: Context,
+    context: Arc<Context>,
     state: Mutex<State>,
 }
 
@@ -94,9 +94,12 @@ struct State {
 }
 
 impl RelayMux {
-    pub fn new(relays: impl Iterator<Item = Relay>, context: Context) -> Self {
-        let inner =
-            Inner { relays: relays.map(Arc::new).collect(), context, state: Default::default() };
+    pub fn new(relays: Vec<Relay>, context: Arc<Context>) -> Self {
+        let inner = Inner {
+            relays: relays.into_iter().map(Arc::new).collect(),
+            context,
+            state: Default::default(),
+        };
         Self(Arc::new(inner))
     }
 
