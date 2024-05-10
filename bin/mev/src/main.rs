@@ -78,6 +78,7 @@ fn parse_custom_chain_config_directory() -> eyre::Result<Option<PathBuf>> {
 }
 
 fn main() -> eyre::Result<()> {
+    #[cfg(feature = "build")]
     let custom_chain_config_directory = parse_custom_chain_config_directory()?;
     let cli = Cli::parse();
 
