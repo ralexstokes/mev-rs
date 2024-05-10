@@ -11,7 +11,6 @@ use serde::Deserialize;
 use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{info, warn};
-use std::collections::HashSet;
 
 #[derive(Debug, Deserialize)]
 pub struct Config {
@@ -38,12 +37,8 @@ pub struct Service {
 impl Service {
     pub fn from(network: Network, config: Config) -> Self {
         let relays = parse_relay_endpoints(&config.relays);
-        let mut relayset: HashSet<RelayEndpoint> = HashSet::new();
-        for relay in relays.into_iter(){
-          relayset.insert(relay);
-        }
 
-        Self { host: config.host, port: config.port, relays: Vec::from_iter(relayset), network, config }
+        Self { host: config.host, port: config.port, relays, network, config }
     }
 
     /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task

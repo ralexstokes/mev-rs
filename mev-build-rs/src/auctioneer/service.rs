@@ -17,7 +17,7 @@ use mev_rs::{
     relay::parse_relay_endpoints,
     signing::sign_builder_message,
     types::{block_submission, BidTrace, SignedBidSubmission},
-    BlindedBlockRelayer, Relay, RelayEndpoint,
+    BlindedBlockRelayer, Relay,
 };
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
@@ -155,13 +155,8 @@ impl<
         context: Arc<Context>,
         genesis_time: u64,
     ) -> Self {
-        let relays = parse_relay_endpoints(&config.relays);
-        let mut relayset: HashSet<RelayEndpoint> = HashSet::new();
-        for relay in relays.into_iter(){
-          relayset.insert(relay);
-        }
-
-        let relays = relayset.into_iter().map(Relay::from).collect::<Vec<_>>();
+        let relays =
+            parse_relay_endpoints(&config.relays).into_iter().map(Relay::from).collect::<Vec<_>>();
 
         config.public_key = config.secret_key.public_key();
 

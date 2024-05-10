@@ -30,19 +30,18 @@ impl TryFrom<Url> for RelayEndpoint {
 }
 
 impl hash::Hash for RelayEndpoint {
-  fn hash<H: hash::Hasher>(&self, state: &mut H) {
-      self.public_key.hash(state);
-  }
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        self.public_key.hash(state);
+    }
 }
 
 impl cmp::PartialEq for RelayEndpoint {
-  fn eq(&self, other: &Self) -> bool {
-      self.public_key == other.public_key
-  }
+    fn eq(&self, other: &Self) -> bool {
+        self.public_key == other.public_key
+    }
 }
 
 impl cmp::Eq for RelayEndpoint {}
-
 
 impl fmt::Debug for RelayEndpoint {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
@@ -72,6 +71,7 @@ pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
     if relays.is_empty() {
         error!("no relays could be loaded from the configuration; please fix and restart");
     }
+    relays.dedup();
     relays
 }
 
