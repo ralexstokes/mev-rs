@@ -1,7 +1,7 @@
 pub mod compat {
     use crate::Error;
     use ethereum_consensus::{
-        deneb::polynomial_commitments::{KzgCommitment, KzgProof},
+        crypto::{KzgCommitment, KzgProof},
         primitives::{Bytes32, ExecutionAddress},
         ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
     };

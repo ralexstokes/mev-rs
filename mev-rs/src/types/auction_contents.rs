@@ -14,7 +14,7 @@ pub mod capella {
 pub mod deneb {
     use super::ExecutionPayload;
     use ethereum_consensus::{
-        deneb::polynomial_commitments::{KzgCommitment, KzgProof},
+        crypto::{KzgCommitment, KzgProof},
         ssz::prelude::*,
     };
 
