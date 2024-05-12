@@ -1,6 +1,7 @@
 use crate::types::AuctionRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
+    crypto::KzgCommitment,
     primitives::{BlsPublicKey, ExecutionAddress, Hash32, ValidatorIndex},
     Error as ConsensusError, Fork,
 };
@@ -10,12 +11,20 @@ use thiserror::Error;
 pub enum BoostError {
     #[error("bid public key {bid} does not match relay public key {relay}")]
     BidPublicKeyMismatch { bid: BlsPublicKey, relay: BlsPublicKey },
-    #[error("could not find relay with outstanding bid to accept")]
-    MissingOpenBid,
+    #[error("could not find relay with outstanding bid to accept for block {0}")]
+    MissingOpenBid(Hash32),
     #[error("could not register with any relay")]
     CouldNotRegister,
     #[error("no payload returned for opened bid with block hash {0:?}")]
     MissingPayload(Hash32),
+    #[error("returned payload block hash {provided} did not match expected {expected}")]
+    InvalidPayloadHash { expected: Hash32, provided: Hash32 },
+    #[error("blobs provided when they were unexpected")]
+    InvalidPayloadUnexpectedBlobs,
+    #[error(
+        "signed block did not match the expected blob commitments ({expected:?} vs {provided:?})"
+    )]
+    InvalidPayloadBlobs { expected: Vec<KzgCommitment>, provided: Vec<KzgCommitment> },
 }
 
 #[derive(Debug, Error)]

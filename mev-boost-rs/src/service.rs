@@ -4,11 +4,11 @@ use futures_util::StreamExt;
 use mev_rs::{
     blinded_block_provider::Server as BlindedBlockProviderServer,
     get_genesis_time,
-    relay::{parse_relay_endpoints, Relay, RelayEndpoint},
+    relay::{parse_relay_endpoints, Relay},
     Error,
 };
 use serde::Deserialize;
-use std::{future::Future, net::Ipv4Addr, pin::Pin, task::Poll};
+use std::{future::Future, net::Ipv4Addr, pin::Pin, sync::Arc, task::Poll};
 use tokio::task::{JoinError, JoinHandle};
 use tracing::{info, warn};
 
@@ -29,20 +29,19 @@ impl Default for Config {
 pub struct Service {
     host: Ipv4Addr,
     port: u16,
-    relays: Vec<RelayEndpoint>,
+    relays: Vec<Relay>,
     network: Network,
     config: Config,
 }
 
 impl Service {
     pub fn from(network: Network, config: Config) -> Self {
-        let relays = parse_relay_endpoints(&config.relays);
+        let relays = parse_relay_endpoints(&config.relays).into_iter().map(Relay::from).collect();
 
         Self { host: config.host, port: config.port, relays, network, config }
     }
 
-    /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
-    pub async fn spawn(self) -> Result<ServiceHandle, Error> {
+    pub fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network, config } = self;
 
         if relays.is_empty() {
@@ -52,30 +51,20 @@ impl Service {
             info!(count, ?relays, "configured with relay(s)");
         }
 
-        let relays = relays.into_iter().map(Relay::from);
-
-        let context = Context::try_from(network)?;
-        let genesis_time = get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
-        let clock = context.clock_at(genesis_time);
-        let relay_mux = RelayMux::new(relays, context);
+        let context = Arc::new(Context::try_from(network)?);
+        let relay_mux = RelayMux::new(relays, context.clone());
 
         let relay_mux_clone = relay_mux.clone();
         let relay_task = tokio::spawn(async move {
             let relay_mux = relay_mux_clone;
+            let genesis_time =
+                get_genesis_time(&context, config.beacon_node_url.as_ref(), None).await;
+            let clock = context.clock_at(genesis_time);
             let mut slots = clock.clone().into_stream();
 
             // NOTE: this will block until genesis if we are before the genesis time
-            let current_slot = slots.next().await.expect("some next slot");
-            let mut current_epoch = clock.epoch_for(current_slot);
-
             while let Some(slot) = slots.next().await {
                 relay_mux.on_slot(slot);
-
-                let epoch = clock.epoch_for(slot);
-                if epoch != current_epoch {
-                    relay_mux.on_epoch(epoch);
-                    current_epoch = epoch;
-                }
             }
         });
 
@@ -85,9 +74,6 @@ impl Service {
     }
 }
 
-/// Contains the handles to spawned [`RelayMux`] and [`BlindedBlockProviderServer`] tasks
-///
-/// This struct is created by the [`Service::spawn`] function
 #[pin_project::pin_project]
 pub struct ServiceHandle {
     #[pin]
