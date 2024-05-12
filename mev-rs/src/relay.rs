@@ -7,7 +7,7 @@ use crate::{
 use async_trait::async_trait;
 use beacon_api_client::Client as BeaconClient;
 use ethereum_consensus::{
-    crypto::Error as CryptoError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
+    crypto::BlsError, primitives::BlsPublicKey, serde::try_bytes_from_hex_str,
 };
 use std::{cmp, fmt, hash, ops::Deref};
 use tracing::{error, warn};
@@ -19,7 +19,7 @@ pub struct RelayEndpoint {
 }
 
 impl TryFrom<Url> for RelayEndpoint {
-    type Error = CryptoError;
+    type Error = BlsError;
 
     fn try_from(url: Url) -> Result<Self, Self::Error> {
         let public_key = try_bytes_from_hex_str(url.username())?;

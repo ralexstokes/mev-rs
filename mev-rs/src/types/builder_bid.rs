@@ -3,7 +3,7 @@ use crate::{
     types::ExecutionPayloadHeader,
 };
 use ethereum_consensus::{
-    deneb::polynomial_commitments::KzgCommitment,
+    crypto::KzgCommitment,
     primitives::{BlsPublicKey, BlsSignature},
     ssz::prelude::*,
     state_transition::Context,
