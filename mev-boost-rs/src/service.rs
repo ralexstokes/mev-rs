@@ -41,7 +41,6 @@ impl Service {
         Self { host: config.host, port: config.port, relays, network, config }
     }
 
-    /// Spawns a new [`RelayMux`] and [`BlindedBlockProviderServer`] task
     pub fn spawn(self) -> Result<ServiceHandle, Error> {
         let Self { host, port, relays, network, config } = self;
 
@@ -75,9 +74,6 @@ impl Service {
     }
 }
 
-/// Contains the handles to spawned [`RelayMux`] and [`BlindedBlockProviderServer`] tasks
-///
-/// This struct is created by the [`Service::spawn`] function
 #[pin_project::pin_project]
 pub struct ServiceHandle {
     #[pin]
