@@ -1,6 +1,7 @@
 use crate::types::AuctionRequest;
 use beacon_api_client::Error as ApiError;
 use ethereum_consensus::{
+    crypto::KzgCommitment,
     primitives::{BlsPublicKey, ExecutionAddress, Hash32, ValidatorIndex},
     Error as ConsensusError, Fork,
 };
@@ -18,8 +19,12 @@ pub enum BoostError {
     MissingPayload(Hash32),
     #[error("returned payload block hash {provided} did not match expected {expected}")]
     InvalidPayloadHash { expected: Hash32, provided: Hash32 },
-    #[error("signed block did not match the expected blob commitments")]
-    InvalidPayloadBlobs,
+    #[error("blobs provided when they were unexpected")]
+    InvalidPayloadUnexpectedBlobs,
+    #[error(
+        "signed block did not match the expected blob commitments ({expected:?} vs {provided:?})"
+    )]
+    InvalidPayloadBlobs { expected: Vec<KzgCommitment>, provided: Vec<KzgCommitment> },
 }
 
 #[derive(Debug, Error)]
