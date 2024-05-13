@@ -1,0 +1,59 @@
+name: docker
+
+on:
+  push:
+   branches:
+    - main
+  tags:
+    - v*
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  IMAGE_NAME: ${{ github.repository_owner}}/mev-rs
+
+jobs:
+  extract-version:
+      runs-on: ubuntu-22.04
+      steps:
+          - name: Extract version (if main)
+            if: github.event.ref == 'refs/heads/main'
+            run: |
+                  echo "VERSION=latest" >> $GITHUB_ENV
+          - name: Extract version (if tagged release)
+            if: startsWith(github.event.ref, 'refs/tags')
+            run: |
+                  echo "VERSION=$(echo ${GITHUB_REF#refs/tags/})" >> $GITHUB_ENV
+      outputs:
+          VERSION: ${{ env.VERSION }}
+  build-docker:
+      name: build-docker-${{ matrix.binary }}
+      runs-on: ubuntu-22.04
+      strategy:
+          matrix:
+              binary: [x86_64]
+              include:
+                - profile: maxperf
+
+      needs: [extract-version]
+      env:
+          VERSION: ${{ needs.extract-version.outputs.VERSION }}
+      steps:
+          - uses: actions/checkout@v4
+          - name: Dockerhub login
+            run: |
+                echo "${DOCKER_PASSWORD}" | docker login --username ${DOCKER_USERNAME} --password-stdin
+          - name: Set up Docker Buildx
+            uses: docker/setup-buildx-action@v3
+          - name: Build and push
+            uses: docker/build-push-action@v5
+            with:
+              file: ./Dockerfile
+              context: .
+              platforms: linux/x86_64
+              push: true
+              tags: ${{ env.IMAGE_NAME }}:${{ env.VERSION }}
