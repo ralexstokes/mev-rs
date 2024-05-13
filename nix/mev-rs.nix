@@ -5,6 +5,7 @@ let
   commonArgs = {
     pname = "mev-rs";
     src = crane.cleanCargoSource (crane.path ../.);
+    CARGO_PROFILE = "maxperf";
     cargoExtraArgs = "--locked ${feature-set}";
     buildInputs = lib.optionals pkgs.stdenv.isLinux [
       openssl
