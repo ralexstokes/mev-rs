@@ -1,4 +1,4 @@
-FROM rust:1.76-bullseye AS chef
+FROM rust:1.77-bullseye AS chef
 RUN cargo install cargo-chef
 WORKDIR /app
 
@@ -9,7 +9,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 
-ARG BUILD_PROFILE=release
+ARG BUILD_PROFILE=maxperf
 ENV BUILD_PROFILE ${BUILD_PROFILE}
 ARG FEATURES=""
 ENV FEATURES ${FEATURES}
@@ -19,7 +19,9 @@ RUN apt-get update && apt-get -y upgrade && apt-get install -y libclang-dev pkg-
 RUN cargo chef cook --profile ${BUILD_PROFILE} --features "$FEATURES" --recipe-path recipe.json
 
 COPY . .
-RUN cargo build --profile ${BUILD_PROFILE} --features "$FEATURES"  --locked --bin mev
+ARG RUSTFLAGS="-C target-cpu=native"
+ENV RUSTFLAGS "$RUSTFLAGS"
+RUN RUSTFLAGS="$RUSTFLAGS" cargo build --profile ${BUILD_PROFILE} --features "$FEATURES"  --locked --bin mev
 
 RUN cp /app/target/${BUILD_PROFILE}/mev /app/mev
 
