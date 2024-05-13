@@ -54,7 +54,7 @@ jobs:
 
       - name: Build mev-rs
         run:  |
-          cargo install --path bin/mev --locked
+          cargo install --profile maxperf --path bin/mev --locked
           mkdir artifacts
           mv ~/.cargo/bin/mev ./artifacts
           cd artifacts
