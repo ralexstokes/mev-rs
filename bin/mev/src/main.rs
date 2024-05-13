@@ -1,11 +1,13 @@
 mod cmd;
 
-use clap::{CommandFactory, Parser, Subcommand};
-use eyre::OptionExt;
-use std::{future::Future, path::PathBuf};
+use clap::{Parser, Subcommand};
+use std::future::Future;
 use tokio::signal;
 use tracing::warn;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+
+#[cfg(feature = "build")]
+use ::{clap::CommandFactory, eyre::OptionExt, std::path::PathBuf};
 
 const MINIMAL_PRESET_NOTICE: &str =
     "`minimal-preset` feature is enabled. The `minimal` consensus preset is being used.";
@@ -60,6 +62,7 @@ fn run_task_until_signal(task: impl Future<Output = eyre::Result<()>>) -> eyre::
         })
 }
 
+#[cfg(feature = "build")]
 fn parse_custom_chain_config_directory() -> eyre::Result<Option<PathBuf>> {
     let matches = Cli::command().get_matches();
     let (_, matches) = matches.subcommand().ok_or_eyre("missing subcommand")?;
@@ -78,7 +81,9 @@ fn parse_custom_chain_config_directory() -> eyre::Result<Option<PathBuf>> {
 }
 
 fn main() -> eyre::Result<()> {
+    #[cfg(feature = "build")]
     let custom_chain_config_directory = parse_custom_chain_config_directory()?;
+
     let cli = Cli::parse();
 
     match cli.command {
