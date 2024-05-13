@@ -6,6 +6,7 @@ let
     pname = "mev-rs";
     src = crane.cleanCargoSource (crane.path ../.);
     CARGO_PROFILE = "maxperf";
+    RUSTFLAGS = "-C target-cpu=native";
     cargoExtraArgs = "--locked ${feature-set}";
     buildInputs = lib.optionals pkgs.stdenv.isLinux [
       openssl

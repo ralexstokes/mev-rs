@@ -35,4 +35,4 @@ clap = { workspace = true, features = ["derive", "env"] }
 eyre = { workspace = true }
 
 ethereum-consensus = { workspace = true }
-reth = { workspace = true, optional = true }
+reth = { workspace = true, optional = true, features = ["jemalloc"] }
