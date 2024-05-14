@@ -30,6 +30,6 @@ WORKDIR /app
 
 EXPOSE 18550
 EXPOSE 28545
-COPY --from=builder mev /usr/local/bin
+COPY --from=builder /app/mev /usr/local/bin
 
 ENTRYPOINT [ "/usr/local/bin/mev" ]
