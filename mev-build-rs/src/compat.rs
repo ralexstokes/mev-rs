@@ -2,7 +2,7 @@ use crate::Error;
 use ethereum_consensus::{
     crypto::{KzgCommitment, KzgProof},
     electra::{DepositReceipt, ExecutionLayerWithdrawalRequest},
-    primitives::{Bytes32, ExecutionAddress},
+    primitives::{BlsPublicKey, BlsSignature, Bytes32, ExecutionAddress},
     ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
     Fork,
 };
@@ -89,26 +89,31 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
                 .collect::<Vec<_>>();
             let mut deposit_receipts = vec![];
             let mut withdrawal_requests = vec![];
-            for request in requests.as_ref().unwrap() {
+            let requests = requests.as_ref().cloned().unwrap();
+            for request in requests {
                 match request {
                     Request::DepositRequest(deposit) => {
                         let deposit_receipt = DepositReceipt {
-                            public_key: deposit.pubkey,
-                            withdrawal_credentials: deposit.withdrawal_credentials,
+                            public_key: BlsPublicKey::try_from(deposit.pubkey.as_ref()).unwrap(),
+                            withdrawal_credentials: to_bytes32(deposit.withdrawal_credentials),
                             amount: deposit.amount,
-                            signature: deposit.signature,
+                            signature: BlsSignature::try_from(deposit.signature.as_ref()).unwrap(),
                             index: deposit.index,
                         };
                         deposit_receipts.push(deposit_receipt);
                     }
                     Request::WithdrawalRequest(withdrawal) => {
                         let withdrawal_request = ExecutionLayerWithdrawalRequest {
-                            source_address: withdrawal.source_address,
-                            validator_public_key: withdrawal.validator_public_key,
+                            source_address: to_bytes20(withdrawal.source_address),
+                            validator_public_key: BlsPublicKey::try_from(
+                                withdrawal.validator_public_key.as_ref(),
+                            )
+                            .unwrap(),
                             amount: withdrawal.amount,
                         };
                         withdrawal_requests.push(withdrawal_request);
                     }
+                    _ => unreachable!("struct is non-exhaustive, but all variants are matched"),
                 }
             }
             let payload = electra::ExecutionPayload {
@@ -129,8 +134,8 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
                 withdrawals: TryFrom::try_from(withdrawals).unwrap(),
                 blob_gas_used: header.blob_gas_used.unwrap(),
                 excess_blob_gas: header.excess_blob_gas.unwrap(),
-                deposit_receipts,
-                withdrawal_requests,
+                deposit_receipts: TryFrom::try_from(deposit_receipts).unwrap(),
+                withdrawal_requests: TryFrom::try_from(withdrawal_requests).unwrap(),
             };
             Ok(ExecutionPayload::Electra(payload))
         }
