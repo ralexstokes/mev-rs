@@ -34,6 +34,19 @@ reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", bran
 alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 
+# revm
+revm = { version = "9.0.0", features = [
+    "std",
+    "secp256k1",
+], default-features = false }
+revm-primitives = { version = "4.0.0", features = [
+    "std",
+], default-features = false }
+revm-interpreter = { version = "5.0.0", features = [
+    "std",
+], default-features = false }
+revm-inspectors = { git = "https://github.com/paradigmxyz/evm-inspectors", rev = "3215ff5" }
+
 futures = "0.3.21"
 tokio = "1.0"
 tokio-stream = "0.1.15"
@@ -65,3 +78,7 @@ clap = "4.1.4"
 
 [patch.crates-io]
 libffi-sys = { git = "https://github.com/tov/libffi-rs", rev = "d0704d634b6f3ffef5b6fc7e07fe965a1cff5c7b" }
+revm = { git = "https://github.com/bluealloy/revm", rev = "38c4d3e756291b8a11f48bdce6f4248582824890" }
+revm-interpreter = { git = "https://github.com/bluealloy/revm", rev = "38c4d3e756291b8a11f48bdce6f4248582824890" }
+revm-precompile = { git = "https://github.com/bluealloy/revm", rev = "38c4d3e756291b8a11f48bdce6f4248582824890" }
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "38c4d3e756291b8a11f48bdce6f4248582824890" }
