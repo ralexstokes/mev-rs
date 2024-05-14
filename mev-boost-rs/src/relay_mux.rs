@@ -27,7 +27,7 @@ const VALIDATOR_REGISTRATION_TIME_OUT_SECS: u64 = 4;
 // Give relays this amount of time in seconds to return bids.
 const FETCH_BEST_BID_TIME_OUT_SECS: u64 = 1;
 // Give relays this amount of time in seconds to respond with a payload.
-const FETCH_PAYLOAD_TIME_OUT_SECS: u64 = 1;
+const FETCH_PAYLOAD_TIME_OUT_SECS: u64 = 4;
 
 #[derive(Debug)]
 struct AuctionContext {
