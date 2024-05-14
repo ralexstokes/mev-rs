@@ -1,12 +1,10 @@
 # cribbed from: https://github.com/paradigmxyz/reth/blob/21db2936e617d1018c0bfa5690d8f035dee2843f/.github/workflows/book.yml
 name: book
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 jobs:
   # test:
   #   runs-on: ubuntu-latest
@@ -47,39 +45,31 @@ jobs:
 
   #     - name: Run linkcheck
   #       run: mdbook-linkcheck --standalone
-
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
       - name: Install toolchain
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly
-
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-
       - name: Install mdbook
         run: |
           mkdir mdbook
           curl -sSL https://github.com/rust-lang/mdBook/releases/download/v0.4.14/mdbook-v0.4.14-x86_64-unknown-linux-gnu.tar.gz | tar -xz --directory=./mdbook
           echo `pwd`/mdbook >> $GITHUB_PATH
-
       - name: Build book
         run: mdbook build
-
       - name: Build docs
         run: RUSTDOCFLAGS="--enable-index-page -Zunstable-options" cargo +nightly doc --all --no-deps
-
       - name: Move docs to book folder
         run: |
           mv target/doc target/book/docs
-
       - name: Archive artifact
         shell: sh
         run: |
@@ -94,7 +84,6 @@ jobs:
             --exclude=.git \
             --exclude=.github \
             .
-
       - name: Upload artifact
         uses: actions/upload-artifact@v3
         with:
@@ -102,22 +91,18 @@ jobs:
           path: ${{ runner.temp }}/artifact.tar
           retention-days: 1
           if-no-files-found: error
-
   deploy:
     # Only deploy if a push to main
     if: github.ref_name == 'main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     needs: [build]
-
     # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
     permissions:
       pages: write
       id-token: write
-
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
