@@ -138,7 +138,7 @@ fn append_payment<Client: StateProviderFactory>(
     drop(evm);
     db.commit(state);
 
-    let Block { mut header, mut body, ommers, withdrawals } = block.unseal();
+    let Block { mut header, mut body, ommers, withdrawals, requests } = block.unseal();
 
     // Verify we reserved the correct amount of gas for the payment transaction
     let gas_limit = header.gas_limit + result.gas_used();
@@ -181,7 +181,7 @@ fn append_payment<Client: StateProviderFactory>(
     header.gas_used = cumulative_gas_used;
     header.gas_limit = gas_limit;
 
-    let block = Block { header, body, ommers, withdrawals };
+    let block = Block { header, body, ommers, withdrawals, requests };
 
     Ok(block.seal_slow())
 }
