@@ -27,10 +27,10 @@ incremental = false
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", branch = "devnet-0" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", branch = "devnet-0" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", branch = "devnet-0" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", branch = "devnet-0" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
 alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 
