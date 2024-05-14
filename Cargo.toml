@@ -27,10 +27,12 @@ incremental = false
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "48066652ff5436eafcbf21b448543b86174c625d" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
+reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
 alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
 
