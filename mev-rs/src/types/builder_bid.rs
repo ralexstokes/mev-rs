@@ -77,7 +77,14 @@ impl<'de> serde::Deserialize<'de> for BuilderBid {
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
-            return Ok(Self::Electra(inner))
+            let builder_bid = Self::Electra(inner);
+            match builder_bid.header().version() {
+                Fork::Deneb => match builder_bid {
+                    Self::Electra(inner) => return Ok(Self::Deneb(inner)),
+                    _ => unreachable!(),
+                },
+                _ => return Ok(builder_bid),
+            }
         }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner))
