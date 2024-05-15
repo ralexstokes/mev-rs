@@ -27,14 +27,14 @@ incremental = false
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "8a394af6c9378b844e183cfdca3091a92b473eda" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "71a97e3c429955a3c4125337019c2553039f1fbd" }
-alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
-alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "dd25769" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "017cfa60c222aa93cf4e7dbe1f085e0d60f2096a" }
+alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "07611cf" }
+alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "07611cf" }
 
 # revm
 revm = { version = "9.0.0", features = [
