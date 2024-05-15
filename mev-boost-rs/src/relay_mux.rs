@@ -131,7 +131,7 @@ impl RelayMux {
 
     pub fn on_slot(&self, slot: Slot) {
         debug!(slot, "processing");
-        let retain_slot = slot - AUCTION_LIFETIME;
+        let retain_slot = slot.checked_sub(AUCTION_LIFETIME).unwrap_or_default();
         let mut state = self.state.lock();
         state.outstanding_bids.retain(|_, auction| auction.slot >= retain_slot);
     }
