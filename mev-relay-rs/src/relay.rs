@@ -637,8 +637,19 @@ impl BlindedBlockProvider for Relay {
         match unblind_block(signed_block, auction_context.execution_payload()) {
             Ok(signed_block) => {
                 let version = signed_block.version();
-                let block_root =
-                    signed_block.message().hash_tree_root().map_err(ConsensusError::from)?;
+                let block_root = match version {
+                    Fork::Deneb => {
+                        signed_block.message().hash_tree_root().map_err(ConsensusError::from)?
+                    }
+                    Fork::Electra => match signed_block {
+                        SignedBeaconBlock::Electra(ref inner) => {
+                            inner.message.hash_tree_root().map_err(ConsensusError::from)?
+                        }
+                        _ => unreachable!(),
+                    },
+                    _ => unreachable!(),
+                };
+
                 let request = SubmitSignedBeaconBlock {
                     signed_block: &signed_block,
                     kzg_proofs: auction_context.blobs_bundle().map(|bundle| bundle.proofs.as_ref()),
