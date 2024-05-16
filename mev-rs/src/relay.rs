@@ -13,6 +13,7 @@ use std::{cmp, fmt, hash, ops::Deref};
 use tracing::{error, warn};
 use url::Url;
 
+#[derive(PartialOrd, Ord, Eq)]
 pub struct RelayEndpoint {
     url: Url,
     public_key: BlsPublicKey,
@@ -26,6 +27,12 @@ impl TryFrom<Url> for RelayEndpoint {
         let public_key = BlsPublicKey::try_from(&public_key[..])?;
 
         Ok(Self { url, public_key })
+    }
+}
+
+impl cmp::PartialEq for RelayEndpoint {
+    fn eq(&self, other: &Self) -> bool {
+        self.public_key == other.public_key
     }
 }
 
@@ -57,6 +64,8 @@ pub fn parse_relay_endpoints(relay_urls: &[String]) -> Vec<RelayEndpoint> {
     if relays.is_empty() {
         error!("no relays could be loaded from the configuration; please fix and restart");
     }
+    relays.sort();
+    relays.dedup();
     relays
 }
 
