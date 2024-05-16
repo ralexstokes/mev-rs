@@ -9,7 +9,7 @@ RUN cargo chef prepare --recipe-path recipe.json
 FROM chef AS builder
 COPY --from=planner /app/recipe.json recipe.json
 
-ARG BUILD_PROFILE=maxperf
+ARG BUILD_PROFILE=release
 ENV BUILD_PROFILE ${BUILD_PROFILE}
 ARG FEATURES=""
 ENV FEATURES ${FEATURES}
