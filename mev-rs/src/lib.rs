@@ -10,7 +10,7 @@ pub mod relay;
 pub mod serde;
 pub mod signing;
 pub mod types;
-mod validator_registry;
+pub mod validator_registry;
 
 pub use blinded_block_provider::BlindedBlockProvider;
 pub use blinded_block_relayer::{BlindedBlockDataProvider, BlindedBlockRelayer};
