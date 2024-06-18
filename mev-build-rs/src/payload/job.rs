@@ -71,7 +71,7 @@ where
         // Note: it is assumed that this is unlikely to happen, as the payload job is started right
         // away and the first full block should have been built by the time CL is requesting the
         // payload.
-        <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.client, self.config.clone())
+        <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.builder, &self.client, self.config.clone())
     }
 
     fn payload_attributes(&self) -> Result<Self::PayloadAttributes, PayloadBuilderError> {
@@ -111,11 +111,12 @@ where
             let (tx, rx) = oneshot::channel();
             let client = self.client.clone();
             let config = self.config.clone();
+            let builder = self.builder.clone();
             self.executor.spawn_blocking(Box::pin(async move {
                 let res = <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<
                     Pool,
                     Client,
-                >>::build_empty_payload(&client, config);
+                >>::build_empty_payload(&builder, &client, config);
                 let _ = tx.send(res);
             }));
 

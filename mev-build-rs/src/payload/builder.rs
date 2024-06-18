@@ -169,15 +169,18 @@ fn append_payment<Client: StateProviderFactory>(
     let mut receipts = bundle_state_with_receipts.receipts_by_block(block_number).to_vec();
     receipts.push(Some(receipt));
 
-    let receipts = Receipts::from_vec(vec![receipts]);
+    let receipts = Receipts::from(vec![receipts]);
 
-    let execution_outcome =
-        ExecutionOutcome::new(db.take_bundle(), receipts, block_number, requests);
+    let execution_outcome = ExecutionOutcome::new(
+        db.take_bundle(),
+        receipts,
+        block_number,
+        vec![requests.clone().unwrap_or_default()],
+    );
 
     let receipts_root =
-        execution_outcome.bundle.receipts_root_slow(block_number).expect("Number is in range");
-    let logs_bloom =
-        execution_outcome.bundle.block_logs_bloom(block_number).expect("Number is in range");
+        execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
+    let logs_bloom = execution_outcome.block_logs_bloom(block_number).expect("Number is in range");
 
     let state_root = state_provider.state_root(execution_outcome.state())?;
     let transactions_root = proofs::calculate_transaction_root(&body);
@@ -294,7 +297,7 @@ where
         &self,
         args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
     ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
-        let payload_id = args.config.payload_id();
+        // let payload_id = args.config.payload_id();
         let outcome = default_ethereum_payload_builder(args)?;
         // if let Some(bundle) = bundle {
         //     let mut states = self.states.lock().expect("can lock");
@@ -383,7 +386,7 @@ where
         }
 
         let (requests, requests_root) =
-            if chain_spec.is_prague_active_at_timestamp(attributes.timestamp) {
+            if chain_spec.is_prague_active_at_timestamp(attributes.timestamp()) {
                 // We do not calculate the EIP-6110 deposit requests because there are no
                 // transactions in an empty payload.
                 let withdrawal_requests = post_block_withdrawal_requests_contract_call(
@@ -493,7 +496,8 @@ where
         initialized_block_env.timestamp.to::<u64>(),
         block_number,
         parent_block.hash(),
-    )?;
+    )
+    .map_err(|err| PayloadBuilderError::Internal(err.into()))?;
 
     let mut receipts = Vec::new();
     while let Some(pool_tx) = best_txs.next() {
@@ -508,7 +512,7 @@ where
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok((BuildOutcome::Cancelled, None))
+            return Ok(BuildOutcome::Cancelled)
         }
 
         // convert tx to a signed transaction
@@ -607,12 +611,12 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok((BuildOutcome::Aborted { fees: total_fees, cached_reads }, None))
+        return Ok(BuildOutcome::Aborted { fees: total_fees, cached_reads })
     }
 
     // calculate the requests and the requests root
     let (requests, requests_root) = if chain_spec
-        .is_prague_active_at_timestamp(attributes.timestamp)
+        .is_prague_active_at_timestamp(attributes.timestamp())
     {
         let deposit_requests = parse_deposits_from_receipts(&chain_spec, receipts.iter().flatten())
             .map_err(|err| PayloadBuilderError::Internal(RethError::Execution(err.into())))?;
@@ -640,17 +644,18 @@ where
     // and 4788 contract call
     db.merge_transitions(BundleRetention::PlainState);
 
-    let bundle = ExecutionOutcome::new(
+    let execution_outcome = ExecutionOutcome::new(
         db.take_bundle(),
-        Receipts::from_vec(vec![receipts]),
+        Receipts::from(vec![receipts]),
         block_number,
-        requests,
+        vec![requests.clone().unwrap_or_default()],
     );
-    let receipts_root = bundle.receipts_root_slow(block_number).expect("Number is in range");
-    let logs_bloom = bundle.block_logs_bloom(block_number).expect("Number is in range");
+    let receipts_root =
+        execution_outcome.receipts_root_slow(block_number).expect("Number is in range");
+    let logs_bloom = execution_outcome.block_logs_bloom(block_number).expect("Number is in range");
 
     // calculate the state root
-    let state_root = state_provider.state_root(bundle.state())?;
+    let state_root = state_provider.state_root(execution_outcome.state())?;
 
     // create the block header
     let transactions_root = proofs::calculate_transaction_root(&executed_txs);
@@ -715,5 +720,5 @@ where
     // extend the payload with the blob sidecars from the executed txs
     payload.extend_sidecars(blob_sidecars);
 
-    Ok((BuildOutcome::Better { payload, cached_reads }, Some(bundle)))
+    Ok(BuildOutcome::Better { payload, cached_reads })
 }

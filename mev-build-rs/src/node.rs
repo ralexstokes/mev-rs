@@ -6,14 +6,15 @@ use crate::payload::{
 use reth::{
     api::{
         validate_version_specific_fields, EngineApiMessageVersion, EngineObjectValidationError,
-        EngineTypes, FullNodeTypes, PayloadOrAttributes,
+        EngineTypes, FullNodeTypes, PayloadOrAttributes, PayloadTypes,
     },
     builder::{components::ComponentsBuilder, NodeTypes},
     payload::EthBuiltPayload,
     primitives::ChainSpec,
     rpc::types::{
         engine::{
-            ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, PayloadAttributes as EthPayloadAttributes
+            ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
+            PayloadAttributes as EthPayloadAttributes,
         },
         ExecutionPayloadV1,
     },
@@ -46,6 +47,7 @@ impl BuilderNode {
             .payload(payload_service_builder)
             .network(EthereumNetworkBuilder::default())
             .executor(EthereumExecutorBuilder::default())
+            .consensus(EthereumConsensusBuilder::default())
     }
 }
 
@@ -57,9 +59,12 @@ impl NodeTypes for BuilderNode {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BuilderEngineTypes;
 
-impl EngineTypes for BuilderEngineTypes {
+impl PayloadTypes for BuilderEngineTypes {
     type PayloadAttributes = EthPayloadAttributes;
     type PayloadBuilderAttributes = BuilderPayloadBuilderAttributes;
+}
+
+impl EngineTypes for BuilderEngineTypes {
     type BuiltPayload = EthBuiltPayload;
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
