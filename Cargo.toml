@@ -24,15 +24,22 @@ codegen-units = 1
 incremental = false
 
 [workspace.dependencies]
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "cf3c404043230559660810bc0c9d6d5a8498d819" }
-beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "cf3c404043230559660810bc0c9d6d5a8498d819" }
+ethereum-consensus = { git = "https://github.com/chirag-bgh/ethereum-consensus", rev = "5712199cf3f54020ebf1cef2d0e24adaa5a871c5" }
+beacon-api-client = { git = "https://github.com/chirag-bgh/ethereum-consensus", rev = "5712199cf3f54020ebf1cef2d0e24adaa5a871c5" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", rev = "5f82993c23164ce8ccdc7bf3ae5085205383a5c8" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "5f82993c23164ce8ccdc7bf3ae5085205383a5c8" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "5f82993c23164ce8ccdc7bf3ae5085205383a5c8" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "5f82993c23164ce8ccdc7bf3ae5085205383a5c8" }
-alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "77c1240" }
-alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "77c1240" }
+reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+reth-errors = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.0-rc.1" }
+alloy-signer = { git = "https://github.com/alloy-rs/alloy", rev = "00d81d7" }
+alloy-signer-wallet = { git = "https://github.com/alloy-rs/alloy", rev = "00d81d7" }
+
+enr = { version = "=0.12.0", default-features = false, features = [
+    "k256",
+    "rust-secp256k1",
+] }
 
 futures = "0.3.21"
 tokio = "1.0"
@@ -64,5 +71,9 @@ rand = "0.8.5"
 clap = "4.1.4"
 
 [patch.crates-io]
-c-kzg = { git = "https://github.com/ethereum/c-kzg-4844", tag = "v1.0.1" }
+c-kzg = { git = "https://github.com/ethereum/c-kzg-4844", tag = "v1.0.2" }
 libffi-sys = { git = "https://github.com/tov/libffi-rs", rev = "d0704d634b6f3ffef5b6fc7e07fe965a1cff5c7b" }
+revm = { git = "https://github.com/bluealloy/revm", rev = "a28a543" }
+revm-interpreter = { git = "https://github.com/bluealloy/revm", rev = "a28a543" }
+revm-precompile = { git = "https://github.com/bluealloy/revm", rev = "a28a543" }
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "a28a543" }

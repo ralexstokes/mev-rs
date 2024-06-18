@@ -13,14 +13,13 @@ use reth::{
     primitives::ChainSpec,
     rpc::types::{
         engine::{
-            ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3,
-            PayloadAttributes as EthPayloadAttributes,
+            ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4, PayloadAttributes as EthPayloadAttributes
         },
         ExecutionPayloadV1,
     },
 };
 use reth_node_ethereum::node::{
-    EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
+    EthereumConsensusBuilder, EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -36,6 +35,7 @@ impl BuilderNode {
         PayloadServiceBuilder,
         EthereumNetworkBuilder,
         EthereumExecutorBuilder,
+        EthereumConsensusBuilder,
     >
     where
         Node: FullNodeTypes<Engine = BuilderEngineTypes>,
@@ -64,6 +64,7 @@ impl EngineTypes for BuilderEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
+    type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
 
     fn validate_version_specific_fields(
         chain_spec: &ChainSpec,
