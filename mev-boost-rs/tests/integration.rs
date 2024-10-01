@@ -68,6 +68,9 @@ fn create_proposers<R: rand::Rng>(rng: &mut R, count: usize) -> Vec<Proposer> {
         .collect()
 }
 
+// TODO: Remove once this is fixed between clippy and tokio
+// https://github.com/rust-lang/rust-clippy/pull/13464
+#[allow(clippy::needless_return)]
 #[tokio::test]
 async fn test_end_to_end() {
     setup_logging();
