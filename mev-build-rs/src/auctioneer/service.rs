@@ -1,9 +1,9 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
     bidder::Service as Bidder,
+    compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
-    utils::compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
     Error,
 };
 use ethereum_consensus::{
@@ -59,9 +59,10 @@ fn prepare_submission(
         gas_used: payload.block().gas_used,
         value: payload.fees(),
     };
-    let execution_payload = to_execution_payload(payload.block());
+    let fork = context.fork_for(auction_context.slot);
+    let execution_payload = to_execution_payload(payload.block(), fork)?;
     let signature = sign_builder_message(&message, signing_key, context)?;
-    let submission = match execution_payload.version() {
+    let submission = match fork {
         Fork::Bellatrix => {
             SignedBidSubmission::Bellatrix(block_submission::bellatrix::SignedBidSubmission {
                 message,
@@ -82,7 +83,7 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
-        other => unreachable!("fork {other} is not reachable from this type"),
+        fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)
 }

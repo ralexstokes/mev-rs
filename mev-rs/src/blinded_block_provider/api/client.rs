@@ -16,6 +16,7 @@ use beacon_api_client::mainnet::Client as BeaconApiClient;
 use beacon_api_client::minimal::Client as BeaconApiClient;
 
 /// A `Client` for a service implementing the Builder APIs.
+///
 /// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
 /// it can provide more flexibility to callers with respect to the types
 /// it accepts.

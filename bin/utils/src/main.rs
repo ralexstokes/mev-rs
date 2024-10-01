@@ -2,6 +2,9 @@ use beacon_api_client::{mainnet::Client, BlockId};
 use mev_rs::{types::AuctionRequest, BlindedBlockRelayer, Relay, RelayEndpoint};
 use url::Url;
 
+// TODO: Remove once this is fixed between clippy and tokio
+// https://github.com/rust-lang/rust-clippy/pull/13464
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main() {
     let endpoint = Url::parse("http://localhost:5052").unwrap();
