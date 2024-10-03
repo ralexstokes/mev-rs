@@ -1,6 +1,6 @@
 use crate::cmd::config::Config;
 use clap::Args;
-use reth::{args::utils::DefaultChainSpecParser, cli::Cli};
+use reth::{args::utils::EthereumChainSpecParser, cli::Cli};
 
 #[derive(Debug, Args)]
 pub struct CliArgs {
@@ -16,4 +16,4 @@ impl TryFrom<CliArgs> for Config {
     }
 }
 
-pub type Command = Cli<DefaultChainSpecParser, CliArgs>;
+pub type Command = Cli<EthereumChainSpecParser, CliArgs>;
