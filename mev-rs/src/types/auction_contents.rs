@@ -1,4 +1,5 @@
 use crate::types::ExecutionPayload;
+pub use deneb::BlobsBundle;
 use ethereum_consensus::Fork;
 
 pub mod bellatrix {
@@ -84,7 +85,7 @@ impl AuctionContents {
         }
     }
 
-    pub fn blobs_bundle(&self) -> Option<&deneb::BlobsBundle> {
+    pub fn blobs_bundle(&self) -> Option<&BlobsBundle> {
         match self {
             Self::Deneb(inner) => Some(&inner.blobs_bundle),
             _ => None,
