@@ -1,12 +1,16 @@
 pub mod compat {
     use crate::Error;
+    use alloy_eips::eip2718::Encodable2718;
     use ethereum_consensus::{
         crypto::{KzgCommitment, KzgProof},
         primitives::{Bytes32, ExecutionAddress},
         ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
     };
     use mev_rs::types::{BlobsBundle, ExecutionPayload};
-    use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
+    use reth::primitives::{
+        revm_primitives::{alloy_primitives::Bloom, Address, B256},
+        BlobTransactionSidecar, SealedBlock,
+    };
 
     #[cfg(not(feature = "minimal-preset"))]
     use ethereum_consensus::deneb::mainnet as spec;
@@ -29,11 +33,11 @@ pub mod compat {
     pub fn to_execution_payload(value: &SealedBlock) -> ExecutionPayload {
         let hash = value.hash();
         let header = &value.header;
-        let transactions = &value.body;
-        let withdrawals = &value.withdrawals;
+        let transactions = &value.body.transactions;
+        let withdrawals = &value.body.withdrawals;
         let transactions = transactions
             .iter()
-            .map(|t| spec::Transaction::try_from(t.envelope_encoded().as_ref()).unwrap())
+            .map(|t| spec::Transaction::try_from(t.encoded_2718().as_ref()).unwrap())
             .collect::<Vec<_>>();
         let withdrawals = withdrawals
             .as_ref()

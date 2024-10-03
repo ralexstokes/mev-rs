@@ -18,7 +18,7 @@ pub async fn get_genesis_time(
             // use provided beacon node
             if let Some(client) = beacon_node {
                 if let Ok(genesis_details) = client.get_genesis_details().await {
-                    return genesis_details.genesis_time
+                    return genesis_details.genesis_time;
                 }
             }
 
@@ -27,7 +27,7 @@ pub async fn get_genesis_time(
                 if let Ok(url) = Url::parse(url) {
                     let client = Client::new(url);
                     if let Ok(genesis_details) = client.get_genesis_details().await {
-                        return genesis_details.genesis_time
+                        return genesis_details.genesis_time;
                     }
                 }
             }

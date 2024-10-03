@@ -2,6 +2,7 @@ use beacon_api_client::{mainnet::Client, BlockId};
 use mev_rs::{types::AuctionRequest, BlindedBlockRelayer, Relay, RelayEndpoint};
 use url::Url;
 
+#[allow(clippy::needless_return)]
 #[tokio::main]
 async fn main() {
     let endpoint = Url::parse("http://localhost:5052").unwrap();

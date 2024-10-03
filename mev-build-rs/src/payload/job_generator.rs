@@ -1,28 +1,18 @@
-use crate::payload::{
-    builder::{PayloadBuilder, BASE_TX_GAS_LIMIT},
-    job::PayloadJob,
-};
+use crate::payload::{builder::PayloadBuilder, job::PayloadJob};
 use ethereum_consensus::clock::duration_until;
-use mev_rs::compute_preferred_gas_limit;
 use reth::{
     api::PayloadBuilderAttributes,
-    payload::{self, database::CachedReads, error::PayloadBuilderError},
-    primitives::{Address, BlockNumberOrTag, Bytes, ChainSpec, B256, U256},
+    payload::{self, database::CachedReads, PayloadBuilderError},
+    primitives::{
+        revm_primitives::{Bytes, B256},
+        BlockNumberOrTag,
+    },
     providers::{BlockReaderIdExt, BlockSource, CanonStateNotification, StateProviderFactory},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
 };
 use reth_basic_payload_builder::{PayloadConfig, PayloadTaskGuard, PrecachedState};
 use std::{sync::Arc, time::Duration};
-
-fn apply_gas_limit<P>(config: &mut PayloadConfig<P>, gas_limit: u64) {
-    // NOTE: reserve enough gas for the final payment transaction
-    config.initialized_block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
-}
-
-fn apply_fee_recipient<P>(config: &mut PayloadConfig<P>, fee_recipient: Address) {
-    config.initialized_block_env.coinbase = fee_recipient;
-}
 
 #[derive(Debug, Clone)]
 pub struct PayloadJobGeneratorConfig {
@@ -41,7 +31,6 @@ pub struct PayloadJobGenerator<Client, Pool, Tasks> {
     executor: Tasks,
     config: PayloadJobGeneratorConfig,
     payload_task_guard: PayloadTaskGuard,
-    chain_spec: Arc<ChainSpec>,
     builder: PayloadBuilder,
     pre_cached: Option<PrecachedState>,
 }
@@ -52,7 +41,6 @@ impl<Client, Pool, Tasks> PayloadJobGenerator<Client, Pool, Tasks> {
         pool: Pool,
         executor: Tasks,
         config: PayloadJobGeneratorConfig,
-        chain_spec: Arc<ChainSpec>,
         builder: PayloadBuilder,
     ) -> Self {
         Self {
@@ -61,7 +49,6 @@ impl<Client, Pool, Tasks> PayloadJobGenerator<Client, Pool, Tasks> {
             executor,
             payload_task_guard: PayloadTaskGuard::new(config.max_payload_tasks),
             config,
-            chain_spec,
             builder,
             pre_cached: None,
         }
@@ -115,29 +102,16 @@ where
             block.seal(attributes.parent())
         };
 
-        let (until, gas_limit) = if let Some(proposal) = attributes.proposal.as_ref() {
-            let until = self.job_deadline(attributes.timestamp());
-            let gas_limit =
-                compute_preferred_gas_limit(proposal.proposer_gas_limit, parent_block.gas_limit);
-            (until, Some(gas_limit))
+        let until = if attributes.proposal.is_some() {
+            self.job_deadline(attributes.timestamp())
         } else {
             // If there is no attached proposal, then terminate the payload job immediately
-            let until = tokio::time::Instant::now();
-            (until, None)
+            tokio::time::Instant::now()
         };
         let deadline = Box::pin(tokio::time::sleep_until(until));
 
-        let mut config = PayloadConfig::new(
-            Arc::new(parent_block),
-            self.config.extradata.clone(),
-            attributes,
-            Arc::clone(&self.chain_spec),
-        );
-
-        if let Some(gas_limit) = gas_limit {
-            apply_gas_limit(&mut config, gas_limit);
-        }
-        apply_fee_recipient(&mut config, self.builder.fee_recipient);
+        let config =
+            PayloadConfig::new(Arc::new(parent_block), self.config.extradata.clone(), attributes);
 
         let cached_reads = self.maybe_pre_cached(config.parent_block.hash());
 
@@ -162,8 +136,8 @@ where
 
         // extract the state from the notification and put it into the cache
         let committed = new_state.committed();
-        let new_state = committed.state();
-        for (addr, acc) in new_state.bundle_accounts_iter() {
+        let execution_outcome = committed.execution_outcome();
+        for (addr, acc) in execution_outcome.bundle_accounts_iter() {
             if let Some(info) = acc.info.clone() {
                 // we want pre cache existing accounts and their storage
                 // this only includes changed accounts and storage but is better than nothing

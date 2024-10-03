@@ -21,7 +21,7 @@ use mev_rs::{
 };
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId},
+    payload::{EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderHandle, PayloadId},
 };
 use serde::Deserialize;
 use std::{
@@ -235,7 +235,7 @@ impl<
 
         if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
             warn!(%err, "could not start build with payload builder");
-            return None
+            return None;
         }
 
         let payload_id = auction.attributes.payload_id();
@@ -262,7 +262,7 @@ impl<
 
         if !is_new {
             trace!(payload_id = %attributes.payload_id(), "ignoring duplicate payload attributes");
-            return
+            return;
         }
 
         if let Some(proposals) = self.get_proposals(slot) {
@@ -319,7 +319,7 @@ impl<
                 block_number = payload.block().number,
                 block_hash = %payload.block().hash(),
                 parent_hash = %payload.block().header.header().parent_hash,
-                txn_count = %payload.block().body.len(),
+                txn_count = %payload.block().body.transactions.len(),
                 blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
                 value = %payload.fees(),
                 relays=?relay_set,

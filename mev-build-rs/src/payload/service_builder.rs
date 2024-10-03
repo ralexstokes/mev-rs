@@ -7,26 +7,26 @@ use crate::{
     service::BuilderConfig as Config,
     Error,
 };
-use alloy_signer_wallet::{coins_bip39::English, LocalWallet, MnemonicBuilder};
+use alloy_signer_local::{coins_bip39::English, MnemonicBuilder, PrivateKeySigner};
 use reth::{
-    builder::{node::FullNodeTypes, BuilderContext},
+    builder::{node::FullNodeTypes, BuilderContext, NodeTypesWithEngine},
+    chainspec::ChainSpec,
     cli::config::PayloadBuilderConfig,
     payload::{EthBuiltPayload, PayloadBuilderHandle, PayloadBuilderService},
-    primitives::{Address, Bytes},
+    primitives::revm_primitives::Bytes,
     providers::CanonStateSubscriptions,
     transaction_pool::TransactionPool,
 };
 use tokio::sync::mpsc::Sender;
 
-fn signer_from_mnemonic(mnemonic: &str) -> Result<LocalWallet, Error> {
+fn signer_from_mnemonic(mnemonic: &str) -> Result<PrivateKeySigner, Error> {
     MnemonicBuilder::<English>::default().phrase(mnemonic).build().map_err(Into::into)
 }
 
 #[derive(Debug, Clone)]
 pub struct PayloadServiceBuilder {
     extra_data: Option<Bytes>,
-    signer: LocalWallet,
-    fee_recipient: Address,
+    signer: PrivateKeySigner,
     bid_tx: Sender<EthBuiltPayload>,
 }
 
@@ -35,22 +35,23 @@ impl TryFrom<(&Config, Sender<EthBuiltPayload>)> for PayloadServiceBuilder {
 
     fn try_from((value, bid_tx): (&Config, Sender<EthBuiltPayload>)) -> Result<Self, Self::Error> {
         let signer = signer_from_mnemonic(&value.execution_mnemonic)?;
-        let fee_recipient = value.fee_recipient.unwrap_or_else(|| signer.address());
-        Ok(Self { extra_data: value.extra_data.clone(), signer, fee_recipient, bid_tx })
+        Ok(Self { extra_data: value.extra_data.clone(), signer, bid_tx })
     }
 }
 
 impl<Node, Pool> reth::builder::components::PayloadServiceBuilder<Node, Pool>
     for PayloadServiceBuilder
 where
-    Node: FullNodeTypes<Engine = BuilderEngineTypes>,
+    Node: FullNodeTypes<
+        Types: NodeTypesWithEngine<Engine = BuilderEngineTypes, ChainSpec = ChainSpec>,
+    >,
     Pool: TransactionPool + Unpin + 'static,
 {
     async fn spawn_payload_service(
         self,
         ctx: &BuilderContext<Node>,
         pool: Pool,
-    ) -> eyre::Result<PayloadBuilderHandle<Node::Engine>> {
+    ) -> eyre::Result<PayloadBuilderHandle<<Node::Types as NodeTypesWithEngine>::Engine>> {
         let chain_id = ctx.chain_spec().chain().id();
         let conf = ctx.payload_builder_config();
 
@@ -72,8 +73,7 @@ where
             pool,
             ctx.task_executor().clone(),
             payload_job_config,
-            ctx.chain_spec().clone(),
-            PayloadBuilder::new(self.bid_tx, self.signer, self.fee_recipient, chain_id),
+            PayloadBuilder::new(self.bid_tx, self.signer, chain_id, ctx.chain_spec().clone()),
         );
 
         let (payload_service, payload_builder) =

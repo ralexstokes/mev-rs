@@ -17,11 +17,13 @@ use mev_rs::{get_genesis_time, Error};
 use reth::{
     api::EngineTypes,
     builder::{NodeBuilder, WithLaunchContext},
+    chainspec::{ChainSpec, NamedChain},
     payload::{EthBuiltPayload, PayloadBuilderHandle},
-    primitives::{Address, Bytes, NamedChain},
+    primitives::revm_primitives::{Address, Bytes},
     tasks::TaskExecutor,
 };
 use reth_db::DatabaseEnv;
+use reth_node_ethereum::node::EthereumAddOns;
 use serde::Deserialize;
 use std::{path::PathBuf, sync::Arc};
 use tokio::sync::{
@@ -102,7 +104,7 @@ fn custom_network_from_config_directory(path: PathBuf) -> Network {
 }
 
 pub async fn launch(
-    node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>>>,
+    node_builder: WithLaunchContext<NodeBuilder<Arc<DatabaseEnv>, ChainSpec>>,
     custom_chain_config_directory: Option<PathBuf>,
     config: Config,
 ) -> eyre::Result<()> {
@@ -112,6 +114,7 @@ pub async fn launch(
     let handle = node_builder
         .with_types::<BuilderNode>()
         .with_components(BuilderNode::components_with(payload_builder))
+        .with_add_ons::<EthereumAddOns>()
         .launch()
         .await?;
 

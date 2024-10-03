@@ -16,6 +16,7 @@ use beacon_api_client::mainnet::Client as BeaconApiClient;
 use beacon_api_client::minimal::Client as BeaconApiClient;
 
 /// A `Client` for a service implementing the Builder APIs.
+///
 /// Note that `Client` does not implement the `BlindedBlockProvider` trait so that
 /// it can provide more flexibility to callers with respect to the types
 /// it accepts.
@@ -53,7 +54,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(auction_request.clone()))
+            return Err(Error::NoBidPrepared(auction_request.clone()));
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =

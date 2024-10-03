@@ -46,7 +46,7 @@ fn validate_bid(
             bid: bid_public_key.clone(),
             relay: public_key.clone(),
         }
-        .into())
+        .into());
     }
     verify_signed_builder_data(&bid.message, public_key, &bid.signature, context)
         .map_err(Into::into)
@@ -62,7 +62,7 @@ fn validate_payload(
         return Err(BoostError::InvalidPayloadHash {
             expected: expected_block_hash.clone(),
             provided: provided_block_hash.clone(),
-        })
+        });
     }
     let provided_commitments = contents.blobs_bundle().map(|bundle| &bundle.commitments);
     match (expected_commitments, provided_commitments) {
@@ -226,7 +226,7 @@ impl BlindedBlockProvider for RelayMux {
 
         if bids.is_empty() {
             info!(%auction_request, "no relays had bids prepared");
-            return Err(Error::NoBidPrepared(auction_request.clone()))
+            return Err(Error::NoBidPrepared(auction_request.clone()));
         }
 
         let mut best_bid_indices =
@@ -308,7 +308,7 @@ impl BlindedBlockProvider for RelayMux {
                 ) {
                     Ok(_) => {
                         info!(%slot, block_hash = %expected_block_hash, %relay, "acquired payload");
-                        return Ok(auction_contents)
+                        return Ok(auction_contents);
                     }
                     Err(err) => {
                         warn!(?err, ?relay, "could not validate payload");
@@ -352,7 +352,7 @@ mod tests {
             assert_eq!(expected, best_bid_indices);
 
             if best_bid_indices.is_empty() {
-                continue
+                continue;
             }
 
             // NOTE: test randomization logic
