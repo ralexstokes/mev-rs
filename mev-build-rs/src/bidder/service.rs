@@ -34,7 +34,7 @@ impl Service {
                 let value = strategy.run(&auction, current_revenue).await;
                 if dispatch.send(value).is_err() {
                     trace!("channel closed; could not send bid value to builder");
-                    break;
+                    break
                 }
             }
         });

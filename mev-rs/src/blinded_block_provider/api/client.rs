@@ -54,7 +54,7 @@ impl Client {
         let response = self.api.http_get(&target).await?;
 
         if response.status() == StatusCode::NO_CONTENT {
-            return Err(Error::NoBidPrepared(auction_request.clone()));
+            return Err(Error::NoBidPrepared(auction_request.clone()))
         }
 
         let result: ApiResult<VersionedValue<SignedBuilderBid>> =

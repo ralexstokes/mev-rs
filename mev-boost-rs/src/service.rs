@@ -89,7 +89,7 @@ impl Future for ServiceHandle {
         let this = self.project();
         let relay_mux = this.relay_mux.poll(cx);
         if relay_mux.is_ready() {
-            return relay_mux;
+            return relay_mux
         }
         this.server.poll(cx)
     }

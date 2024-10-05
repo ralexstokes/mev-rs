@@ -61,7 +61,7 @@ where
     // TODO: do we need to customize this? if not, use default impl in some way
     fn best_payload(&self) -> Result<Self::BuiltPayload, PayloadBuilderError> {
         if let Some(ref payload) = self.best_payload {
-            return Ok(payload.clone());
+            return Ok(payload.clone())
         }
         // No payload has been built yet, but we need to return something that the CL then can
         // deliver, so we need to return an empty payload.
@@ -141,7 +141,7 @@ where
         // check if the deadline is reached
         if this.deadline.as_mut().poll(cx).is_ready() {
             trace!(target: "payload_builder", "payload building deadline reached");
-            return Poll::Ready(Ok(()));
+            return Poll::Ready(Ok(()))
         }
 
         // poll for pending bids
@@ -236,7 +236,7 @@ where
                                 let bidder = proposal.bidder.clone();
                                 this.executor.spawn(Box::pin(async move {
                                     if bidder.is_closed() {
-                                        return;
+                                        return
                                     }
                                     if bidder.send((fees, value_tx)).await.is_err() {
                                         warn!("could not send fees to bidder");

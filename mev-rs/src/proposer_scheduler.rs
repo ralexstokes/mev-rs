@@ -44,7 +44,7 @@ impl ProposerScheduler {
             let slot = epoch * self.slots_per_epoch;
             let state = self.state.lock();
             if state.proposer_schedule.iter().any(|schedule| schedule.slot >= slot) {
-                return Ok(());
+                return Ok(())
             }
         }
         // TODO be tolerant to re-orgs

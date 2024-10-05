@@ -72,13 +72,13 @@ impl<'de> serde::Deserialize<'de> for BuilderBid {
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
-            return Ok(Self::Deneb(inner));
+            return Ok(Self::Deneb(inner))
         }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
-            return Ok(Self::Capella(inner));
+            return Ok(Self::Capella(inner))
         }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
-            return Ok(Self::Bellatrix(inner));
+            return Ok(Self::Bellatrix(inner))
         }
         Err(serde::de::Error::custom("no variant could be deserialized from input"))
     }

@@ -393,7 +393,7 @@ impl Relay {
             return Err(RelayError::InvalidFeeRecipient(
                 proposer_public_key.clone(),
                 fee_recipient.clone(),
-            ));
+            ))
         }
 
         // NOTE: disabled in the "trusted" validation
@@ -410,28 +410,25 @@ impl Relay {
             return Err(RelayError::InvalidGasLimit(
                 bid_trace.gas_limit,
                 execution_payload.gas_limit(),
-            ));
+            ))
         }
 
         if bid_trace.gas_used != execution_payload.gas_used() {
-            return Err(RelayError::InvalidGasUsed(
-                bid_trace.gas_used,
-                execution_payload.gas_used(),
-            ));
+            return Err(RelayError::InvalidGasUsed(bid_trace.gas_used, execution_payload.gas_used()))
         }
 
         if &bid_trace.parent_hash != execution_payload.parent_hash() {
             return Err(RelayError::InvalidParentHash(
                 bid_trace.parent_hash.clone(),
                 execution_payload.parent_hash().clone(),
-            ));
+            ))
         }
 
         if &bid_trace.block_hash != execution_payload.block_hash() {
             return Err(RelayError::InvalidBlockHash(
                 bid_trace.block_hash.clone(),
                 execution_payload.block_hash().clone(),
-            ));
+            ))
         }
 
         Ok(())
@@ -447,7 +444,7 @@ impl Relay {
         if let Some(bid) = self.get_auction_context(&auction_request) {
             if bid.value() > value {
                 info!(%auction_request, builder_public_key = %bid.builder_public_key(), "block submission was not greater in value; ignoring");
-                return Ok(());
+                return Ok(())
             }
         }
         let auction_context = AuctionContext::new(
@@ -491,7 +488,7 @@ impl Relay {
                     ?existing,
                     "skipping attempt to store different result for delivered payload"
                 );
-                return;
+                return
             }
         }
         state.delivered_payloads.insert(auction_request, auction_context);
@@ -534,7 +531,7 @@ impl BlindedBlockProvider for Relay {
     ) -> Result<SignedBuilderBid, Error> {
         if let Err(err) = self.validate_auction_request(auction_request) {
             warn!(%err, "could not fetch best bid");
-            return Err(err.into());
+            return Err(err.into())
         }
 
         let auction_context = self
@@ -565,7 +562,7 @@ impl BlindedBlockProvider for Relay {
 
         if let Err(err) = self.validate_auction_request(&auction_request) {
             warn!(%err, "could not open bid");
-            return Err(err.into());
+            return Err(err.into())
         }
 
         let auction_context = self
@@ -579,7 +576,7 @@ impl BlindedBlockProvider for Relay {
             let local_header = auction_context.signed_builder_bid().message.header();
             if let Err(err) = validate_header_equality(local_header, execution_payload_header) {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
             }
         }
 
@@ -590,7 +587,7 @@ impl BlindedBlockProvider for Relay {
             &self.context,
         ) {
             warn!(%err, %auction_request, "invalid incoming signed blinded beacon block signature");
-            return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+            return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
         }
 
         match unblind_block(signed_block, auction_context.execution_payload()) {
@@ -624,7 +621,7 @@ impl BlindedBlockProvider for Relay {
             }
             Err(err) => {
                 warn!(%err, %auction_request, "invalid incoming signed blinded beacon block");
-                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into());
+                return Err(RelayError::InvalidSignedBlindedBeaconBlock.into())
             }
         }
     }
@@ -653,7 +650,7 @@ impl BlindedBlockRelayer for Relay {
             };
             if let Err(err) = self.validate_auction_request(&auction_request) {
                 warn!(%err, "could not validate bid submission");
-                return Err(err.into());
+                return Err(err.into())
             }
 
             self.validate_builder_submission_trusted(bid_trace, signed_submission.payload())?;

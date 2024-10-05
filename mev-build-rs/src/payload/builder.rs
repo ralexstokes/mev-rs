@@ -156,7 +156,7 @@ fn append_payment<Client: StateProviderFactory>(
         return Err(PayloadBuilderError::Other(Box::new(Error::BlockGasLimitExceeded {
             gas_used: cumulative_gas_used,
             gas_limit: header.gas_limit,
-        })));
+        })))
     }
     let receipt = Receipt {
         tx_type: payment_tx.tx_type(),
@@ -513,12 +513,12 @@ where
             // which also removes all dependent transaction from the iterator before we can
             // continue
             best_txs.mark_invalid(&pool_tx);
-            continue;
+            continue
         }
 
         // check if the job was cancelled, if so we can exit early
         if cancel.is_cancelled() {
-            return Ok((BuildOutcome::Cancelled, None));
+            return Ok((BuildOutcome::Cancelled, None))
         }
 
         // convert tx to a signed transaction
@@ -535,7 +535,7 @@ where
                 // for regular transactions above.
                 trace!(target: "payload_builder", tx=?tx.hash, ?sum_blob_gas_used, ?tx_blob_gas, "skipping blob transaction because it would exceed the max data gas per block");
                 best_txs.mark_invalid(&pool_tx);
-                continue;
+                continue
             }
         }
 
@@ -563,11 +563,11 @@ where
                             best_txs.mark_invalid(&pool_tx);
                         }
 
-                        continue;
+                        continue
                     }
                     err => {
                         // this is an error that we should treat as fatal for this attempt
-                        return Err(PayloadBuilderError::EvmExecutionError(err));
+                        return Err(PayloadBuilderError::EvmExecutionError(err))
                     }
                 }
             }
@@ -616,7 +616,7 @@ where
     // check if we have a better block
     if !is_better_payload(best_payload.as_ref(), total_fees) {
         // can skip building the block
-        return Ok((BuildOutcome::Aborted { fees: total_fees, cached_reads }, None));
+        return Ok((BuildOutcome::Aborted { fees: total_fees, cached_reads }, None))
     }
 
     let WithdrawalsOutcome { withdrawals_root, withdrawals } = commit_withdrawals(

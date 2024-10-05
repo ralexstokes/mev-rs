@@ -97,7 +97,7 @@ impl Service {
                                 Ok(stream) => stream,
                                 Err(err) => {
                                     error!(%err, "could not open payload attributes stream");
-                                    return Err(retry);
+                                    return Err(retry)
                                 }
                             };
 
@@ -106,12 +106,12 @@ impl Service {
                                 Ok(event) => {
                                     if let Err(err) = relay.on_payload_attributes(event.data) {
                                         warn!(%err, "could not process payload attributes");
-                                        continue;
+                                        continue
                                     }
                                 }
                                 Err(err) => {
                                     warn!(%err, "error reading payload attributes stream");
-                                    return Err(retry);
+                                    return Err(retry)
                                 }
                             }
                         }
@@ -170,11 +170,11 @@ impl Future for ServiceHandle {
         let this = self.project();
         let relay = this.relay.poll(cx);
         if relay.is_ready() {
-            return relay;
+            return relay
         }
         let consensus = this.consensus.poll(cx);
         if consensus.is_ready() {
-            return consensus;
+            return consensus
         }
         this.server.poll(cx)
     }
