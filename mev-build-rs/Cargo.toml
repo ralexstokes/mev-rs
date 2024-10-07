@@ -32,10 +32,7 @@ reth-basic-payload-builder = { workspace = true }
 reth-db = { workspace = true }
 reth-evm = { workspace = true }
 reth-node-ethereum = { workspace = true }
-alloy-eips = { workspace = true }
-alloy-consensus = { workspace = true }
-alloy-signer = { workspace = true }
-alloy-signer-local = { workspace = true, features = ["mnemonic"] }
+alloy = { workspace = true }
 
 sha2 = { workspace = true }
 eyre = { workspace = true }

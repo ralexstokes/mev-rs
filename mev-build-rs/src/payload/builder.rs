@@ -1,7 +1,8 @@
 use crate::payload::{attributes::BuilderPayloadBuilderAttributes, job::PayloadFinalizerConfig};
-use alloy_consensus::TxEip1559;
-use alloy_signer::SignerSync;
-use alloy_signer_local::PrivateKeySigner;
+use alloy::{
+    consensus::TxEip1559,
+    signers::{local::PrivateKeySigner, SignerSync},
+};
 use mev_rs::compute_preferred_gas_limit;
 use reth::{
     api::PayloadBuilderAttributes,

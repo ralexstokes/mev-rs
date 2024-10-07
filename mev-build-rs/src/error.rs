@@ -1,4 +1,4 @@
-use alloy_signer_local::LocalSignerError;
+use alloy::signers::local::LocalSignerError;
 use ethereum_consensus::{Error as ConsensusError, Fork};
 use reth::payload::PayloadBuilderError;
 use thiserror::Error;

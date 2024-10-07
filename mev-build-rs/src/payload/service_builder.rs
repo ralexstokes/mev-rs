@@ -7,7 +7,7 @@ use crate::{
     service::BuilderConfig as Config,
     Error,
 };
-use alloy_signer_local::{coins_bip39::English, MnemonicBuilder, PrivateKeySigner};
+use alloy::signers::local::{coins_bip39::English, MnemonicBuilder, PrivateKeySigner};
 use reth::{
     builder::{node::FullNodeTypes, BuilderContext, NodeTypesWithEngine},
     chainspec::ChainSpec,
