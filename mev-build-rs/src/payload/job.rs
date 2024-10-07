@@ -2,12 +2,10 @@ use crate::payload::{attributes::BuilderPayloadBuilderAttributes, builder::Paylo
 use futures_util::{Future, FutureExt};
 use reth::{
     payload::{
-        self, database::CachedReads, error::PayloadBuilderError, EthBuiltPayload,
-        KeepPayloadJobAlive,
+        self, database::CachedReads, EthBuiltPayload, KeepPayloadJobAlive, PayloadBuilderError,
     },
-    primitives::{Address, U256},
+    primitives::revm_primitives::{Address, BlockEnv, CfgEnvWithHandlerCfg, U256},
     providers::StateProviderFactory,
-    revm::primitives::{BlockEnv, CfgEnvWithHandlerCfg},
     tasks::TaskSpawner,
     transaction_pool::TransactionPool,
 };
@@ -71,7 +69,7 @@ where
         // Note: it is assumed that this is unlikely to happen, as the payload job is started right
         // away and the first full block should have been built by the time CL is requesting the
         // payload.
-        <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.client, self.config.clone())
+        <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<Pool, Client>>::build_empty_payload(&self.builder, &self.client, self.config.clone())
     }
 
     fn payload_attributes(&self) -> Result<Self::PayloadAttributes, PayloadBuilderError> {
@@ -111,11 +109,12 @@ where
             let (tx, rx) = oneshot::channel();
             let client = self.client.clone();
             let config = self.config.clone();
+            let builder = self.builder.clone();
             self.executor.spawn_blocking(Box::pin(async move {
                 let res = <PayloadBuilder as reth_basic_payload_builder::PayloadBuilder<
                     Pool,
                     Client,
-                >>::build_empty_payload(&client, config);
+                >>::build_empty_payload(&builder, &client, config);
                 let _ = tx.send(res);
             }));
 
@@ -155,10 +154,11 @@ where
                     if let Some((payload, value_to_bid)) = maybe_dispatch {
                         // TODO: handle the pending block, esp if this is the last bid
                         if let Some(proposal) = this.config.attributes.proposal.as_ref() {
+                            let (cfg_env, block_env) = this.builder.cfg_and_block_env(&this.config);
                             let config = PayloadFinalizerConfig {
                                 proposer_fee_recipient: proposal.proposer_fee_recipient,
-                                cfg_env: this.config.initialized_cfg.clone(),
-                                block_env: this.config.initialized_block_env.clone(),
+                                cfg_env,
+                                block_env,
                             };
                             let client = this.client.clone();
                             let builder = this.builder.clone();

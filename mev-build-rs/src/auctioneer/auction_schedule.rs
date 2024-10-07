@@ -1,6 +1,6 @@
 use ethereum_consensus::primitives::{BlsPublicKey, Slot};
 use mev_rs::types::ProposerSchedule;
-use reth::primitives::Address;
+use reth::primitives::revm_primitives::Address;
 use std::collections::{HashMap, HashSet};
 
 pub type RelayIndex = usize;

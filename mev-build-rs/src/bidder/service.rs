@@ -2,7 +2,7 @@ use crate::{
     auctioneer::AuctionContext,
     bidder::{strategies::BasicStrategy, Config},
 };
-use reth::{primitives::U256, tasks::TaskExecutor};
+use reth::{primitives::revm_primitives::U256, tasks::TaskExecutor};
 use std::sync::Arc;
 use tokio::sync::{mpsc::Receiver, oneshot};
 use tracing::trace;

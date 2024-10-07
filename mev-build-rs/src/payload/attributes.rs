@@ -3,9 +3,11 @@ use reth::{
     api::PayloadBuilderAttributes,
     payload::{EthPayloadBuilderAttributes, PayloadId},
     primitives::{
-        alloy_primitives::private::alloy_rlp::Encodable,
-        revm_primitives::{BlockEnv, CfgEnvWithHandlerCfg},
-        Address, ChainSpec, Header, Withdrawals, B256, B64,
+        revm_primitives::{
+            alloy_primitives::{private::alloy_rlp::Encodable, B64},
+            Address, B256,
+        },
+        Withdrawals,
     },
     rpc::types::engine::PayloadAttributes,
 };
@@ -120,13 +122,5 @@ impl PayloadBuilderAttributes for BuilderPayloadBuilderAttributes {
 
     fn withdrawals(&self) -> &Withdrawals {
         &self.inner.withdrawals
-    }
-
-    fn cfg_and_block_env(
-        &self,
-        chain_spec: &ChainSpec,
-        parent: &Header,
-    ) -> (CfgEnvWithHandlerCfg, BlockEnv) {
-        self.inner.cfg_and_block_env(chain_spec, parent)
     }
 }

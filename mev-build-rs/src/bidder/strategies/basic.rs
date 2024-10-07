@@ -1,5 +1,5 @@
 use crate::auctioneer::AuctionContext;
-use reth::primitives::U256;
+use reth::primitives::revm_primitives::U256;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Default, Clone)]
