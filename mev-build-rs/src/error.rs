@@ -12,5 +12,5 @@ pub enum Error {
     #[error(transparent)]
     PayloadBuilderError(#[from] PayloadBuilderError),
     #[error(transparent)]
-    WalletError(#[from] LocalSignerError),
+    SignerError(#[from] LocalSignerError),
 }
