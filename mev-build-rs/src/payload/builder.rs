@@ -15,7 +15,7 @@ use reth::{
         proofs,
         revm_primitives::{
             alloy_primitives::{ChainId, Parity},
-            calc_excess_blob_gas, BlockEnv, CfgEnvWithHandlerCfg, TxEnv, TxKind, U256,
+            calc_excess_blob_gas, Address, BlockEnv, CfgEnvWithHandlerCfg, TxEnv, TxKind, U256,
         },
         transaction::FillTxEnv,
         Block, BlockBody, Header, Receipt, Receipts, SealedBlock, Signature, Transaction,
@@ -213,6 +213,7 @@ impl Deref for PayloadBuilder {
 pub struct Inner {
     bids: Sender<EthBuiltPayload>,
     signer: PrivateKeySigner,
+    fee_recipient: Address,
     chain_id: ChainId,
     execution_outcomes: Mutex<HashMap<PayloadId, ExecutionOutcome>>,
     evm_config: EthEvmConfig,
@@ -222,12 +223,19 @@ impl PayloadBuilder {
     pub fn new(
         bids: Sender<EthBuiltPayload>,
         signer: PrivateKeySigner,
+        fee_recipient: Address,
         chain_id: ChainId,
         chain_spec: Arc<ChainSpec>,
     ) -> Self {
         let evm_config = EthEvmConfig::new(chain_spec);
-        let inner =
-            Inner { bids, signer, chain_id, execution_outcomes: Default::default(), evm_config };
+        let inner = Inner {
+            bids,
+            signer,
+            fee_recipient,
+            chain_id,
+            execution_outcomes: Default::default(),
+            evm_config,
+        };
         Self(Arc::new(inner))
     }
 
@@ -254,6 +262,8 @@ impl PayloadBuilder {
             block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
 
             block_env.coinbase = proposal_attributes.proposer_fee_recipient;
+        } else {
+            block_env.coinbase = self.0.fee_recipient;
         }
 
         (cfg_env, block_env)

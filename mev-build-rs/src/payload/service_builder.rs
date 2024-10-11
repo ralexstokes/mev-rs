@@ -13,7 +13,7 @@ use reth::{
     chainspec::ChainSpec,
     cli::config::PayloadBuilderConfig,
     payload::{EthBuiltPayload, PayloadBuilderHandle, PayloadBuilderService},
-    primitives::revm_primitives::Bytes,
+    primitives::revm_primitives::{Address, Bytes},
     providers::CanonStateSubscriptions,
     transaction_pool::TransactionPool,
 };
@@ -27,6 +27,7 @@ fn signer_from_mnemonic(mnemonic: &str) -> Result<PrivateKeySigner, Error> {
 pub struct PayloadServiceBuilder {
     extra_data: Option<Bytes>,
     signer: PrivateKeySigner,
+    fee_recipient: Address,
     bid_tx: Sender<EthBuiltPayload>,
 }
 
@@ -35,7 +36,8 @@ impl TryFrom<(&Config, Sender<EthBuiltPayload>)> for PayloadServiceBuilder {
 
     fn try_from((value, bid_tx): (&Config, Sender<EthBuiltPayload>)) -> Result<Self, Self::Error> {
         let signer = signer_from_mnemonic(&value.execution_mnemonic)?;
-        Ok(Self { extra_data: value.extra_data.clone(), signer, bid_tx })
+        let fee_recipient = value.fee_recipient.unwrap_or_else(|| signer.address());
+        Ok(Self { extra_data: value.extra_data.clone(), signer, fee_recipient, bid_tx })
     }
 }
 
@@ -73,7 +75,13 @@ where
             pool,
             ctx.task_executor().clone(),
             payload_job_config,
-            PayloadBuilder::new(self.bid_tx, self.signer, chain_id, ctx.chain_spec().clone()),
+            PayloadBuilder::new(
+                self.bid_tx,
+                self.signer,
+                self.fee_recipient,
+                chain_id,
+                ctx.chain_spec().clone(),
+            ),
         );
 
         let (payload_service, payload_builder) =
