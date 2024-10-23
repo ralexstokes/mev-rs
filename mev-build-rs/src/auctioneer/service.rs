@@ -1,7 +1,9 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
     bidder::Service as Bidder,
-    compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
+    compat::{
+        to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload, to_execution_requests,
+    },
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     Error,
@@ -61,6 +63,7 @@ fn prepare_submission(
     };
     let fork = context.fork_for(auction_context.slot);
     let execution_payload = to_execution_payload(payload.block(), fork)?;
+    let execution_requests = to_execution_requests(payload.block(), fork)?;
     let signature = sign_builder_message(&message, signing_key, context)?;
     let submission = match fork {
         Fork::Bellatrix => {
@@ -83,6 +86,15 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
+        Fork::Electra => {
+            SignedBidSubmission::Electra(block_submission::electra::SignedBidSubmission {
+                message,
+                execution_payload,
+                execution_requests,
+                blobs_bundle: to_blobs_bundle(payload.sidecars())?,
+                signature,
+            })
+        }
         fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)

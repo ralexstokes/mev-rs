@@ -1,21 +1,21 @@
 use crate::Error;
 use alloy_eips::eip2718::Encodable2718;
 use ethereum_consensus::{
-    crypto::{KzgCommitment, KzgProof},
+    crypto::{self, KzgCommitment, KzgProof},
     primitives::{Bytes32, ExecutionAddress},
-    ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
+    ssz::prelude::{ByteList, ByteVector, DeserializeError, SimpleSerializeError, U256},
     Fork,
 };
 use mev_rs::types::{BlobsBundle, ExecutionPayload};
 use reth::primitives::{
     revm_primitives::{alloy_primitives::Bloom, Address, B256},
-    BlobTransactionSidecar, SealedBlock,
+    BlobTransactionSidecar, Request, SealedBlock,
 };
 
 #[cfg(not(feature = "minimal-preset"))]
-use ethereum_consensus::deneb::mainnet as deneb;
+use ethereum_consensus::{deneb::mainnet as deneb, electra::mainnet as electra};
 #[cfg(feature = "minimal-preset")]
-use ethereum_consensus::deneb::minimal as deneb;
+use ethereum_consensus::{deneb::minimal as deneb, electra::minimal as electra};
 
 pub fn to_bytes32(value: B256) -> Bytes32 {
     Bytes32::try_from(value.as_ref()).unwrap()
@@ -29,13 +29,62 @@ fn to_byte_vector(value: Bloom) -> ByteVector<256> {
     ByteVector::<256>::try_from(value.as_ref()).unwrap()
 }
 
+pub fn to_execution_requests(
+    block: &SealedBlock,
+    fork: Fork,
+) -> Result<electra::ExecutionRequests, Error> {
+    let input = block.body.requests.as_ref();
+    let mut requests = electra::ExecutionRequests::default();
+    if let Some(input) = input {
+        for request in &input.0 {
+            match request {
+                Request::DepositRequest(request) => {
+                    requests.deposits.push(electra::DepositRequest {
+                        public_key: TryFrom::try_from(request.pubkey.as_ref())
+                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
+                        withdrawal_credentials: TryFrom::try_from(
+                            request.withdrawal_credentials.as_ref(),
+                        )
+                        .map_err(|err: DeserializeError| {
+                            Error::Consensus(SimpleSerializeError::Deserialize(err).into())
+                        })?,
+                        amount: request.amount,
+                        signature: TryFrom::try_from(request.signature.as_ref())
+                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
+                        index: request.index,
+                    });
+                }
+                Request::WithdrawalRequest(request) => {
+                    requests.withdrawals.push(electra::WithdrawalRequest {
+                        source_address: to_bytes20(request.source_address),
+                        validator_public_key: TryFrom::try_from(request.validator_pubkey.as_ref())
+                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
+                        amount: request.amount,
+                    });
+                }
+                Request::ConsolidationRequest(request) => {
+                    requests.consolidations.push(electra::ConsolidationRequest {
+                        source_address: to_bytes20(request.source_address),
+                        source_public_key: TryFrom::try_from(request.source_pubkey.as_ref())
+                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
+                        target_public_key: TryFrom::try_from(request.target_pubkey.as_ref())
+                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
+                    });
+                }
+                _ => return Err(Error::UnsupportedFork(fork)),
+            }
+        }
+    }
+    Ok(requests)
+}
+
 pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<ExecutionPayload, Error> {
     let hash = value.hash();
     let header = &value.header;
     let transactions = &value.body.transactions;
     let withdrawals = &value.body.withdrawals;
     match fork {
-        Fork::Deneb => {
+        Fork::Deneb | Fork::Electra => {
             let transactions = transactions
                 .iter()
                 .map(|t| deneb::Transaction::try_from(t.encoded_2718().as_ref()).unwrap())
