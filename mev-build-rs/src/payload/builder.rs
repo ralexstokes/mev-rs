@@ -139,7 +139,7 @@ fn append_payment<Client: StateProviderFactory>(
         tx_env,
     );
     // NOTE: adjust gas limit to allow for payment transaction
-    env.block.gas_limit += U256::from(BASE_TX_GAS_LIMIT);
+    env.block.gas_limit += U256::from(gas_limit);
     let mut evm = revm::Evm::builder().with_db(&mut db).with_env_with_handler_cfg(env).build();
 
     let ResultAndState { result, state } =
@@ -258,13 +258,13 @@ impl PayloadBuilder {
                 proposal_attributes.proposer_gas_limit,
                 payload_config.parent_block.gas_limit,
             );
-            // NOTE: reserve enough gas for the final payment transaction
-            block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
-
-            block_env.coinbase = proposal_attributes.proposer_fee_recipient;
-        } else {
-            block_env.coinbase = self.0.fee_recipient;
+            // NOTE: reserve enough gas for the final payment transaction,
+            // regardless of EOA or smart contract
+            // TODO: check recipient ahead of time to determine this here, rather than leave some
+            // gas on the table
+            block_env.gas_limit = U256::from(gas_limit) - U256::from(PAYMENT_TO_CONTRACT_GAS_LIMIT);
         }
+        block_env.coinbase = self.0.fee_recipient;
 
         (cfg_env, block_env)
     }

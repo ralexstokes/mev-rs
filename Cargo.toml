@@ -32,7 +32,13 @@ reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", tag 
 reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.8" }
 reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.8" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.0.8" }
-alloy = { version = "0.4.2", features = ["consensus", "eips", "signers", "signer-local", "signer-mnemonic"] }
+alloy = { version = "0.4.2", features = [
+    "consensus",
+    "eips",
+    "signers",
+    "signer-local",
+    "signer-mnemonic",
+] }
 
 futures = "0.3.21"
 tokio = "1.0"
@@ -62,6 +68,3 @@ sha2 = "0.10.8"
 rand = "0.8.5"
 
 clap = "4.1.4"
-
-[patch.crates-io]
-libffi-sys = { git = "https://github.com/tov/libffi-rs", rev = "d0704d634b6f3ffef5b6fc7e07fe965a1cff5c7b" }
