@@ -4,23 +4,18 @@ use crate::payload::{
     attributes::BuilderPayloadBuilderAttributes, service_builder::PayloadServiceBuilder,
 };
 use reth::{
-    api::{
-        validate_version_specific_fields, EngineApiMessageVersion, EngineObjectValidationError,
-        EngineTypes, FullNodeTypes, PayloadOrAttributes,
-    },
-    builder::{components::ComponentsBuilder, NodeTypes},
+    api::{EngineTypes, FullNodeTypes, PayloadTypes},
+    builder::{components::ComponentsBuilder, NodeTypes, NodeTypesWithEngine},
+    chainspec::ChainSpec,
     payload::EthBuiltPayload,
-    primitives::ChainSpec,
-    rpc::types::{
-        engine::{
-            ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3,
-            PayloadAttributes as EthPayloadAttributes,
-        },
-        ExecutionPayloadV1,
+    rpc::types::engine::{
+        ExecutionPayloadEnvelopeV2, ExecutionPayloadEnvelopeV3, ExecutionPayloadEnvelopeV4,
+        ExecutionPayloadV1, PayloadAttributes as EthPayloadAttributes,
     },
 };
 use reth_node_ethereum::node::{
-    EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
+    EthereumConsensusBuilder, EthereumEngineValidatorBuilder, EthereumExecutorBuilder,
+    EthereumNetworkBuilder, EthereumPoolBuilder,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -36,9 +31,13 @@ impl BuilderNode {
         PayloadServiceBuilder,
         EthereumNetworkBuilder,
         EthereumExecutorBuilder,
+        EthereumConsensusBuilder,
+        EthereumEngineValidatorBuilder,
     >
     where
-        Node: FullNodeTypes<Engine = BuilderEngineTypes>,
+        Node: FullNodeTypes<
+            Types: NodeTypesWithEngine<Engine = BuilderEngineTypes, ChainSpec = ChainSpec>,
+        >,
     {
         ComponentsBuilder::default()
             .node_types::<Node>()
@@ -46,30 +45,32 @@ impl BuilderNode {
             .payload(payload_service_builder)
             .network(EthereumNetworkBuilder::default())
             .executor(EthereumExecutorBuilder::default())
+            .consensus(EthereumConsensusBuilder::default())
+            .engine_validator(EthereumEngineValidatorBuilder::default())
     }
 }
 
 impl NodeTypes for BuilderNode {
     type Primitives = ();
+    type ChainSpec = ChainSpec;
+}
+
+impl NodeTypesWithEngine for BuilderNode {
     type Engine = BuilderEngineTypes;
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct BuilderEngineTypes;
 
-impl EngineTypes for BuilderEngineTypes {
+impl PayloadTypes for BuilderEngineTypes {
+    type BuiltPayload = EthBuiltPayload;
     type PayloadAttributes = EthPayloadAttributes;
     type PayloadBuilderAttributes = BuilderPayloadBuilderAttributes;
-    type BuiltPayload = EthBuiltPayload;
+}
+
+impl EngineTypes for BuilderEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
     type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
     type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
-
-    fn validate_version_specific_fields(
-        chain_spec: &ChainSpec,
-        version: EngineApiMessageVersion,
-        payload_or_attrs: PayloadOrAttributes<'_, Self::PayloadAttributes>,
-    ) -> Result<(), EngineObjectValidationError> {
-        validate_version_specific_fields(chain_spec, version, payload_or_attrs)
-    }
+    type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
 }

@@ -21,7 +21,7 @@ use mev_rs::{
 };
 use reth::{
     api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{EthBuiltPayload, Events, PayloadBuilderHandle, PayloadId},
+    payload::{EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderHandle, PayloadId},
 };
 use serde::Deserialize;
 use std::{
@@ -320,7 +320,7 @@ impl<
                 block_number = payload.block().number,
                 block_hash = %payload.block().hash(),
                 parent_hash = %payload.block().header.header().parent_hash,
-                txn_count = %payload.block().body.len(),
+                txn_count = %payload.block().body.transactions.len(),
                 blob_count = %payload.sidecars().iter().map(|s| s.blobs.len()).sum::<usize>(),
                 value = %payload.fees(),
                 relays=?relay_set,

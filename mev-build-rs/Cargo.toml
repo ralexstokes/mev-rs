@@ -28,11 +28,11 @@ beacon-api-client = { workspace = true }
 mev-rs = { path = "../mev-rs" }
 
 reth = { workspace = true }
-reth-db = { workspace = true }
-reth-node-ethereum = { workspace = true }
 reth-basic-payload-builder = { workspace = true }
-alloy-signer = { workspace = true }
-alloy-signer-wallet = { workspace = true, features = ["mnemonic"] }
+reth-db = { workspace = true }
+reth-evm = { workspace = true }
+reth-node-ethereum = { workspace = true }
+alloy = { workspace = true }
 
 sha2 = { workspace = true }
 eyre = { workspace = true }
