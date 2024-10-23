@@ -260,11 +260,8 @@ impl PayloadBuilder {
             );
             // NOTE: reserve enough gas for the final payment transaction
             block_env.gas_limit = U256::from(gas_limit) - U256::from(BASE_TX_GAS_LIMIT);
-
-            block_env.coinbase = proposal_attributes.proposer_fee_recipient;
-        } else {
-            block_env.coinbase = self.0.fee_recipient;
         }
+        block_env.coinbase = self.0.fee_recipient;
 
         (cfg_env, block_env)
     }
