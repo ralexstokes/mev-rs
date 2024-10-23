@@ -68,6 +68,3 @@ sha2 = "0.10.8"
 rand = "0.8.5"
 
 clap = "4.1.4"
-
-[patch.crates-io]
-libffi-sys = { git = "https://github.com/tov/libffi-rs", rev = "d0704d634b6f3ffef5b6fc7e07fe965a1cff5c7b" }
