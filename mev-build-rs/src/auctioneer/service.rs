@@ -278,7 +278,12 @@ impl<
     }
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
-        let auction = self.open_auctions.get(&payload.id()).expect("has auction");
+        // TODO: resolve hot fix for short slot timings
+        let auction = self.open_auctions.get(&payload.id());
+        if auction.is_none() {
+            return
+        }
+        let auction = auction.unwrap();
         let mut successful_relays_for_submission = Vec::with_capacity(auction.relays.len());
         match prepare_submission(
             &payload,
