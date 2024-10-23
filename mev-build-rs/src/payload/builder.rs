@@ -80,6 +80,8 @@ fn make_payment_transaction(
     Ok(TransactionSignedEcRecovered::from_signed_transaction(signed_transaction, signer.address()))
 }
 
+// TODO: fix lint
+#[allow(clippy::too_many_arguments)]
 fn append_payment<Client: StateProviderFactory>(
     client: Client,
     bundle_state_with_receipts: BundleStateWithReceipts,
@@ -279,7 +281,7 @@ impl PayloadBuilder {
             self.chain_id,
             block,
             payment_amount,
-            self.evm_config.clone(),
+            self.evm_config,
         )?;
         Ok(EthBuiltPayload::new(payload_id, block, payment_amount))
     }
@@ -298,7 +300,7 @@ where
         args: BuildArguments<Pool, Client, Self::Attributes, Self::BuiltPayload>,
     ) -> Result<BuildOutcome<Self::BuiltPayload>, PayloadBuilderError> {
         let payload_id = args.config.payload_id();
-        let (outcome, bundle) = default_ethereum_payload_builder(self.evm_config.clone(), args)?;
+        let (outcome, bundle) = default_ethereum_payload_builder(self.evm_config, args)?;
         if let Some(bundle) = bundle {
             let mut states = self.states.lock().expect("can lock");
             states.insert(payload_id, bundle);
