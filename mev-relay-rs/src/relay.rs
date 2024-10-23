@@ -225,7 +225,7 @@ fn unblind_block(
                         execution_payload: execution_payload.clone(),
                         bls_to_execution_changes: body.bls_to_execution_changes.clone(),
                         blob_kzg_commitments: body.blob_kzg_commitments.clone(),
-                        consolidations: body.consolidations.clone(),
+                        execution_requests: body.execution_requests.clone(),
                     },
                 },
                 signature,

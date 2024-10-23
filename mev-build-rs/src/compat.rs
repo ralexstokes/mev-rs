@@ -1,13 +1,12 @@
 use crate::Error;
 use ethereum_consensus::{
     crypto::{KzgCommitment, KzgProof},
-    electra::{DepositReceipt, ExecutionLayerWithdrawalRequest},
-    primitives::{BlsPublicKey, BlsSignature, Bytes32, ExecutionAddress},
+    primitives::{Bytes32, ExecutionAddress},
     ssz::prelude::{ByteList, ByteVector, SimpleSerializeError, U256},
     Fork,
 };
 use mev_rs::types::{BlobsBundle, ExecutionPayload};
-use reth::primitives::{Address, BlobTransactionSidecar, Bloom, Request, SealedBlock, B256};
+use reth::primitives::{Address, BlobTransactionSidecar, Bloom, SealedBlock, B256};
 
 #[cfg(not(feature = "minimal-preset"))]
 use ethereum_consensus::{deneb::mainnet as deneb, electra::mainnet as electra};
@@ -31,7 +30,6 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
     let header = &value.header;
     let transactions = &value.body;
     let withdrawals = &value.withdrawals;
-    let requests = &value.requests;
     match fork {
         Fork::Deneb => {
             let transactions = transactions
@@ -87,35 +85,6 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
                     amount: w.amount,
                 })
                 .collect::<Vec<_>>();
-            let mut deposit_receipts = vec![];
-            let mut withdrawal_requests = vec![];
-            let requests = requests.as_ref().cloned().unwrap();
-            for request in requests {
-                match request {
-                    Request::DepositRequest(deposit) => {
-                        let deposit_receipt = DepositReceipt {
-                            public_key: BlsPublicKey::try_from(deposit.pubkey.as_ref()).unwrap(),
-                            withdrawal_credentials: to_bytes32(deposit.withdrawal_credentials),
-                            amount: deposit.amount,
-                            signature: BlsSignature::try_from(deposit.signature.as_ref()).unwrap(),
-                            index: deposit.index,
-                        };
-                        deposit_receipts.push(deposit_receipt);
-                    }
-                    Request::WithdrawalRequest(withdrawal) => {
-                        let withdrawal_request = ExecutionLayerWithdrawalRequest {
-                            source_address: to_bytes20(withdrawal.source_address),
-                            validator_public_key: BlsPublicKey::try_from(
-                                withdrawal.validator_public_key.as_ref(),
-                            )
-                            .unwrap(),
-                            amount: withdrawal.amount,
-                        };
-                        withdrawal_requests.push(withdrawal_request);
-                    }
-                    _ => unreachable!("struct is non-exhaustive, but all variants are matched"),
-                }
-            }
             let payload = electra::ExecutionPayload {
                 parent_hash: to_bytes32(header.parent_hash),
                 fee_recipient: to_bytes20(header.beneficiary),
@@ -134,8 +103,6 @@ pub fn to_execution_payload(value: &SealedBlock, fork: Fork) -> Result<Execution
                 withdrawals: TryFrom::try_from(withdrawals).unwrap(),
                 blob_gas_used: header.blob_gas_used.unwrap(),
                 excess_blob_gas: header.excess_blob_gas.unwrap(),
-                deposit_receipts: TryFrom::try_from(deposit_receipts).unwrap(),
-                withdrawal_requests: TryFrom::try_from(withdrawal_requests).unwrap(),
             };
             Ok(ExecutionPayload::Electra(payload))
         }

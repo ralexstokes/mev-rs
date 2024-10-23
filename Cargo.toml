@@ -24,8 +24,8 @@ codegen-units = 1
 incremental = false
 
 [workspace.dependencies]
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "269ba9b" }
-beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "269ba9b" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "3068ca2bab27c39a5a409dcd359e46319d82c431" }
+beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "3068ca2bab27c39a5a409dcd359e46319d82c431" }
 
 reth = { git = "https://github.com/paradigmxyz/reth", rev = "3736d8f9aa7c5cf46edc1e5d1dbd9dcf6f50b9c9" }
 reth-interfaces = { git = "https://github.com/paradigmxyz/reth", rev = "3736d8f9aa7c5cf46edc1e5d1dbd9dcf6f50b9c9" }
