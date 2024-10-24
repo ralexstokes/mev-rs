@@ -1,7 +1,9 @@
 use crate::{
     auctioneer::auction_schedule::{AuctionSchedule, Proposals, Proposer, RelayIndex, RelaySet},
     bidder::Service as Bidder,
-    compat::{to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload},
+    compat::{
+        to_blobs_bundle, to_bytes20, to_bytes32, to_execution_payload, to_execution_requests,
+    },
     payload::attributes::{BuilderPayloadBuilderAttributes, ProposalAttributes},
     service::ClockMessage,
     Error,
@@ -20,8 +22,11 @@ use mev_rs::{
     BlindedBlockRelayer, Relay,
 };
 use reth::{
-    api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderHandle, PayloadId},
+    api::{BuiltPayload, EngineTypes, PayloadBuilderAttributes},
+    payload::{
+        EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderError, PayloadBuilderHandle,
+        PayloadId,
+    },
 };
 use serde::Deserialize;
 use std::{
@@ -83,6 +88,23 @@ fn prepare_submission(
             blobs_bundle: to_blobs_bundle(payload.sidecars())?,
             signature,
         }),
+        Fork::Electra => {
+            let executed_block = payload
+                .executed_block()
+                .ok_or_else(|| Error::PayloadBuilderError(PayloadBuilderError::MissingPayload))?;
+
+            let execution_output = executed_block.execution_output.as_ref();
+            // NOTE: assume the target requests we want are the first entry;
+            let requests = execution_output.requests.first();
+            let execution_requests = to_execution_requests(requests, fork)?;
+            SignedBidSubmission::Electra(block_submission::electra::SignedBidSubmission {
+                message,
+                execution_payload,
+                execution_requests,
+                blobs_bundle: to_blobs_bundle(payload.sidecars())?,
+                signature,
+            })
+        }
         fork => return Err(Error::UnsupportedFork(fork)),
     };
     Ok(submission)
@@ -234,7 +256,7 @@ impl<
         // TODO: work out cancellation discipline
         let auction = self.store_auction(auction);
 
-        if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
+        if let Err(err) = self.builder.send_new_payload(auction.attributes.clone()).await {
             warn!(%err, "could not start build with payload builder");
             return None
         }
@@ -278,7 +300,12 @@ impl<
     }
 
     async fn submit_payload(&self, payload: EthBuiltPayload) {
-        let auction = self.open_auctions.get(&payload.id()).expect("has auction");
+        // TODO: resolve hot fix for short slot timings
+        let auction = self.open_auctions.get(&payload.id());
+        if auction.is_none() {
+            return
+        }
+        let auction = auction.unwrap();
         let mut successful_relays_for_submission = Vec::with_capacity(auction.relays.len());
         match prepare_submission(
             &payload,

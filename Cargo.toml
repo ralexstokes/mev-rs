@@ -24,25 +24,25 @@ codegen-units = 1
 incremental = false
 
 [workspace.dependencies]
-ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "cf3c404043230559660810bc0c9d6d5a8498d819" }
-beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "cf3c404043230559660810bc0c9d6d5a8498d819" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
+ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "92f3ec3" }
+beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "92f3ec3" }
+
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-chain-state = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-errors = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
 alloy = { version = "0.5.4", features = [
-    # "consensus",
-    # "eips",
+    "consensus",
+    "eips",
     "signers",
     "signer-local",
     "signer-mnemonic",
 ] }
-# TODO: use `alloy` crate with `eips` feature, should be possible in next reth release
-alloy-eips = "0.4.2"
-# TODO: use `alloy` crate with `eips` feature, should be possible in next reth release
-alloy-consensus = "0.4.2"
 
 futures = "0.3.21"
 tokio = "1.0"

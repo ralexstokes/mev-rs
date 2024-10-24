@@ -109,8 +109,7 @@ pub mod capella {
 }
 
 pub mod deneb {
-    use super::{BidTrace, BlsSignature, ExecutionPayload};
-    use crate::types::auction_contents::deneb::BlobsBundle;
+    use super::{BidTrace, BlobsBundle, BlsSignature, ExecutionPayload};
     use ethereum_consensus::ssz::prelude::*;
 
     #[derive(Debug, Clone, Serializable, HashTreeRoot)]
@@ -118,6 +117,26 @@ pub mod deneb {
     pub struct SignedBidSubmission {
         pub message: BidTrace,
         pub execution_payload: ExecutionPayload,
+        pub blobs_bundle: BlobsBundle,
+        pub signature: BlsSignature,
+    }
+}
+
+pub mod electra {
+    use super::{BidTrace, BlobsBundle, BlsSignature, ExecutionPayload};
+    use ethereum_consensus::ssz::prelude::*;
+
+    #[cfg(not(feature = "minimal-preset"))]
+    use ethereum_consensus::electra::mainnet::ExecutionRequests;
+    #[cfg(feature = "minimal-preset")]
+    use ethereum_consensus::electra::minimal::ExecutionRequests;
+
+    #[derive(Debug, Clone, Serializable, HashTreeRoot)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    pub struct SignedBidSubmission {
+        pub message: BidTrace,
+        pub execution_payload: ExecutionPayload,
+        pub execution_requests: ExecutionRequests,
         pub blobs_bundle: BlobsBundle,
         pub signature: BlsSignature,
     }
@@ -131,6 +150,7 @@ pub enum SignedBidSubmission {
     Bellatrix(bellatrix::SignedBidSubmission),
     Capella(capella::SignedBidSubmission),
     Deneb(deneb::SignedBidSubmission),
+    Electra(electra::SignedBidSubmission),
 }
 
 impl<'de> serde::Deserialize<'de> for SignedBidSubmission {
@@ -139,6 +159,9 @@ impl<'de> serde::Deserialize<'de> for SignedBidSubmission {
         D: serde::Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
+        if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
+            return Ok(Self::Electra(inner))
+        }
         if let Ok(inner) = <_ as serde::Deserialize>::deserialize(&value) {
             return Ok(Self::Deneb(inner))
         }
@@ -158,6 +181,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(..) => Fork::Bellatrix,
             Self::Capella(..) => Fork::Capella,
             Self::Deneb(..) => Fork::Deneb,
+            Self::Electra(..) => Fork::Electra,
         }
     }
 
@@ -166,6 +190,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.message,
             Self::Capella(inner) => &inner.message,
             Self::Deneb(inner) => &inner.message,
+            Self::Electra(inner) => &inner.message,
         }
     }
 
@@ -174,6 +199,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.execution_payload,
             Self::Capella(inner) => &inner.execution_payload,
             Self::Deneb(inner) => &inner.execution_payload,
+            Self::Electra(inner) => &inner.execution_payload,
         }
     }
 
@@ -182,6 +208,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(inner) => &inner.signature,
             Self::Capella(inner) => &inner.signature,
             Self::Deneb(inner) => &inner.signature,
+            Self::Electra(inner) => &inner.signature,
         }
     }
 
@@ -190,6 +217,7 @@ impl SignedBidSubmission {
             Self::Bellatrix(..) => None,
             Self::Capella(..) => None,
             Self::Deneb(inner) => Some(&inner.blobs_bundle),
+            Self::Electra(inner) => Some(&inner.blobs_bundle),
         }
     }
 }

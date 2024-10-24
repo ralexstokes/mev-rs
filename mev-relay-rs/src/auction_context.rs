@@ -23,6 +23,7 @@ fn to_header(execution_payload: &ExecutionPayload) -> Result<ExecutionPayloadHea
         }
         ExecutionPayload::Capella(payload) => ExecutionPayloadHeader::Capella(payload.try_into()?),
         ExecutionPayload::Deneb(payload) => ExecutionPayloadHeader::Deneb(payload.try_into()?),
+        ExecutionPayload::Electra(payload) => ExecutionPayloadHeader::Electra(payload.try_into()?),
     };
     Ok(header)
 }
@@ -89,11 +90,52 @@ pub mod deneb {
     }
 }
 
+pub mod electra {
+    use super::*;
+
+    #[cfg(not(feature = "minimal-preset"))]
+    use ethereum_consensus::electra::mainnet as electra;
+    #[cfg(feature = "minimal-preset")]
+    use ethereum_consensus::electra::minimal as electra;
+
+    #[derive(Debug, PartialEq, Eq)]
+    pub struct AuctionContext {
+        pub builder_public_key: BlsPublicKey,
+        pub bid_trace: BidTrace,
+        pub receive_duration: Duration,
+        pub signed_builder_bid: SignedBuilderBid,
+        pub execution_payload: ExecutionPayload,
+        pub execution_requests: electra::ExecutionRequests,
+        pub value: U256,
+        pub blobs_bundle: BlobsBundle,
+    }
+
+    impl Hash for AuctionContext {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.builder_public_key.hash(state);
+            self.bid_trace.hash(state);
+            self.receive_duration.hash(state);
+            self.signed_builder_bid.hash(state);
+            let payload_root =
+                self.execution_payload.hash_tree_root().expect("can get hash tree root");
+            payload_root.hash(state);
+            let requests_root =
+                self.execution_requests.hash_tree_root().expect("can get hash tree root");
+            requests_root.hash(state);
+            self.value.hash(state);
+            let blobs_bundle_root =
+                self.blobs_bundle.hash_tree_root().expect("can get hash tree root");
+            blobs_bundle_root.hash(state);
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum AuctionContext {
     Bellatrix(bellatrix::AuctionContext),
     Capella(capella::AuctionContext),
     Deneb(deneb::AuctionContext),
+    Electra(electra::AuctionContext),
 }
 
 impl AuctionContext {
@@ -134,6 +176,15 @@ impl AuctionContext {
                     public_key: relay_public_key,
                 })
             }
+            SignedBidSubmission::Electra(ref submission) => {
+                BuilderBid::Electra(builder_bid::electra::BuilderBid {
+                    header: execution_payload_header,
+                    blob_kzg_commitments: submission.blobs_bundle.commitments.clone(),
+                    execution_requests: submission.execution_requests.clone(),
+                    value,
+                    public_key: relay_public_key,
+                })
+            }
         };
 
         let signature = sign_builder_message(&bid, relay_secret_key, context)?;
@@ -167,6 +218,16 @@ impl AuctionContext {
                 value,
                 blobs_bundle: submission.blobs_bundle,
             }),
+            SignedBidSubmission::Electra(submission) => Self::Electra(electra::AuctionContext {
+                builder_public_key,
+                bid_trace: submission.message,
+                receive_duration,
+                signed_builder_bid,
+                execution_payload,
+                execution_requests: submission.execution_requests,
+                value,
+                blobs_bundle: submission.blobs_bundle,
+            }),
         };
 
         Ok(auction_context)
@@ -177,6 +238,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => &context.builder_public_key,
             Self::Capella(context) => &context.builder_public_key,
             Self::Deneb(context) => &context.builder_public_key,
+            Self::Electra(context) => &context.builder_public_key,
         }
     }
 
@@ -185,6 +247,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => &context.bid_trace,
             Self::Capella(context) => &context.bid_trace,
             Self::Deneb(context) => &context.bid_trace,
+            Self::Electra(context) => &context.bid_trace,
         }
     }
 
@@ -193,6 +256,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => context.receive_duration,
             Self::Capella(context) => context.receive_duration,
             Self::Deneb(context) => context.receive_duration,
+            Self::Electra(context) => context.receive_duration,
         }
     }
 
@@ -201,6 +265,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => &context.signed_builder_bid,
             Self::Capella(context) => &context.signed_builder_bid,
             Self::Deneb(context) => &context.signed_builder_bid,
+            Self::Electra(context) => &context.signed_builder_bid,
         }
     }
 
@@ -209,6 +274,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => &context.execution_payload,
             Self::Capella(context) => &context.execution_payload,
             Self::Deneb(context) => &context.execution_payload,
+            Self::Electra(context) => &context.execution_payload,
         }
     }
 
@@ -217,6 +283,7 @@ impl AuctionContext {
             Self::Bellatrix(_) => None,
             Self::Capella(_) => None,
             Self::Deneb(context) => Some(&context.blobs_bundle),
+            Self::Electra(context) => Some(&context.blobs_bundle),
         }
     }
 
@@ -225,6 +292,7 @@ impl AuctionContext {
             Self::Bellatrix(context) => context.value,
             Self::Capella(context) => context.value,
             Self::Deneb(context) => context.value,
+            Self::Electra(context) => context.value,
         }
     }
 
@@ -236,6 +304,12 @@ impl AuctionContext {
             Self::Capella(context) => AuctionContents::Capella(context.execution_payload.clone()),
             Self::Deneb(context) => {
                 AuctionContents::Deneb(auction_contents::deneb::AuctionContents {
+                    execution_payload: context.execution_payload.clone(),
+                    blobs_bundle: context.blobs_bundle.clone(),
+                })
+            }
+            Self::Electra(context) => {
+                AuctionContents::Electra(auction_contents::deneb::AuctionContents {
                     execution_payload: context.execution_payload.clone(),
                     blobs_bundle: context.blobs_bundle.clone(),
                 })
