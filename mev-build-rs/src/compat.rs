@@ -1,5 +1,5 @@
 use crate::Error;
-use alloy::eips::eip2718::Encodable2718;
+use alloy_eips::eip2718::Encodable2718;
 use ethereum_consensus::{
     crypto::{KzgCommitment, KzgProof},
     primitives::{Bytes32, ExecutionAddress},

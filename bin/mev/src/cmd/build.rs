@@ -1,6 +1,6 @@
 use crate::cmd::config::Config;
 use clap::Args;
-use reth::{args::utils::EthereumChainSpecParser, cli::Cli};
+use reth::{chainspec::EthereumChainSpecParser, cli::Cli};
 
 #[derive(Debug, Args)]
 pub struct CliArgs {

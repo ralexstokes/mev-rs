@@ -33,6 +33,8 @@ reth-db = { workspace = true }
 reth-evm = { workspace = true }
 reth-node-ethereum = { workspace = true }
 alloy = { workspace = true }
+alloy-eips = { workspace = true }
+alloy-consensus = { workspace = true }
 
 sha2 = { workspace = true }
 eyre = { workspace = true }
