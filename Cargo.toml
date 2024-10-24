@@ -28,11 +28,11 @@ incremental = false
 ethereum-consensus = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "92f3ec3" }
 beacon-api-client = { git = "https://github.com/ralexstokes/ethereum-consensus", rev = "92f3ec3" }
 
-reth = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-db = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-evm = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
-reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", tag = "v1.1.0" }
+reth = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-evm = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
 alloy = { version = "0.5.4", features = [
     # "consensus",
     # "eips",
