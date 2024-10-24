@@ -114,7 +114,7 @@ pub async fn launch(
     let handle = node_builder
         .with_types::<BuilderNode>()
         .with_components(BuilderNode::components_with(payload_builder))
-        .with_add_ons::<EthereumAddOns>()
+        .with_add_ons(EthereumAddOns::default())
         .launch()
         .await?;
 
