@@ -14,8 +14,7 @@ use reth::{
     },
 };
 use reth_node_ethereum::node::{
-    EthereumConsensusBuilder, EthereumEngineValidatorBuilder, EthereumExecutorBuilder,
-    EthereumNetworkBuilder, EthereumPoolBuilder,
+    EthereumConsensusBuilder, EthereumExecutorBuilder, EthereumNetworkBuilder, EthereumPoolBuilder,
 };
 
 #[derive(Debug, Default, Clone, Copy)]
@@ -32,7 +31,6 @@ impl BuilderNode {
         EthereumNetworkBuilder,
         EthereumExecutorBuilder,
         EthereumConsensusBuilder,
-        EthereumEngineValidatorBuilder,
     >
     where
         Node: FullNodeTypes<
@@ -46,7 +44,6 @@ impl BuilderNode {
             .network(EthereumNetworkBuilder::default())
             .executor(EthereumExecutorBuilder::default())
             .consensus(EthereumConsensusBuilder::default())
-            .engine_validator(EthereumEngineValidatorBuilder::default())
     }
 }
 
@@ -70,7 +67,7 @@ impl PayloadTypes for BuilderEngineTypes {
 
 impl EngineTypes for BuilderEngineTypes {
     type ExecutionPayloadV1 = ExecutionPayloadV1;
-    type ExecutionPayloadV2 = ExecutionPayloadEnvelopeV2;
-    type ExecutionPayloadV3 = ExecutionPayloadEnvelopeV3;
-    type ExecutionPayloadV4 = ExecutionPayloadEnvelopeV4;
+    type ExecutionPayloadEnvelopeV2 = ExecutionPayloadEnvelopeV2;
+    type ExecutionPayloadEnvelopeV3 = ExecutionPayloadEnvelopeV3;
+    type ExecutionPayloadEnvelopeV4 = ExecutionPayloadEnvelopeV4;
 }

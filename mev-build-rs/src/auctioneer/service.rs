@@ -22,8 +22,11 @@ use mev_rs::{
     BlindedBlockRelayer, Relay,
 };
 use reth::{
-    api::{EngineTypes, PayloadBuilderAttributes},
-    payload::{EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderHandle, PayloadId},
+    api::{BuiltPayload, EngineTypes, PayloadBuilderAttributes},
+    payload::{
+        EthBuiltPayload, Events, PayloadBuilder, PayloadBuilderError, PayloadBuilderHandle,
+        PayloadId,
+    },
 };
 use serde::Deserialize;
 use std::{
@@ -63,7 +66,6 @@ fn prepare_submission(
     };
     let fork = context.fork_for(auction_context.slot);
     let execution_payload = to_execution_payload(payload.block(), fork)?;
-    let execution_requests = to_execution_requests(payload.block(), fork)?;
     let signature = sign_builder_message(&message, signing_key, context)?;
     let submission = match fork {
         Fork::Bellatrix => {
@@ -87,6 +89,14 @@ fn prepare_submission(
             signature,
         }),
         Fork::Electra => {
+            let executed_block = payload
+                .executed_block()
+                .ok_or_else(|| Error::PayloadBuilderError(PayloadBuilderError::MissingPayload))?;
+
+            let execution_output = executed_block.execution_output.as_ref();
+            // NOTE: assume the target requests we want are the first entry;
+            let requests = execution_output.requests.first();
+            let execution_requests = to_execution_requests(requests, fork)?;
             SignedBidSubmission::Electra(block_submission::electra::SignedBidSubmission {
                 message,
                 execution_payload,
@@ -246,7 +256,7 @@ impl<
         // TODO: work out cancellation discipline
         let auction = self.store_auction(auction);
 
-        if let Err(err) = self.builder.new_payload(auction.attributes.clone()).await {
+        if let Err(err) = self.builder.send_new_payload(auction.attributes.clone()).await {
             warn!(%err, "could not start build with payload builder");
             return None
         }

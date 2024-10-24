@@ -1,15 +1,15 @@
 use crate::Error;
-use alloy_eips::eip2718::Encodable2718;
+use alloy::eips::{eip2718::Encodable2718, eip7685::Requests};
 use ethereum_consensus::{
-    crypto::{self, KzgCommitment, KzgProof},
+    crypto::{KzgCommitment, KzgProof},
     primitives::{Bytes32, ExecutionAddress},
-    ssz::prelude::{ByteList, ByteVector, DeserializeError, SimpleSerializeError, U256},
+    ssz::prelude::{deserialize, ByteList, ByteVector, SimpleSerializeError, U256},
     Fork,
 };
 use mev_rs::types::{BlobsBundle, ExecutionPayload};
 use reth::primitives::{
     revm_primitives::{alloy_primitives::Bloom, Address, B256},
-    BlobTransactionSidecar, Request, SealedBlock,
+    BlobTransactionSidecar, SealedBlock,
 };
 
 #[cfg(not(feature = "minimal-preset"))]
@@ -30,46 +30,27 @@ fn to_byte_vector(value: Bloom) -> ByteVector<256> {
 }
 
 pub fn to_execution_requests(
-    block: &SealedBlock,
+    payload_requests: Option<&Requests>,
     fork: Fork,
 ) -> Result<electra::ExecutionRequests, Error> {
-    let input = block.body.requests.as_ref();
     let mut requests = electra::ExecutionRequests::default();
-    if let Some(input) = input {
-        for request in &input.0 {
-            match request {
-                Request::DepositRequest(request) => {
-                    requests.deposits.push(electra::DepositRequest {
-                        public_key: TryFrom::try_from(request.pubkey.as_ref())
-                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
-                        withdrawal_credentials: TryFrom::try_from(
-                            request.withdrawal_credentials.as_ref(),
-                        )
-                        .map_err(|err: DeserializeError| {
-                            Error::Consensus(SimpleSerializeError::Deserialize(err).into())
-                        })?,
-                        amount: request.amount,
-                        signature: TryFrom::try_from(request.signature.as_ref())
-                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
-                        index: request.index,
-                    });
+    if let Some(payload_requests) = payload_requests {
+        for (index, request_data) in payload_requests.iter().enumerate() {
+            match index {
+                0 => {
+                    requests.deposits = deserialize(request_data).map_err(|err| {
+                        Error::Consensus(SimpleSerializeError::Deserialize(err).into())
+                    })?;
                 }
-                Request::WithdrawalRequest(request) => {
-                    requests.withdrawals.push(electra::WithdrawalRequest {
-                        source_address: to_bytes20(request.source_address),
-                        validator_public_key: TryFrom::try_from(request.validator_pubkey.as_ref())
-                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
-                        amount: request.amount,
-                    });
+                1 => {
+                    requests.withdrawals = deserialize(request_data).map_err(|err| {
+                        Error::Consensus(SimpleSerializeError::Deserialize(err).into())
+                    })?;
                 }
-                Request::ConsolidationRequest(request) => {
-                    requests.consolidations.push(electra::ConsolidationRequest {
-                        source_address: to_bytes20(request.source_address),
-                        source_public_key: TryFrom::try_from(request.source_pubkey.as_ref())
-                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
-                        target_public_key: TryFrom::try_from(request.target_pubkey.as_ref())
-                            .map_err(|err: crypto::BlsError| Error::Consensus(err.into()))?,
-                    });
+                2 => {
+                    requests.consolidations = deserialize(request_data).map_err(|err| {
+                        Error::Consensus(SimpleSerializeError::Deserialize(err).into())
+                    })?;
                 }
                 _ => return Err(Error::UnsupportedFork(fork)),
             }

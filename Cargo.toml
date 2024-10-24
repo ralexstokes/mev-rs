@@ -33,17 +33,16 @@ reth-basic-payload-builder = { git = "https://github.com/paradigmxyz/reth", rev 
 reth-db = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
 reth-evm = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
 reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-chain-state = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-evm-ethereum = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
+reth-errors = { git = "https://github.com/paradigmxyz/reth", rev = "8a40d5c6aabd8f232b9aaacce0ca474a480a9b64" }
 alloy = { version = "0.5.4", features = [
-    # "consensus",
-    # "eips",
+    "consensus",
+    "eips",
     "signers",
     "signer-local",
     "signer-mnemonic",
 ] }
-# TODO: use `alloy` crate with `eips` feature, should be possible in next reth release
-alloy-eips = "0.4.2"
-# TODO: use `alloy` crate with `eips` feature, should be possible in next reth release
-alloy-consensus = "0.4.2"
 
 futures = "0.3.21"
 tokio = "1.0"
